@@ -1,0 +1,7 @@
+build/
+build-win/
+out/
+*.log
+.DS_Store
+CLAUDE.md
+vid/

@@ -1,0 +1,10 @@
+# Sources are UTF-8 and the client is a Unicode application. Normalise text,
+# and keep the artwork and the map fixtures byte-exact.
+* text=auto
+
+*.png binary
+*.bmp binary
+*.ico binary
+*.bin binary
+*.pud binary
+*.manifest text eol=crlf
