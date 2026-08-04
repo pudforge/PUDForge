@@ -1,0 +1,923 @@
+// Menus, accelerators, version and manifest.
+//
+// The menu mirrors the web client's bar (PUDForgeWeb/index.html), adapted to
+// Windows convention: Undo and Redo get an Edit menu rather than toolbar
+// buttons, and Exit lives under File. Dialog templates arrive with the dialogs.
+
+#include <windows.h>
+
+#include "resource.h"
+#include "version.h"
+
+// Every string the code shows the user. Menus and dialog templates below hold
+// the rest; both localise by translating a resource script.
+#include "Strings.rc"
+
+// Common Controls v6 and per-monitor DPI, or the map is blurry and the
+// controls are drawn in the Win95 style.
+1 RT_MANIFEST "PUDForge.manifest"
+
+// The application icon: the title bar, Alt+Tab, the task bar and Explorer.
+// main.cpp has always asked for IDI_APP and nothing ever defined it, so
+// LoadIconW handed back null and the window wore the system default.
+//
+// Two sizes, because Windows picks by use rather than by scaling one: 16 for
+// the title bar and the small task-bar icon, 32 for Alt+Tab. Both are drawn by
+// hand, side by side in the 64x32 sheet at app-icon-src.png — 16 pixels
+// of pixel art is not 32 pixels of it halved. `scripts/make-icon.ps1` turns the
+// sheet into this file; see the README for why it is not a converter.
+//
+// It must be the first icon in the script: Explorer shows an executable by
+// its lowest-numbered icon resource, whatever the code asks for by name.
+IDI_APP ICON "app.ico"
+
+// The editor's own button artwork: New, Undo, the brush shapes, the mirror
+// axes — none of which Warcraft II has a drawing of. One sheet of 16x16 cells,
+// built from ui-icons.png by scripts/make-ui-icons.ps1; UiIcons.hpp
+// says which cell is which. A BMP because rc.exe understands one and the core
+// has a PNG encoder but no decoder.
+IDB_UI_ICONS BITMAP "ui-icons.bmp"
+
+// The user guide, embedded whole so the editor documents itself with no install
+// and no network. Built from docs/user_guide.md by scripts/make-help.ps1;
+// RCDATA because it is bytes rather than a type the resource compiler knows.
+IDR_USER_GUIDE RCDATA "user-guide.html"
+
+IDR_MENU MENU
+BEGIN
+  POPUP "&File"
+  BEGIN
+    MENUITEM "&New Map\tCtrl+N",           IDM_FILE_NEW
+    MENUITEM "&Generate a Map…\tCtrl+G",   IDM_FILE_GENERATE
+    MENUITEM "&Open…\tCtrl+O",             IDM_FILE_OPEN
+    MENUITEM "Open from an &Archive…",     IDM_FILE_ARCHIVE
+    MENUITEM "&Save\tCtrl+S",              IDM_FILE_SAVE
+    MENUITEM "Save &As…\tCtrl+Shift+S",    IDM_FILE_SAVE_AS
+    MENUITEM SEPARATOR
+    // Filled at runtime with the most recently opened maps. A submenu and not
+    // a run of items in line, because this list grows with use and the File
+    // menu should not. The placeholder is what shows when there are none, and
+    // is how RefreshRecentMenu finds this popup: a POPUP has no id of its own.
+    POPUP "&Recent Maps"
+    BEGIN
+      MENUITEM "Recent files",             IDM_FILE_RECENT_FIRST, GRAYED
+    END
+    MENUITEM SEPARATOR
+    MENUITEM "E&xit",                      IDM_FILE_EXIT
+  END
+  POPUP "&Edit"
+  BEGIN
+    MENUITEM "&Undo\tCtrl+Z",              IDM_EDIT_UNDO
+    MENUITEM "&Redo\tCtrl+Y",              IDM_EDIT_REDO
+    MENUITEM SEPARATOR
+    MENUITEM "Cu&t\tCtrl+X",               IDM_EDIT_CUT
+    // Copy takes terrain or units and never both, because a fragment carrying
+    // both drops both. Plain Copy asks the mode which you meant; these two are
+    // for when the mode is not the answer.
+    MENUITEM "&Copy\tCtrl+C",              IDM_EDIT_COPY
+    MENUITEM "Copy the T&errain",          IDM_EDIT_COPY_TERRAIN
+    MENUITEM "Copy the U&nits",            IDM_EDIT_COPY_UNITS
+    MENUITEM "&Paste\tCtrl+V",             IDM_EDIT_PASTE
+    POPUP "&Rotate Clipboard Contents"
+    BEGIN
+      MENUITEM "&Flip Left to Right\tCtrl+H", IDM_EDIT_PASTE_FLIP
+      MENUITEM "&Mirror Top to Bottom\tCtrl+J", IDM_EDIT_PASTE_MIRROR
+      MENUITEM "&Rotate a Quarter Turn\tCtrl+R", IDM_EDIT_PASTE_ROTATE
+    END
+    MENUITEM "Blend a Paste into Its S&urroundings", IDM_OPT_FIT_PASTE
+    MENUITEM SEPARATOR
+    MENUITEM "F&ill the Terrain Rectangle", IDM_EDIT_FILL
+    // One entry per player slot, filled at startup from pf_player_name so the
+    // colours are named once in the core rather than twice here. With units
+    // selected these hand those over; with nothing selected they set who the
+    // next unit placed is for, which is why they are never greyed.
+    POPUP "Assign to &Player"
+    BEGIN
+      MENUITEM "Player 1",                 IDM_EDIT_OWNER_FIRST
+    END
+    MENUITEM SEPARATOR
+    // The two select tools. They live on the toolbar, which is a row of
+    // pictures with no keys written on it, so this is where somebody finds out
+    // they have shortcuts at all. Ctrl+T and Ctrl+U rather than the bare T and
+    // U that switch *mode*: a mode says which half of the editor you are in,
+    // and these say what the next click does within it.
+    MENUITEM "Select &Tiles\tCtrl+T",      IDM_TOOL_TERRAIN_SELECT
+    MENUITEM "Se&lect Units\tCtrl+U",      IDM_TOOL_UNIT_SELECT
+    MENUITEM SEPARATOR
+    // Not a clipboard operation, which is why it is not beside Copy: it arms
+    // the placement tool with the selected unit's type and owner, so the next
+    // click lays another one wherever you want it rather than a fixed offset
+    // from the original.
+    MENUITEM "D&uplicate the Selected Unit\tCtrl+D", IDM_EDIT_DUPLICATE
+    MENUITEM "&Delete Selected Units\tDel", IDM_EDIT_DELETE
+  END
+  POPUP "&View"
+  BEGIN
+    POPUP "&Mode"
+    BEGIN
+      MENUITEM "&Terrain\tT",              IDM_VIEW_MODE_TERRAIN
+      MENUITEM "&Units\tU",                IDM_VIEW_MODE_UNITS
+    END
+    MENUITEM SEPARATOR
+    POPUP "&Units"
+    BEGIN
+      MENUITEM "&All",                     IDM_VIEW_UNITS_ALL
+      MENUITEM "&None",                    IDM_VIEW_UNITS_NONE
+      MENUITEM "&Ground",                  IDM_VIEW_UNITS_GROUND
+      MENUITEM "&Flying",                  IDM_VIEW_UNITS_AIR
+      MENUITEM "&Buildings",               IDM_VIEW_UNITS_BUILDINGS
+    END
+    POPUP "&Layer"
+    BEGIN
+      // "Artwork" named what you see when no overlay is on, which reads as a
+      // fourth overlay rather than as the absence of the other three.
+      MENUITEM "&None",                    IDM_VIEW_LAYER_ART
+      MENUITEM "&Movement",                IDM_VIEW_LAYER_MOVEMENT
+      MENUITEM "&Regions",                 IDM_VIEW_LAYER_REGIONS
+      MENUITEM "&Tile IDs",                IDM_VIEW_LAYER_TILES
+    END
+    MENUITEM "Tile &Grid\tG",              IDM_VIEW_GRID
+    MENUITEM "Animate the &Water",         IDM_VIEW_WATER
+    MENUITEM "Sight and Range of the s&elected unit(s)", IDM_VIEW_REACH
+    MENUITEM SEPARATOR
+    MENUITEM "&Find a Unit…\tQ",           IDM_VIEW_QUICK_PICK
+    MENUITEM "Terrain &Ring\tSpace",       IDM_VIEW_TERRAIN_RING
+    MENUITEM SEPARATOR
+    POPUP "&Zoom"
+    BEGIN
+      MENUITEM "&Fit the Map\t0",          IDM_VIEW_ZOOM_FIT
+      MENUITEM "Zoom to the &Selection",   IDM_VIEW_ZOOM_SELECTION
+      MENUITEM "Zoom &In\t+",              IDM_VIEW_ZOOM_IN
+      MENUITEM "Zoom &Out\t-",             IDM_VIEW_ZOOM_OUT
+      MENUITEM SEPARATOR
+      MENUITEM "50%",                      IDM_VIEW_ZOOM_50
+      MENUITEM "100%",                     IDM_VIEW_ZOOM_100
+      MENUITEM "200%",                     IDM_VIEW_ZOOM_200
+      MENUITEM "400%",                     IDM_VIEW_ZOOM_400
+    END
+    // One entry per playable slot, filled at startup; each scrolls to that
+    // player's start location and greys out when they have none.
+    POPUP "&Go to Start"
+    BEGIN
+      MENUITEM "Player 1",                 IDM_VIEW_GOTO_START_FIRST
+    END
+    MENUITEM SEPARATOR
+    MENUITEM "&Toolbar",                   IDM_VIEW_TOOLBAR
+    MENUITEM "Tool &Panels",               IDM_VIEW_TOOLBARS
+    MENUITEM "&Status Bar",                IDM_VIEW_STATUSBAR
+    MENUITEM "Mi&nimap",                   IDM_VIEW_MINIMAP
+  END
+  // Two halves, and the separator is the whole point of the order. Above it,
+  // the six tabs of the map window, in the order the tabs themselves are in —
+  // every one of these opens the same window on its own page, so listing them
+  // apart from each other said they were six different places to go. Below it,
+  // the three things that edit the whole map on the spot and put up no window
+  // at all. Resizing is not here: it is part of what the Map tab now is.
+  POPUP "&Map"
+  BEGIN
+    // Ctrl+Shift and the page's own mnemonic letter, so the shortcut is the
+    // letter already underlined in the item rather than a position in a list
+    // that changes the moment a page is added.
+    MENUITEM "Map &Properties…\tCtrl+Shift+P",     IDM_MAP_PROPERTIES
+    MENUITEM "Pla&yer Properties…\tCtrl+Shift+Y",  IDM_MAP_PLAYERS
+    MENUITEM "&Unit Properties…\tCtrl+Shift+U",    IDM_MAP_UNIT_DATA
+    MENUITEM "Up&grade Properties…\tCtrl+Shift+G", IDM_MAP_UPGRADES
+    MENUITEM "Restrictio&ns…\tCtrl+Shift+N",       IDM_MAP_RESTRICTIONS
+    MENUITEM "Map Stat&istics…\tCtrl+Shift+I",     IDM_MAP_STATS
+    MENUITEM SEPARATOR
+    MENUITEM "Place &Start Locations",     IDM_MAP_PLACE_STARTS
+    MENUITEM "Randomize &Light and Dark",  IDM_MAP_RANDOM_SHADES
+    MENUITEM "&Check Map",                 IDM_MAP_VALIDATE
+  END
+  // Every unit the editor will place, by race and kind, filled at startup from
+  // the same rule that groups the units dock — so a menu and a palette cannot
+  // come to disagree about which submenu a Dragon is in. This is PUDDraft's
+  // Units menu, and it replaces the Add-a-unit box, which asked for a type by
+  // name and a tile by number: naming the type is what a menu is for, and the
+  // tile is what the pointer is for.
+  POPUP "&Units"
+  BEGIN
+    MENUITEM "Human Land",                 IDM_UNITS_FIRST
+  END
+  POPUP "&Select"
+  BEGIN
+    MENUITEM "&All Units\tCtrl+A",         IDM_SELECT_ALL
+    MENUITEM "&None\tEsc",                 IDM_SELECT_NONE
+    MENUITEM "&Invert Selection",          IDM_SELECT_INVERT
+    MENUITEM SEPARATOR
+    MENUITEM "Same &Type as Selection",    IDM_SELECT_SAME_TYPE
+    MENUITEM "Same &Player as Selection",  IDM_SELECT_SAME_OWNER
+    MENUITEM SEPARATOR
+    POPUP "By &Kind"
+    BEGIN
+      // One entry per pf_unit_group, in the core's order.
+      MENUITEM "Buildings",                IDM_SELECT_KIND_FIRST
+      MENUITEM "Land Units",               IDM_SELECT_KIND_FIRST + 1
+      MENUITEM "Flying Units",             IDM_SELECT_KIND_FIRST + 2
+      MENUITEM "Naval Units",              IDM_SELECT_KIND_FIRST + 3
+      MENUITEM "Critters",                 IDM_SELECT_KIND_FIRST + 4
+      MENUITEM "Heroes",                   IDM_SELECT_KIND_FIRST + 5
+      MENUITEM "Gold Mines and Oil Patches", IDM_SELECT_KIND_FIRST + 6
+      MENUITEM "Start Locations",          IDM_SELECT_KIND_FIRST + 7
+      MENUITEM "Spellcasters",             IDM_SELECT_KIND_FIRST + 8
+      MENUITEM "Towers",                   IDM_SELECT_KIND_FIRST + 9
+    END
+    POPUP "By P&layer"
+    BEGIN
+      MENUITEM "Player 1",                 IDM_SELECT_OWNER_FIRST
+    END
+  END
+  // What is left after three moves out of here. Replacing and decorating
+  // terrain are buttons on the terrain dock, beside the brushes that do the
+  // same job a tile at a time. Switching a player's race happens when their
+  // race is changed on the player page, which is the only place anybody was
+  // ever going to look for it. Importing and exporting a section are buttons
+  // on the page that shows that section, because a .un file is the Units
+  // page's business and nothing else's.
+  POPUP "&Tools"
+  BEGIN
+    MENUITEM "&Convert Units…",            IDM_TOOLS_CONVERT
+    // Tile Movement Data (IDM_TOOLS_MOVEMENT) is off the menu for now. The
+    // dialog, its command and IDD_MOVEMENT are all still here and still work:
+    // painting keeps `SQM ` in step by itself, so the tool only has something
+    // to say about maps another editor has been through, and that is not worth
+    // a permanent line in the menu. Putting this one item back is how it
+    // returns — nothing else has to be rebuilt.
+    MENUITEM "AI &Scripts…",               IDM_TOOLS_AI_SCRIPTS
+    MENUITEM SEPARATOR
+    MENUITEM "&Export to a PNG…",          IDM_TOOLS_EXPORT_PNG
+    MENUITEM SEPARATOR
+    MENUITEM "&Log…\tCtrl+L",              IDM_TOOLS_LOG
+    MENUITEM "Select Warcraft II &Data…",  IDM_TOOLS_GAME_FOLDER
+    MENUITEM "&Options…",                  IDM_TOOLS_OPTIONS
+  END
+  POPUP "&Help"
+  BEGIN
+    // F1, which the shortcut list used to answer: the guide holds the keyboard
+    // reference now, so the key that meant "what can I press" still does.
+    MENUITEM "&User Guide\tF1",            IDM_HELP_GUIDE
+    MENUITEM SEPARATOR
+    MENUITEM "&About PUDForge…",           IDM_HELP_ABOUT
+  END
+END
+
+IDR_ACCELERATORS ACCELERATORS
+BEGIN
+  "N",      IDM_FILE_NEW,          VIRTKEY, CONTROL
+  "G",      IDM_FILE_GENERATE,     VIRTKEY, CONTROL
+  "O",      IDM_FILE_OPEN,         VIRTKEY, CONTROL
+  "S",      IDM_FILE_SAVE,         VIRTKEY, CONTROL
+  "S",      IDM_FILE_SAVE_AS,      VIRTKEY, CONTROL, SHIFT
+  "Z",      IDM_EDIT_UNDO,         VIRTKEY, CONTROL
+  "Y",      IDM_EDIT_REDO,         VIRTKEY, CONTROL
+  "Z",      IDM_EDIT_REDO,         VIRTKEY, CONTROL, SHIFT
+  "X",      IDM_EDIT_CUT,          VIRTKEY, CONTROL
+  "C",      IDM_EDIT_COPY,         VIRTKEY, CONTROL
+  "V",      IDM_EDIT_PASTE,        VIRTKEY, CONTROL
+  "H",      IDM_EDIT_PASTE_FLIP,   VIRTKEY, CONTROL
+  "J",      IDM_EDIT_PASTE_MIRROR, VIRTKEY, CONTROL
+  "R",      IDM_EDIT_PASTE_ROTATE, VIRTKEY, CONTROL
+  "D",      IDM_EDIT_DUPLICATE,    VIRTKEY, CONTROL
+  "T",      IDM_TOOL_TERRAIN_SELECT, VIRTKEY, CONTROL
+  "U",      IDM_TOOL_UNIT_SELECT,  VIRTKEY, CONTROL
+  "A",      IDM_SELECT_ALL,        VIRTKEY, CONTROL
+  VK_DELETE, IDM_EDIT_DELETE,      VIRTKEY
+  VK_ESCAPE, IDM_SELECT_NONE,      VIRTKEY
+  // Enter on the selected unit, the way Explorer and every list open a row.
+  VK_RETURN, IDM_CONTEXT_INSPECT,  VIRTKEY
+  "0",      IDM_VIEW_ZOOM_FIT,     VIRTKEY
+  VK_OEM_PLUS,  IDM_VIEW_ZOOM_IN,  VIRTKEY
+  VK_OEM_MINUS, IDM_VIEW_ZOOM_OUT, VIRTKEY
+  VK_ADD,       IDM_VIEW_ZOOM_IN,  VIRTKEY
+  VK_SUBTRACT,  IDM_VIEW_ZOOM_OUT, VIRTKEY
+  "T",      IDM_VIEW_MODE_TERRAIN, VIRTKEY
+  "U",      IDM_VIEW_MODE_UNITS,   VIRTKEY
+  // The two pickers that open at the pointer. Space is held for the ring, so
+  // it repeats while down; the ring's own loop is what reads that.
+  "Q",      IDM_VIEW_QUICK_PICK,   VIRTKEY
+  VK_SPACE, IDM_VIEW_TERRAIN_RING, VIRTKEY
+  // The brush-size ladder, where every painting program puts it.
+  VK_OEM_4, IDM_EDIT_BRUSH_SMALLER, VIRTKEY
+  VK_OEM_6, IDM_EDIT_BRUSH_BIGGER,  VIRTKEY
+  VK_F1,    IDM_HELP_GUIDE,        VIRTKEY
+  "I",      IDM_MAP_STATS,         VIRTKEY, CONTROL
+  "E",      IDM_VIEW_ZOOM_SELECTION, VIRTKEY, CONTROL
+  "L",      IDM_TOOLS_LOG,         VIRTKEY, CONTROL
+  "G",      IDM_VIEW_GRID,         VIRTKEY
+  // The six pages of the map window, each on its own mnemonic letter rather
+  // than on a position in a list. Ctrl+Shift rather than Ctrl, because half of
+  // these letters are already spoken for on their own and Ctrl+U or Ctrl+P
+  // mean other things everywhere else in Windows.
+  "P",      IDM_MAP_PROPERTIES,    VIRTKEY, CONTROL, SHIFT
+  "Y",      IDM_MAP_PLAYERS,       VIRTKEY, CONTROL, SHIFT
+  "U",      IDM_MAP_UNIT_DATA,     VIRTKEY, CONTROL, SHIFT
+  "G",      IDM_MAP_UPGRADES,      VIRTKEY, CONTROL, SHIFT
+  "N",      IDM_MAP_RESTRICTIONS,  VIRTKEY, CONTROL, SHIFT
+  "I",      IDM_MAP_STATS,         VIRTKEY, CONTROL, SHIFT
+  // The eight playable slots, where the hand already is. 0 is taken by zoom
+  // to fit, so 9 and 10 stay menu-only.
+  "1",      IDM_EDIT_OWNER_FIRST,     VIRTKEY
+  "2",      IDM_EDIT_OWNER_FIRST + 1, VIRTKEY
+  "3",      IDM_EDIT_OWNER_FIRST + 2, VIRTKEY
+  "4",      IDM_EDIT_OWNER_FIRST + 3, VIRTKEY
+  "5",      IDM_EDIT_OWNER_FIRST + 4, VIRTKEY
+  "6",      IDM_EDIT_OWNER_FIRST + 5, VIRTKEY
+  "7",      IDM_EDIT_OWNER_FIRST + 6, VIRTKEY
+  "8",      IDM_EDIT_OWNER_FIRST + 7, VIRTKEY
+END
+
+/* ------------------------------------------------------------------ dialogs
+ *
+ * Laid out in dialog units so they scale with the system font and DPI, which
+ * is the whole reason to use .rc templates rather than positioning children by
+ * hand. Both are modal and both edit the map through the same C ABI the canvas
+ * uses, so an edit made here is undoable like any other.
+ */
+
+/*
+ * The six sheets that are *about the map* are pages of one window rather than
+ * six windows: they are all the same question asked of different sections, and
+ * a mapper setting a map up wants to go from the players to their restrictions
+ * without closing anything. So each is a child template — WS_CHILD, no caption
+ * and no buttons — and IDD_MAP_SHEETS below owns the tabs, the frame and the
+ * one OK that commits all of them.
+ *
+ * DS_CONTROL is what makes tab and the arrow keys walk out of a page and into
+ * the tab strip instead of stopping at the page's edge.
+ */
+/*
+ * Map properties, which is also where the map is resized: the page already
+ * had to say how big the map is, and "how big is it" and "make it that size
+ * instead" are one thought. The nine anchor buttons are one auto-radio group
+ * in reading order, so the arrow keys walk them the way the grid looks.
+ *
+ * The group has room below the anchors for two lines of prose because both
+ * get used: what the chosen size would do, and — on a map that keeps triggers
+ * in OILM — that resizing will break them.
+ */
+IDD_MAP_PROPERTIES DIALOGEX 0, 0, 420, 268
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+  LTEXT           "&Map description:", -1, 8, 8, 244, 8
+  EDITTEXT        IDC_MAP_DESCRIPTION, 8, 20, 244, 14, ES_AUTOHSCROLL
+  LTEXT           "", IDC_MAP_DESC_LEFT, 8, 38, 244, 8
+  LTEXT           "&Tileset:", -1, 8, 56, 40, 8
+  COMBOBOX        IDC_MAP_TILESET, 52, 54, 100, 80, CBS_DROPDOWNLIST | WS_TABSTOP | WS_VSCROLL
+
+  GROUPBOX        "Size", -1, 8, 102, 404, 116
+  LTEXT           "", IDC_MAP_SIZE, 16, 118, 260, 8
+  LTEXT           "&New size:", -1, 16, 136, 44, 8
+  COMBOBOX        IDC_RESIZE_SIZE, 64, 134, 80, 80, CBS_DROPDOWNLIST | WS_TABSTOP | WS_VSCROLL
+  LTEXT           "Keep the map:", -1, 152, 136, 58, 8
+  CONTROL "", IDC_RESIZE_ANCHOR,     "BUTTON", BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP, 214, 134, 12, 12
+  CONTROL "", IDC_RESIZE_ANCHOR + 1, "BUTTON", BS_AUTORADIOBUTTON, 230, 134, 12, 12
+  CONTROL "", IDC_RESIZE_ANCHOR + 2, "BUTTON", BS_AUTORADIOBUTTON, 246, 134, 12, 12
+  CONTROL "", IDC_RESIZE_ANCHOR + 3, "BUTTON", BS_AUTORADIOBUTTON, 214, 150, 12, 12
+  CONTROL "", IDC_RESIZE_ANCHOR + 4, "BUTTON", BS_AUTORADIOBUTTON, 230, 150, 12, 12
+  CONTROL "", IDC_RESIZE_ANCHOR + 5, "BUTTON", BS_AUTORADIOBUTTON, 246, 150, 12, 12
+  CONTROL "", IDC_RESIZE_ANCHOR + 6, "BUTTON", BS_AUTORADIOBUTTON, 214, 166, 12, 12
+  CONTROL "", IDC_RESIZE_ANCHOR + 7, "BUTTON", BS_AUTORADIOBUTTON, 230, 166, 12, 12
+  CONTROL "", IDC_RESIZE_ANCHOR + 8, "BUTTON", BS_AUTORADIOBUTTON, 246, 166, 12, 12
+  LTEXT           "", IDC_RESIZE_NOTE, 16, 156, 190, 24
+  LTEXT           "", IDC_RESIZE_WARNING, 16, 186, 388, 24
+END
+
+// Master and detail. The list on the left never moves and never scrolls
+// sideways; the form on the right shows everything about whichever slot is
+// picked. A placeholder holds the form's rectangle so the layout stays here
+// with the rest of the sheet's rather than becoming arithmetic in the code.
+IDD_PLAYERS DIALOGEX 0, 0, 420, 268
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+  LISTBOX         IDC_PLAYER_LIST, 8, 8, 130, 240,
+                  LBS_OWNERDRAWFIXED | LBS_HASSTRINGS | LBS_NOTIFY |
+                  WS_TABSTOP | WS_VSCROLL | WS_BORDER
+  LTEXT           "", IDC_PLAYER_NOTE, 8, 252, 130, 8
+  // The form fills this, AI script row and all. The button that opens the
+  // game's own AI listing used to sit here at the foot of the page, a long way
+  // from the dropdown it explains; it is that row's companion button now, so
+  // it is not in this template at all.
+  LTEXT           "", IDC_PLAYER_FORM_SLOT, 146, 8, 266, 240
+END
+
+/*
+ * The tile picker. IDC_TILES_GRID is a placeholder, not a control anybody
+ * talks to: a PaletteGrid is a registered class of ours and cannot appear in a
+ * template, so the dialog hides the placeholder and puts the grid in its
+ * rectangle. Keeping the rectangle here means the geometry is still described
+ * in one place with the rest of the layout.
+ */
+IDD_TILE_PICKER DIALOGEX 0, 0, 300, 240
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Select a Tile"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+  LTEXT           "", IDC_TILES_GRID, 8, 8, 284, 186
+  LTEXT           "", IDC_TILES_NOTE, 8, 200, 284, 16
+  DEFPUSHBUTTON   "OK", IDOK, 188, 218, 50, 14
+  PUSHBUTTON      "Cancel", IDCANCEL, 242, 218, 50, 14
+END
+
+/*
+ * Unit properties. The three value editors sit in one rectangle and the
+ * field's kind decides which is visible: a number, a choice, or a
+ * multi-selection listbox where selected means the bit is set.
+ */
+IDD_UNIT_DATA DIALOGEX 0, 0, 420, 268
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+  AUTOCHECKBOX    "&Use the game default unit table", IDC_UDTA_DEFAULTS,
+                  8, 8, 150, 10
+  PUSHBUTTON      "Import…", IDC_UDTA_IMPORT, 300, 6, 54, 14
+  PUSHBUTTON      "Export…", IDC_UDTA_EXPORT, 358, 6, 54, 14
+  LISTBOX         IDC_UDTA_UNITS, 8, 24, 140, 224,
+                  LBS_OWNERDRAWFIXED | LBS_HASSTRINGS | LBS_NOTIFY |
+                  WS_TABSTOP | WS_VSCROLL | WS_BORDER
+  LTEXT           "", IDC_UDTA_SUBJECT, 156, 26, 256, 9
+  LTEXT           "", IDC_UDTA_FORM_SLOT, 156, 38, 256, 210
+  LTEXT           "Edited units indicated by blue star. Right-click to reset to defaults.",
+                  IDC_UDTA_NOTE, 8, 252, 340, 8
+END
+
+/* IDD_BITS is gone. A flags field showed a hex number on a button that opened
+ * this dialog to tick its bits in — two windows and a number nobody reads to
+ * answer a question a tick answers. The named bits are ticks on the unit page
+ * itself now, two to a line, under the numbered fields. */
+
+/*
+ * Upgrade properties. The same shape as the unit sheet with one value editor
+ * instead of three: every UGRD field is a plain number.
+ */
+IDD_UPGRADES DIALOGEX 0, 0, 420, 268
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+  AUTOCHECKBOX    "&Use the game default upgrade table", IDC_UGRD_DEFAULTS,
+                  8, 8, 160, 10
+  PUSHBUTTON      "Import…", IDC_UGRD_IMPORT, 300, 6, 54, 14
+  PUSHBUTTON      "Export…", IDC_UGRD_EXPORT, 358, 6, 54, 14
+  // Wider than the unit list because the names are longer: these come from the
+  // game's own table, where an upgrade is a three-line button caption flattened
+  // to one — "Upgrade Human Shield Strength 1". At the unit page's 140 the two
+  // strengths of a shield both clipped to the same "…Strengt…", which is a list
+  // you cannot read. The form gives up the width; it had it spare.
+  LISTBOX         IDC_UGRD_LIST, 8, 24, 196, 224,
+                  LBS_OWNERDRAWFIXED | LBS_HASSTRINGS | LBS_NOTIFY |
+                  WS_TABSTOP | WS_VSCROLL | WS_BORDER
+  LTEXT           "", IDC_UGRD_SUBJECT, 212, 26, 200, 9
+  LTEXT           "", IDC_UGRD_FORM_SLOT, 212, 38, 200, 210
+  LTEXT           "Edited upgrades indicated by blue star. Right-click to reset to defaults.",
+                  IDC_UGRD_NOTE, 8, 252, 340, 8
+END
+
+/*
+ * Restrictions. One block and one player at a time, and 32 rows where a
+ * selected row means the thing is allowed.
+ *
+ * A map need not carry an `ALOW` section, and most do not. The page used to
+ * grey every control on itself and say so, which left a tab whose whole
+ * content was an explanation that it did nothing. It shows what the game will
+ * actually read instead — everything allowed, which is exactly how a map with
+ * no section behaves — and the first tick changed is what creates the section,
+ * seeded from that same all-allowed state so the map plays the same until the
+ * tick lands.
+ *
+ * Nothing on the page says which of the two the map is in. Whether an `ALOW`
+ * section exists is a fact about the file, and somebody who opened this tab
+ * asked what a player is allowed to build.
+ */
+IDD_RESTRICTIONS DIALOGEX 0, 0, 420, 268
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+  AUTOCHECKBOX    "&Use the game default restrictions", IDC_ALOW_DEFAULTS,
+                  8, 8, 160, 10
+  PUSHBUTTON      "Import…", IDC_ALOW_IMPORT, 300, 6, 54, 14
+  PUSHBUTTON      "Export…", IDC_ALOW_EXPORT, 358, 6, 54, 14
+  LTEXT           "&What:", -1, 8, 28, 30, 8
+  COMBOBOX        IDC_ALOW_BLOCK, 42, 26, 110, 120, CBS_DROPDOWNLIST | WS_TABSTOP | WS_VSCROLL
+  LTEXT           "", IDC_ALOW_MEANING, 158, 28, 150, 8
+  LISTBOX         IDC_ALOW_PLAYER, 8, 46, 130, 186,
+                  LBS_OWNERDRAWFIXED | LBS_HASSTRINGS | LBS_NOTIFY |
+                  WS_TABSTOP | WS_VSCROLL | WS_BORDER
+  LTEXT           "", IDC_ALOW_SUBJECT, 146, 48, 266, 9
+  LTEXT           "", IDC_ALOW_FORM_SLOT, 146, 60, 266, 172
+  LTEXT           "", IDC_ALOW_NOTE, 8, 238, 130, 8
+  PUSHBUTTON      "Allow &all", IDC_ALOW_ALL, 146, 236, 56, 14
+  PUSHBUTTON      "Allow &none", IDC_ALOW_NONE, 206, 236, 56, 14
+END
+
+/*
+ * Generate. Every control redraws the preview, because the numbers mean very
+ * little written down and a great deal shown.
+ */
+IDD_GENERATE DIALOGEX 0, 0, 380, 312
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Generate a Map"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+  LTEXT           "&Size:", -1, 8, 12, 34, 8
+  COMBOBOX        IDC_GEN_SIZE, 46, 10, 74, 80, CBS_DROPDOWNLIST | WS_TABSTOP | WS_VSCROLL
+  LTEXT           "&Tileset:", -1, 8, 30, 34, 8
+  COMBOBOX        IDC_GEN_TILESET, 46, 28, 74, 80, CBS_DROPDOWNLIST | WS_TABSTOP | WS_VSCROLL
+
+  LTEXT           "&Water", -1, 8, 52, 40, 8
+  CONTROL "", IDC_GEN_WATER, "msctls_trackbar32", TBS_HORZ | TBS_NOTICKS | WS_TABSTOP, 46, 50, 100, 16
+  LTEXT           "", IDC_GEN_WATER_VALUE, 150, 52, 70, 8
+  LTEXT           "&Coast", -1, 8, 70, 40, 8
+  CONTROL "", IDC_GEN_COAST, "msctls_trackbar32", TBS_HORZ | TBS_NOTICKS | WS_TABSTOP, 46, 68, 100, 16
+  LTEXT           "", IDC_GEN_COAST_VALUE, 150, 70, 70, 8
+  LTEXT           "&Forest", -1, 8, 88, 40, 8
+  CONTROL "", IDC_GEN_FOREST, "msctls_trackbar32", TBS_HORZ | TBS_NOTICKS | WS_TABSTOP, 46, 86, 100, 16
+  LTEXT           "", IDC_GEN_FOREST_VALUE, 150, 88, 70, 8
+  LTEXT           "&Rock", -1, 8, 106, 40, 8
+  CONTROL "", IDC_GEN_ROCK, "msctls_trackbar32", TBS_HORZ | TBS_NOTICKS | WS_TABSTOP, 46, 104, 100, 16
+  LTEXT           "", IDC_GEN_ROCK_VALUE, 150, 106, 70, 8
+
+  // The three octaves the shape is layered from, broadest first. Scale is
+  // features per tile, so left is a broader shape and right a busier one.
+  LTEXT           "&Landmass", -1, 8, 130, 40, 8
+  CONTROL "", IDC_GEN_LAND, "msctls_trackbar32", TBS_HORZ | TBS_NOTICKS | WS_TABSTOP, 46, 128, 100, 16
+  LTEXT           "", IDC_GEN_LAND_VALUE, 150, 130, 70, 8
+  LTEXT           "Coast&line", -1, 8, 148, 40, 8
+  CONTROL "", IDC_GEN_COASTLINE, "msctls_trackbar32", TBS_HORZ | TBS_NOTICKS | WS_TABSTOP, 46, 146, 100, 16
+  LTEXT           "", IDC_GEN_COASTLINE_VALUE, 150, 148, 70, 8
+  LTEXT           "Detai&l", -1, 8, 166, 40, 8
+  CONTROL "", IDC_GEN_DETAIL, "msctls_trackbar32", TBS_HORZ | TBS_NOTICKS | WS_TABSTOP, 46, 164, 100, 16
+  LTEXT           "", IDC_GEN_DETAIL_VALUE, 150, 166, 70, 8
+
+  LTEXT           "&Bases:", -1, 8, 192, 36, 8
+  EDITTEXT        IDC_GEN_CLEARINGS, 46, 190, 30, 14, ES_AUTOHSCROLL | ES_NUMBER
+  LTEXT           "clear for", -1, 82, 192, 34, 8
+  EDITTEXT        IDC_GEN_RADIUS, 118, 190, 30, 14, ES_AUTOHSCROLL | ES_NUMBER
+  LTEXT           "tiles around", -1, 154, 192, 66, 8
+
+  LTEXT           "See&d:", -1, 8, 212, 36, 8
+  EDITTEXT        IDC_GEN_SEED, 46, 210, 60, 14, ES_AUTOHSCROLL | ES_NUMBER
+  PUSHBUTTON      "A&nother", IDC_GEN_ANOTHER, 112, 210, 50, 14
+
+  AUTOCHECKBOX    "Place gold &mines", IDC_GEN_MINES, 8, 234, 100, 10
+  AUTOCHECKBOX    "Place start &locations", IDC_GEN_STARTS, 8, 248, 110, 10
+
+  CONTROL "", IDC_GEN_PREVIEW, "STATIC", SS_OWNERDRAW | WS_BORDER, 240, 10, 132, 132
+  LTEXT           "", IDC_GEN_NOTE, 240, 150, 132, 40
+
+  // Bottom left, away from Create: it throws the whole sheet away and rolls it
+  // again, which is the one button here nobody wants to press by aiming at OK.
+  PUSHBUTTON      "&Randomize", IDC_GEN_RANDOMIZE, 8, 290, 60, 14
+  DEFPUSHBUTTON   "Create", IDOK, 264, 290, 50, 14
+  PUSHBUTTON      "Cancel", IDCANCEL, 318, 290, 50, 14
+END
+
+/*
+ * Find a unit by typing. A window of its own, opened at the pointer, rather
+ * than a filter over the palette: the palette is where you go to browse, and
+ * a box that appears under your hand, takes a few letters and disappears is a
+ * different act. No caption and no border chrome, because it is dismissed by
+ * looking away rather than by a close button.
+ *
+ * Sized in dialog units like every other sheet; positioned in pixels at the
+ * pointer, in code.
+ */
+// Wider and taller than it was, because its rows are: the icons are drawn at
+// twice the height the property sheets' lists use, which is a portrait at its
+// own 38 pixels rather than downscaled to a thumbnail you have to lean into.
+// The extra width is for the group name that follows each unit's, which the
+// bigger icon would otherwise push off the end.
+IDD_QUICK_PICK DIALOGEX 0, 0, 240, 260
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_SETFOREGROUND | WS_POPUP | WS_BORDER
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+  EDITTEXT        IDC_QUICK_SEARCH, 4, 4, 232, 14, ES_AUTOHSCROLL
+  LISTBOX         IDC_QUICK_LIST, 4, 22, 232, 234,
+                  LBS_NOTIFY | LBS_OWNERDRAWFIXED | LBS_HASSTRINGS | WS_VSCROLL
+  // A default button with nothing to press. Enter in a dialog goes to the
+  // default push button, and a box with no buttons at all therefore swallowed
+  // it — which is the one key this box most needs. Hidden and sized to
+  // nothing, it exists only to give Enter somewhere to land.
+  DEFPUSHBUTTON   "", IDOK, 240, 260, 4, 4
+END
+
+/*
+ * The bulk edits — PUDDraft's whole-map tools, and the web client's Tools
+ * menu. All four share a shape: pick two things, read what it would do, press
+ * the verb. Each says how much it is about to touch before it touches it,
+ * because none of them is a small change and all of them are one undo step.
+ */
+IDD_REPLACE_TERRAIN DIALOGEX 0, 0, 230, 96
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Replace Terrain"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+  LTEXT           "&Replace every", -1, 8, 12, 60, 8
+  COMBOBOX        IDC_REPLACE_FROM, 72, 10, 150, 200, CBS_DROPDOWNLIST | CBS_OWNERDRAWFIXED | CBS_HASSTRINGS | WS_TABSTOP | WS_VSCROLL
+  LTEXT           "&with", -1, 8, 32, 60, 8
+  COMBOBOX        IDC_REPLACE_TO, 72, 30, 150, 200, CBS_DROPDOWNLIST | CBS_OWNERDRAWFIXED | CBS_HASSTRINGS | WS_TABSTOP | WS_VSCROLL
+  LTEXT           "", IDC_REPLACE_NOTE, 8, 52, 214, 20
+  DEFPUSHBUTTON   "Replace", IDOK, 118, 76, 50, 14
+  PUSHBUTTON      "Cancel", IDCANCEL, 172, 76, 50, 14
+END
+
+IDD_DECORATE DIALOGEX 0, 0, 230, 100
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Decorate with a Terrain"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+  LTEXT           "&Scatter", -1, 8, 12, 40, 8
+  COMBOBOX        IDC_DECORATE_TERRAIN, 52, 10, 170, 200, CBS_DROPDOWNLIST | CBS_OWNERDRAWFIXED | CBS_HASSTRINGS | WS_TABSTOP | WS_VSCROLL
+  LTEXT           "&Density", -1, 8, 34, 40, 8
+  CONTROL         "", IDC_DECORATE_DENSITY, "msctls_trackbar32", TBS_HORZ | TBS_NOTICKS | WS_TABSTOP, 52, 30, 148, 16
+  LTEXT           "", IDC_DECORATE_VALUE, 204, 34, 24, 8
+  LTEXT           "", IDC_DECORATE_NOTE, 8, 54, 214, 20
+  DEFPUSHBUTTON   "Decorate", IDOK, 118, 80, 50, 14
+  PUSHBUTTON      "Cancel", IDCANCEL, 172, 80, 50, 14
+END
+
+IDD_CONVERT_UNITS DIALOGEX 0, 0, 230, 96
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Convert Units"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+  LTEXT           "&Turn every", -1, 8, 12, 60, 8
+  COMBOBOX        IDC_CONVERT_FROM, 72, 10, 150, 240, CBS_DROPDOWNLIST | CBS_OWNERDRAWFIXED | CBS_HASSTRINGS | WS_TABSTOP | WS_VSCROLL
+  LTEXT           "&into", -1, 8, 32, 60, 8
+  COMBOBOX        IDC_CONVERT_TO, 72, 30, 150, 240, CBS_DROPDOWNLIST | CBS_OWNERDRAWFIXED | CBS_HASSTRINGS | WS_TABSTOP | WS_VSCROLL
+  LTEXT           "", IDC_CONVERT_NOTE, 8, 52, 214, 20
+  DEFPUSHBUTTON   "Convert", IDOK, 118, 76, 50, 14
+  PUSHBUTTON      "Cancel", IDCANCEL, 172, 76, 50, 14
+END
+
+/* IDD_SWITCH_RACE is gone. Swapping a player's units to the other race is
+ * what changing their race on the player page now does, which is the only
+ * place anybody was ever going to look for it — a dialog under Tools asking
+ * the same question a page already asks was two ways to say one thing, and
+ * the two could disagree about `SIDE`. */
+
+/*
+ * What the map is made of. Read-only, and a list rather than a table because
+ * every row is a name and a number and nothing needs aligning across sections.
+ */
+IDD_MAP_STATS DIALOGEX 0, 0, 420, 268
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+  LISTBOX         IDC_STATS_LIST, 8, 8, 404, 252, LBS_NOSEL | LBS_USETABSTOPS | WS_BORDER | WS_VSCROLL | WS_TABSTOP
+END
+
+/*
+ * The window the six of them live in. The tab control fills it and the pages
+ * sit in its display rectangle; the size is the largest page plus the strip
+ * and the button row, which is why every page template above is the same
+ * 420x268 — a tabbed window that resizes itself as you change tabs is a
+ * window whose OK button moves out from under the pointer.
+ */
+IDD_MAP_SHEETS DIALOGEX 0, 0, 440, 320
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Map"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+  CONTROL         "", IDC_SHEET_TABS, "SysTabControl32", TCS_TABS | WS_TABSTOP,
+                  6, 6, 428, 288
+  DEFPUSHBUTTON   "OK", IDOK, 328, 300, 50, 14
+  PUSHBUTTON      "Cancel", IDCANCEL, 382, 300, 50, 14
+END
+
+IDD_EXPORT_PNG DIALOGEX 0, 0, 210, 120
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Export the Map to a PNG"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+  AUTOCHECKBOX    "&Units", IDC_PNG_UNITS, 8, 10, 100, 10
+  AUTOCHECKBOX    "Tile &grid", IDC_PNG_GRID, 8, 24, 100, 10
+  AUTOCHECKBOX    "Only the terrain &rectangle", IDC_PNG_SELECTION, 8, 38, 150, 10
+  LTEXT           "&Scale", -1, 8, 56, 30, 8
+  COMBOBOX        IDC_PNG_SCALE, 42, 54, 80, 100, CBS_DROPDOWNLIST | WS_TABSTOP
+  LTEXT           "", IDC_PNG_NOTE, 8, 74, 194, 20
+  DEFPUSHBUTTON   "Export…", IDOK, 98, 100, 50, 14
+  PUSHBUTTON      "Cancel", IDCANCEL, 152, 100, 50, 14
+END
+
+/*
+ * Options. These were checkable items in the Tools menu — where PUDDraft kept
+ * them — and they outgrew it: a menu shows one at a time and says nothing
+ * about which belong together.
+ */
+IDD_OPTIONS DIALOGEX 0, 0, 250, 240
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Options"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+  GROUPBOX        "Terrain", -1, 8, 6, 234, 62
+  AUTOCHECKBOX    "&Adjust surrounding terrain when editing", IDC_OPT_FIT_EDGES, 16, 20, 218, 10
+  AUTOCHECKBOX    "Adjust edges when &pasting", IDC_OPT_FIT_PASTE, 16, 34, 218, 10
+  AUTOCHECKBOX    "&Keep units the terrain no longer supports", IDC_OPT_KEEP_STRANDED, 16, 48, 218, 10
+
+  GROUPBOX        "Unit placement", -1, 8, 74, 234, 76
+  AUTOCHECKBOX    "Allow placing units at &illegal positions", IDC_OPT_ILLEGAL, 16, 88, 218, 10
+  AUTOCHECKBOX    "Allow units on top of each &other", IDC_OPT_STACKED, 16, 102, 218, 10
+  AUTOCHECKBOX    "Allow units on the map &edge", IDC_OPT_EDGE, 16, 116, 218, 10
+  AUTOCHECKBOX    "&Mark special units", IDC_OPT_MARK_SPECIAL, 16, 130, 218, 10
+
+  GROUPBOX        "Unit display", -1, 8, 156, 234, 58
+  LTEXT           "&Unit artwork", -1, 16, 170, 50, 8
+  COMBOBOX        IDC_OPT_UNIT_ART, 70, 168, 80, 60, CBS_DROPDOWNLIST | WS_TABSTOP
+  AUTOCHECKBOX    "&Vary rotation", IDC_OPT_FACING, 158, 170, 76, 10
+  // Off unless asked for, and it needs the game to hand: the clips are read
+  // out of the archives the user already owns, like every other byte of
+  // artwork. Nothing in the editor depends on one having been heard.
+  AUTOCHECKBOX    "Play unit sounds &sounds", IDC_OPT_SOUNDS, 16, 184, 218, 10
+  // Off by default. With it off the palette follows the chosen player and
+  // handing a unit to the other race converts it; see Editor::show_all_races.
+  AUTOCHECKBOX    "Unit Toolbar: Show units from &all races", IDC_OPT_ALL_RACES, 16, 198, 218, 10
+
+  // Away from OK and Cancel, on the other side of the row: it is the one
+  // button on this page that discards something.
+  PUSHBUTTON      "&Reset Everything…", IDC_OPT_RESET, 8, 220, 80, 14
+  DEFPUSHBUTTON   "OK", IDOK, 138, 220, 50, 14
+  PUSHBUTTON      "Cancel", IDCANCEL, 192, 220, 50, 14
+END
+
+/*
+ * First run: the welcome, and which copy of Warcraft II to read the artwork
+ * out of.
+ *
+ * A list rather than a folder picker on its own, because the two products carry
+ * different drawings of the same units and a machine can have both — so this is
+ * a choice, not a search. The picker is still here for a copy nowhere near
+ * where an installer would have put it.
+ *
+ * The game is required, so at startup closing this dialog closes the editor and
+ * there is no button saying so — the title bar is that button. From Tools >
+ * Select Warcraft II Data there is a folder in use already, so there IDCANCEL is
+ * shown, reads Cancel, and means keep it.
+ *
+ * Every caption here is set at runtime, and for the same reason: this is the
+ * first window a new install shows *and* the one the Tools menu reopens, and
+ * "Welcome to PUDForge" over a list somebody asked to see is a window that has
+ * not noticed who it is talking to.
+ */
+IDD_GAME_SETUP DIALOGEX 0, 0, 340, 204
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION ""
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+  /* SS_ICON sizes the control to the image, so the box here is a placeholder:
+     what lands in it is a 32x32 icon scaled to the window's DPI. */
+  ICON            "", IDC_SETUP_ICON, 14, 14, 21, 20
+  LTEXT           "", IDC_SETUP_TITLE, 46, 14, 280, 14
+  LTEXT           "", IDC_SETUP_HEAD, 46, 32, 280, 26
+  LISTBOX         IDC_SETUP_LIST, 14, 66, 312, 82, LBS_NOTIFY | WS_BORDER | WS_VSCROLL | WS_TABSTOP
+  LTEXT           "", IDC_SETUP_NOTE, 14, 154, 312, 20
+  PUSHBUTTON      "&Browse…", IDC_SETUP_BROWSE, 14, 182, 60, 14
+  PUSHBUTTON      "", IDC_SETUP_GUIDE, 78, 182, 64, 14
+  DEFPUSHBUTTON   "OK", IDOK, 212, 182, 50, 14
+  PUSHBUTTON      "", IDCANCEL, 266, 182, 60, 14
+END
+
+/*
+ * New map. Tileset and size, because a new map with neither asked about is a
+ * map you immediately have to go and change.
+ */
+IDD_NEW_MAP DIALOGEX 0, 0, 180, 82
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "New Map"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+  LTEXT           "&Tileset", -1, 8, 12, 40, 8
+  COMBOBOX        IDC_NEW_TILESET, 52, 10, 120, 100, CBS_DROPDOWNLIST | WS_TABSTOP
+  LTEXT           "&Size", -1, 8, 34, 40, 8
+  COMBOBOX        IDC_NEW_SIZE, 52, 32, 120, 100, CBS_DROPDOWNLIST | WS_TABSTOP
+  DEFPUSHBUTTON   "Create", IDOK, 68, 60, 50, 14
+  PUSHBUTTON      "Cancel", IDCANCEL, 122, 60, 50, 14
+END
+
+/*
+ * Opening a map out of an archive.
+ *
+ * The campaign maps ship inside War2Dat.mpq and there is no other way to get
+ * at them: they are not files on disk. The list is every .pud the archive
+ * holds, filtered by typing, because an archive holds hundreds of entries and
+ * only a few dozen of them are maps.
+ */
+IDD_ARCHIVE DIALOGEX 0, 0, 240, 210
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Open from an Archive"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+  EDITTEXT        IDC_ARCHIVE_FIND, 8, 8, 224, 14, ES_AUTOHSCROLL
+  LISTBOX         IDC_ARCHIVE_LIST, 8, 26, 224, 148, LBS_NOTIFY | WS_BORDER | WS_VSCROLL | WS_TABSTOP
+  LTEXT           "", IDC_ARCHIVE_NOTE, 8, 178, 160, 8
+  DEFPUSHBUTTON   "Open", IDOK, 124, 190, 50, 14
+  PUSHBUTTON      "Cancel", IDCANCEL, 178, 190, 50, 14
+END
+
+/*
+ * The log. A read-only edit rather than a listbox, so the text can be
+ * selected with the mouse and dragged out of the window — somebody looking at
+ * this is usually about to quote part of it.
+ */
+IDD_LOG DIALOGEX 0, 0, 320, 220
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_SIZEBOX
+CAPTION "Log"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+  EDITTEXT        IDC_LOG_TEXT, 8, 8, 304, 182,
+                  ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL | WS_BORDER | WS_VSCROLL | WS_TABSTOP
+  PUSHBUTTON      "&Copy all", IDC_LOG_COPY, 8, 198, 50, 14
+  PUSHBUTTON      "C&lear", IDC_LOG_CLEAR, 62, 198, 50, 14
+  DEFPUSHBUTTON   "Close", IDOK, 262, 198, 50, 14
+END
+
+/*
+ * Movement. Almost every tile agrees with the terrain under it, because
+ * painting writes both; what this sheet is about is the handful that do not.
+ */
+IDD_MOVEMENT DIALOGEX 0, 0, 262, 268
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Tile Movement Data"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+  // Every one of these is a paragraph rather than a caption, so each is sized
+  // for the lines its string wraps to. Measured at 8pt on a 100% display: the
+  // first runs to five lines and the two under the list to two apiece.
+  LTEXT           "", IDC_MOVE_ABOUT, 8, 8, 246, 56
+  LTEXT           "", IDC_MOVE_LEGEND, 8, 68, 246, 18
+  LISTBOX         IDC_MOVE_CLASSES, 8, 90, 246, 100, LBS_NOSEL | LBS_USETABSTOPS | WS_BORDER | WS_VSCROLL | WS_TABSTOP
+  LTEXT           "", IDC_MOVE_COUNT, 8, 196, 246, 16
+  LTEXT           "", IDC_MOVE_HINT, 8, 216, 246, 18
+  PUSHBUTTON      "Put &back to match the terrain", IDC_MOVE_RESET, 8, 244, 130, 14
+  DEFPUSHBUTTON   "Close", IDOK, 204, 244, 50, 14
+END
+
+/*
+ * The AI scripts a map may point a player at. Read-only: a PUD stores the
+ * script *number*, not the script, so what this shows is the game's own table
+ * — which is exactly what makes "what does AI 12 actually do" answerable.
+ */
+IDD_AI_SCRIPTS DIALOGEX 0, 0, 380, 240
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "AI Scripts"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+  LISTBOX         IDC_AI_LIST, 8, 8, 120, 200, LBS_NOTIFY | WS_BORDER | WS_VSCROLL | WS_TABSTOP
+  EDITTEXT        IDC_AI_SUMMARY, 136, 8, 236, 52, ES_MULTILINE | ES_READONLY | WS_BORDER | WS_VSCROLL
+  EDITTEXT        IDC_AI_LISTING, 136, 66, 236, 142, ES_MULTILINE | ES_READONLY | WS_BORDER | WS_VSCROLL | WS_HSCROLL
+  DEFPUSHBUTTON   "Close", IDOK, 322, 216, 50, 14
+END
+
+/*
+ * One unit, up close: what it is, where it stands, whose it is, and the one
+ * number the format keeps per unit — which means gold or oil on a resource
+ * and the rescue flag on anything else, so the label changes with the unit.
+ */
+IDD_UNIT_INSPECTOR DIALOGEX 0, 0, 210, 150
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Unit"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+  CONTROL         "", IDC_INSPECT_ICON, "STATIC", SS_OWNERDRAW, 8, 8, 26, 26
+  LTEXT           "", IDC_INSPECT_TYPE, 42, 10, 160, 8
+  LTEXT           "", IDC_INSPECT_POS, 42, 22, 160, 8
+  LTEXT           "&Player", -1, 8, 44, 34, 8
+  COMBOBOX        IDC_INSPECT_OWNER, 46, 42, 156, 200, CBS_DROPDOWNLIST | WS_TABSTOP | WS_VSCROLL
+  LTEXT           "", IDC_INSPECT_VALUE_LBL, 8, 66, 34, 8
+  EDITTEXT        IDC_INSPECT_VALUE, 46, 64, 60, 14, ES_AUTOHSCROLL | ES_NUMBER
+  // What that number is in: the field is gold, the file keeps it in 2,500s, and
+  // "Gold Left: 16" against a mine the statistics call 40,000 read as a bug.
+  LTEXT           "", IDC_INSPECT_NOTE, 8, 82, 194, 18
+  // Full width and on its own row: the caption is the unit's name and a
+  // sentence, so it does not fit beside OK, and it is a different kind of act
+  // from the two below it — it leaves this dialog for another one.
+  PUSHBUTTON      "", IDC_INSPECT_PROPS, 8, 106, 194, 14
+  DEFPUSHBUTTON   "OK", IDOK, 98, 128, 50, 14
+  PUSHBUTTON      "Cancel", IDCANCEL, 152, 128, 50, 14
+END
+
+// The version Explorer reads off the exe, from the same three digits the title
+// bar and About show. The fourth field is the build number, which nothing here
+// produces, so it stays zero rather than pretending to be one.
+VS_VERSION_INFO VERSIONINFO
+FILEVERSION    PF_APP_VERSION_MAJOR,PF_APP_VERSION_MINOR,PF_APP_VERSION_PATCH,0
+PRODUCTVERSION PF_APP_VERSION_MAJOR,PF_APP_VERSION_MINOR,PF_APP_VERSION_PATCH,0
+FILEOS         VOS_NT_WINDOWS32
+FILETYPE       VFT_APP
+BEGIN
+  BLOCK "StringFileInfo"
+  BEGIN
+    BLOCK "040904b0"
+    BEGIN
+      VALUE "FileDescription", "PUDForge - Warcraft II map editor"
+      VALUE "ProductName",     "PUDForge"
+      VALUE "FileVersion",     PF_APP_VERSION_STR
+      VALUE "ProductVersion",  PF_APP_VERSION_STR
+      VALUE "OriginalFilename", "PUDForge.exe"
+    END
+  END
+  BLOCK "VarFileInfo"
+  BEGIN
+    VALUE "Translation", 0x409, 1200
+  END
+END

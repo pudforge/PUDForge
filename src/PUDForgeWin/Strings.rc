@@ -1,0 +1,634 @@
+/*
+ * Every word the user reads.
+ *
+ * To translate PUDForge: copy this file, translate the text inside the quotes
+ * and nothing else, and build with your copy in place of this one. The menus
+ * and dialog templates in PUDForge.rc hold the rest of the text and localise
+ * the same way.
+ *
+ * Things that are not prose — window class names, registry paths, file
+ * extensions, the "%04X" a tile id is shown in — deliberately do not appear
+ * here. They are not text and translating them would break the program.
+ *
+ * The voice, so a new string sounds like the ones around it:
+ *
+ *   Menu items, buttons, tabs and window captions are Title Case. Labels,
+ *   hints and prose are sentence case. Headings over a list or a palette are
+ *   the shouted kind, LIKE THIS.
+ *
+ *   A status line is one clause and takes no full stop; prose in a dialog is
+ *   as long as the explanation needs and takes one. A failure earns the room
+ *   to say why it failed - that is the moment somebody needs the reason.
+ *
+ *   Never "a, not b". Say what is, and stop.
+ *
+ *   Chords read `<Key> to <verb>`, and the verb is the technical one: Alt to
+ *   exclude, not "alt takes away". Never address the reader as "you".
+ *
+ *   "Pick" is the eyedropper and nothing else. Choosing from a list or a grid
+ *   is "select".
+ *
+ *   Dimensions are `%d x %d`, with a plain x.
+ *
+ *   Do not spell out a chord the hint cell already shows: the status bar has
+ *   a tool cell and a hint cell beside the message, and a line that repeats
+ *   either of them is read twice and believed once.
+ *
+ * Notes for a translator:
+ *
+ *   %d, %ls and friends are placeholders the program fills in. Keep them all,
+ *   and move them wherever your language needs them — that is why they are
+ *   inside the string. %ls is a word or a name; %d is a number.
+ *
+ *   Strings come in singular and plural pairs where a count decides between
+ *   them. Languages needing more than two forms need a rule in Strings.hpp's
+ *   Plural(), not more entries here; say so rather than approximating.
+ *
+ *   Room: a status-bar line has about 120 characters before it is cut, and a
+ *   button caption has whatever the dialog template gives it. German runs
+ *   about a third longer than English, so the layouts have slack, but not
+ *   unlimited slack.
+ */
+
+#include "strings.h"
+
+STRINGTABLE
+BEGIN
+  /* ---------------------------------------------------------- the shell */
+  IDS_UNTITLED          "Untitled"
+  /* %ls is the file name, then the version. */
+  IDS_TITLE             "%ls - PUDForge %ls"
+  /* The same, when the map has unsaved changes. */
+  IDS_TITLE_DIRTY       "%ls * - PUDForge %ls"
+  /* Tile column, tile row, the terrain there. */
+  IDS_HOVER_TILE        "%d, %d  %ls"
+  IDS_ZOOM_PERCENT      "%d%%"
+  IDS_MAP_SIZE          "%d x %d"
+  /* Shown greyed when no map has been opened yet. */
+  IDS_RECENT_EMPTY      "Recent files"
+  /* Position in the list, then the file name. */
+  /* What is selected: units and the box round them, or a bare tile box. */
+  IDS_SELECTED_ONE      "%d unit, %d x %d"
+  IDS_SELECTED_MANY     "%d units, %d x %d"
+  IDS_SELECTED_TILES    "%d x %d tiles"
+  /* A selection built with shift and alt is not its own box: how many tiles
+     are really in it, then how far it reaches. */
+  IDS_SELECTED_REGION   "%d tiles in %d x %d"
+  IDS_RECENT_ITEM       "%d  %ls"
+
+  /* ---------------------------------------------------------------- file */
+  IDS_NEW_MAP           "New map"
+  IDS_OPENED            "Opened %ls"
+  IDS_SAVED             "Saved %ls"
+  /* File name, then why it could not be read. */
+  IDS_CANNOT_OPEN       "%ls\n\n%ls"
+  IDS_SAVE_CHANGES      "Save the changes to this map?"
+  IDS_GENERATED         "Generated"
+
+  /* ----------------------------------------------------------- check map */
+  IDS_CHECK_TITLE       "Check Map"
+  IDS_CHECK_NONE        "No problems found."
+  IDS_SEVERITY_ERROR    "Error: "
+  IDS_SEVERITY_WARNING  "Warning: "
+  IDS_SEVERITY_NOTE     "Note: "
+
+  /* ------------------------------------------------------------- editing */
+  IDS_STARTS_PLACED_ONE  "%d start location placed"
+  IDS_STARTS_PLACED_MANY "%d start locations placed"
+  IDS_TILES_FILLED      "%d tiles filled"
+  IDS_FILL_NEEDS_RECT   "Select some tiles first, then fill them"
+  IDS_UNITS_REMOVED_ONE  "%d unit removed by the terrain change"
+  IDS_UNITS_REMOVED_MANY "%d units removed by the terrain change"
+  /* Stands in for a player's name when the core has none. */
+  IDS_THAT_PLAYER       "that player"
+  IDS_OWNS_NOTHING      "%ls owns nothing on this map"
+  IDS_OWNED_BY_ONE      "%d unit owned by %ls"
+  IDS_OWNED_BY_MANY     "%d units owned by %ls"
+  IDS_GIVEN_TO_ONE      "%d unit given to %ls"
+  IDS_GIVEN_TO_MANY     "%d units given to %ls"
+  IDS_PLACING_FOR       "Placing for %ls"
+  /* A fallback name for a player slot, numbered from 1. */
+  IDS_PLAYER_N          "Player %d"
+
+  /* ----------------------------------------------------------- clipboard */
+  /* A copy takes terrain or units, never both, so each line says only what it
+     took. %d is a count of units; the terrain one is a width and a height. */
+  IDS_COPIED_ONE        "Copied %d unit. Ctrl+V to paste"
+  IDS_COPIED_MANY       "Copied %d units. Ctrl+V to paste"
+  IDS_COPIED_TERRAIN    "Copied %d x %d tiles of terrain. Ctrl+V to paste"
+  IDS_CUT_ONE           "Cut %d unit. Ctrl+V to paste"
+  IDS_CUT_MANY          "Cut %d units. Ctrl+V to paste"
+  IDS_NOTHING_COPIED    "Nothing has been copied yet"
+  IDS_PASTE_ARMED       "Click to paste. Right-click to cancel"
+  IDS_FRAGMENT_SIZE     "Fragment is now %d x %d tiles"
+
+  /* ------------------------------------------------------- terrain panel */
+  IDS_ROW_DETAIL        "Detail"
+  IDS_DETAIL_PLAIN      "Plain"
+  IDS_DETAIL_MIXED      "Mixed"
+  IDS_DETAIL_DETAIL     "Detail"
+  IDS_ROW_SHAPE         "Shape"
+  IDS_ROW_SIZE          "Size"
+  IDS_ROW_MIRROR        "Mirror"
+  IDS_ROW_SHADE         "Shade"
+  IDS_MIX_SHADES_ON     "Strokes will mix the light and dark shade, the way the shipped maps are mottled"
+  IDS_MIX_SHADES_OFF    "Strokes lay one flat shade"
+  IDS_PICK_A_TILE       "Select a Tile"
+  /* %04X is a tile id in hexadecimal; leave it as it is. */
+  IDS_CUSTOM_TILE       "Tile 0x%04X"
+  /* The two whole-map terrain edits. The ellipsis is part of the label: both
+     ask their questions in a sheet before anything is touched. */
+  IDS_BULK_REPLACE      "Replace…"
+  IDS_BULK_DECORATE     "Decorate…"
+  IDS_TIP_BULK_REPLACE  "Repaint one terrain as another, across the selected tiles or the whole map"
+  IDS_TIP_BULK_DECORATE "Scatter a terrain across the selected tiles or the whole map"
+  IDS_NO_ARTWORK_TO_PICK "No artwork loaded"
+
+  /* --------------------------------------------------------- units panel */
+  /* Grey hint inside the empty search box. */
+  IDS_FIND_A_UNIT       "Find a unit"
+  /* A row in the quick pick's list, not a heading over a palette, which is
+     what it used to be — hence sentence case. */
+  IDS_NOTHING_MATCHES   "No unit matches"
+  IDS_RACE_HUMAN        "HUMAN"
+  IDS_RACE_ORC          "ORC"
+  /* The kind carries its own noun, so the heading can be a plain phrase
+     rather than two labels joined by punctuation. Buildings and heroes are
+     already nouns; land, air and water are not. */
+  IDS_KIND_LAND         "LAND UNITS"
+  IDS_KIND_AIR          "AIR UNITS"
+  IDS_KIND_WATER        "WATER UNITS"
+  IDS_KIND_BUILDINGS    "BUILDINGS"
+  IDS_KIND_HEROES       "HEROES"
+  IDS_GROUP_NEUTRAL     "NEUTRAL"
+  IDS_GROUP_MARKERS     "MARKERS"
+  /* Race then kind, e.g. "HUMAN LAND UNITS". */
+  IDS_GROUP_HEADING     "%ls %ls"
+
+  /* ---------------------------------------------------------- the canvas */
+  IDS_PASTED_SHORT      "Pasted the terrain and %d of %d units; %d would not fit"
+  IDS_PASTED_ALL        "Pasted the terrain and %d units"
+  IDS_PASTED_ONE        "Pasted the terrain and %d unit"
+  IDS_PASTED_TERRAIN_ONLY "Pasted the terrain"
+  IDS_PASTE_CANCELLED   "Paste cancelled"
+  /* Escape or the right button, while a click would have placed a unit. Said
+     out loud because the only other sign is which tool button is pressed in. */
+  IDS_PLACING_LEFT      "Placing units off"
+
+  /* ------------------------------------------------------------ game data */
+  /* Title of the folder picker that asks where the game is installed. */
+  IDS_FIND_GAME_TITLE   "Where is Warcraft II installed?"
+  /* First run. The heading says why a map editor wants the game at all; the
+     note under the list says what the second button does, which is not the same
+     thing in the two places this dialog opens from. */
+  IDS_SETUP_HEAD_FOUND  "PUDForge draws maps with Warcraft II's own artwork, read from the copy you already own. Choose which one to use."
+  IDS_SETUP_HEAD_NONE   "PUDForge draws maps with Warcraft II's own artwork, read from the copy you already own. None was found here — use Browse to point at one."
+  IDS_SETUP_NOTE        "Choosing an installation reloads the artwork straight away. Closing this keeps the one already in use."
+  IDS_SETUP_NOTE_REQUIRED "PUDForge reads its terrain, units, names and sounds from the game and does not run without it. Closing this window closes PUDForge; you can start it again once the game is installed."
+  IDS_SETUP_CANCEL      "Cancel"
+  /* The heading and the caption both, in each of the two places this opens
+     from — greeting a new install, and answering the Tools menu. */
+  IDS_SETUP_TITLE_WELCOME "Welcome to PUDForge"
+  IDS_SETUP_TITLE_FIND  "Select Warcraft II Data"
+  IDS_SETUP_GUIDE       "User &Guide"
+  /* %1 the product, %2 the folder the data was actually found in. */
+  IDS_SETUP_ROW         "%ls  —  %ls"
+  IDS_SETUP_BAD_FOLDER  "No Warcraft II data in that folder. Point at the folder the game is installed in."
+  /* The label for a folder the editor found for itself and is already reading,
+     which the search behind the list does not look for. */
+  IDS_SETUP_IN_USE      "Found beside PUDForge"
+
+  /* ----------------------------------------------------------- the sheets */
+  IDS_TILESET_FOREST    "Forest"
+  IDS_TILESET_WINTER    "Winter"
+  IDS_TILESET_WASTELAND "Wasteland"
+  IDS_TILESET_SWAMP     "Swamp"
+  IDS_OWNER_NOBODY      "Nobody"
+  IDS_OWNER_HUMAN       "Human player"
+  IDS_OWNER_COMPUTER    "Computer"
+  IDS_OWNER_PASSIVE     "Passive computer"
+  IDS_OWNER_RESCUE_PASSIVE "Rescue (passive)"
+  IDS_OWNER_RESCUE_ACTIVE  "Rescue (active)"
+  IDS_RACE_HUMAN_NAME   "Human"
+  IDS_RACE_ORC_NAME     "Orc"
+  IDS_RACE_NEUTRAL      "Neutral"
+
+  /* Characters used, then how many the map description has room for. */
+  IDS_DESC_ROOM         "%d of %d characters used"
+  IDS_DESC_REFUSED_CHAR "The game cannot show that character in a map description, so it was left out."
+  IDS_DESC_UNSTORABLE   "This description uses characters the game cannot show, and it will not be saved."
+  IDS_DESC_NOT_STORED   "The description was left as it was because the game cannot show every character in it."
+  IDS_SIZE_IN_TILES     "%d x %d tiles"
+  /* Slot number, the player's name and colour, who controls them. */
+  IDS_PLAYER_ROW        "%d. %ls (%ls)"
+  IDS_OWNS_ONE_HERE     "%d unit on the map belongs to this player"
+  IDS_OWNS_MANY_HERE    "%d units on the map belong to this player"
+  IDS_TILESET_CHANGED   "Tileset changed. Every tile was repainted with the nearest terrain the new tileset draws"
+  IDS_MAP_PROPS_UPDATED "Map properties updated"
+  IDS_NO_PLAYERS_CHANGED "No player settings changed"
+  IDS_PLAYERS_UPDATED_ONE  "Updated %d player"
+  IDS_PLAYERS_UPDATED_MANY "Updated %d players"
+
+  /* Appended to a field name that has a width and a height. */
+  IDS_FIELD_WIDTH       " (width)"
+  IDS_FIELD_HEIGHT      " (height)"
+  IDS_YES               "yes"
+  IDS_NO                "no"
+  /* Marks a unit id no map places. */
+  IDS_UNUSED_UNIT       "  (unused)"
+  IDS_NOTHING_CHANGED   "Nothing changed yet"
+  IDS_UDTA_CHANGED_ONE  "%d field changed on this unit, %d in all"
+  IDS_UDTA_CHANGED_MANY "%d fields changed on this unit, %d in all"
+  IDS_UNIT_PROPS_NONE   "No unit properties changed"
+  IDS_UNIT_PROPS_ONE    "%d unit property changed"
+  IDS_UNIT_PROPS_MANY   "%d unit properties changed"
+  IDS_UGRD_CHANGED_ONE  "%d field changed"
+  IDS_UGRD_CHANGED_MANY "%d fields changed"
+  IDS_UPGRADE_PROPS_NONE "No upgrade properties changed"
+  IDS_UPGRADE_PROPS_ONE  "%d upgrade property changed"
+  IDS_UPGRADE_PROPS_MANY "%d upgrade properties changed"
+
+  /* A restriction bit Blizzard left unnamed; %d is its number. */
+  IDS_ALOW_BIT_UNKNOWN  "bit %d"
+  /* The whole table now, not one player's column: 32 bits across 16 slots. */
+  IDS_ALOW_COUNT        "%d of %d ticked"
+  /* What a tick means, which differs by block: three say "allowed", one says
+     the player already knows the spell, and two say a research is part-way
+     done. One sentence for all six would be wrong for half of them. */
+  IDS_ALOW_MEANS_ALLOWED "Ticked means allowed."
+  IDS_ALOW_MEANS_KNOWN   "Ticked means already known."
+  IDS_ALOW_MEANS_PARTIAL "Ticked means part-researched."
+  /* The two ways the section itself can move, as opposed to a tick within it.
+     Restrictions live in an optional section, so "back to the defaults" means
+     the map stops carrying one at all. */
+  IDS_ALOW_CLEARED      "Restrictions removed; the map uses the game defaults"
+  IDS_ALOW_ADDED        "Restrictions added, none set yet"
+  IDS_ALOW_CHANGED_ONE  "%d restriction set changed"
+  IDS_ALOW_CHANGED_MANY "%d restriction sets changed"
+
+  IDS_RESIZE_SAME       "Already that size."
+  IDS_RESIZE_PADS       "Pads %d tiles of ground on each side of the map."
+  IDS_RESIZE_CROPS_SAFE "Crops %d tiles. No unit is lost."
+  IDS_RESIZE_CROPS_ONE  "Crops %d tiles, and %d unit no longer fits."
+  IDS_RESIZE_CROPS_MANY "Crops %d tiles, and %d units no longer fit."
+  /* OILM is a section name in the map format; leave it as it is. */
+  IDS_RESIZE_OILM_WARNING "This map stores triggers in OILM. Resizing remaps that tile by tile and will break them."
+  IDS_RESIZE_FAILED     "The map could not be resized"
+  IDS_RESIZED           "Resized to %d x %d"
+  IDS_RESIZED_DROPPED_ONE  "Resized to %d x %d, dropping %d unit"
+  IDS_RESIZED_DROPPED_MANY "Resized to %d x %d, dropping %d units"
+
+  IDS_TILES_PICK_ONE    "Select one of %d tiles"
+  /* Tile id, then the terrain most of it shows. */
+  IDS_TILE_MOSTLY       "Tile 0x%04X is mostly %ls"
+  /* Heading for tiles whose terrain the core cannot name. */
+  IDS_TERRAIN_OTHER     "Other"
+  IDS_UNKNOWN           "unknown"
+  IDS_TILE_HEX          "0x%04X"
+
+  IDS_GEN_NO_MAP        "Those settings do not make a map."
+  IDS_GEN_SIZE          "%d x %d"
+  IDS_GEN_SIZE_SHORT    "%d x %d: only room for %ls"
+  IDS_GEN_SHORT_MINES   "%d of %d mines"
+  IDS_GEN_SHORT_STARTS  "%d of %d starts"
+  /* Joins two shortfalls, e.g. "2 of 4 mines, 3 of 4 starts". */
+  IDS_GEN_SHORT_JOIN    ", "
+  IDS_GEN_OF_THE_MAP    "of the map"
+  IDS_GEN_OF_THE_LAND   "of the land"
+  /* A percentage, then what it is a share of. */
+  IDS_GEN_SHARE         "%d%% %ls"
+
+  /* ------------------------------------------------------ the file dialogs */
+  /* Keep the (*.pud) part: it tells the user what the filter matches. */
+  IDS_FILTER_MAPS       "Warcraft II maps (*.pud)"
+  IDS_FILTER_ALL        "All files"
+  IDS_FILTER_PNG        "PNG images (*.png)"
+
+  /* --------------------------------------------------------- bulk edits */
+  /* Every bulk edit acts on the terrain rectangle when there is one and on
+     the whole map when there is not, and every one of them says which. */
+  IDS_SCOPE_MAP         "the whole map"
+  IDS_SCOPE_SELECTION   "the selected tiles"
+  IDS_PICK_TWO_TERRAINS "Select two different terrains."
+  IDS_PICK_TWO_TYPES    "Select two different unit types."
+  /* %d tiles, %ls terrain, %ls scope. Arguments are consumed in the order
+     they are passed: the C runtime's wide printf has no positional form. */
+  IDS_REPLACE_WOULD_TOUCH "This would repaint %d tiles of %ls in %ls."
+  /* %ls terrain, %ls scope. */
+  IDS_REPLACE_FOUND_NONE  "There is no %ls in %ls."
+  IDS_REPLACED_TILES    "Replaced %d tiles of %ls with %ls"
+  IDS_REPLACED_NOTHING  "Nothing replaced"
+  IDS_PER_CENT          "%d%%"
+  IDS_DECORATE_SCOPE    "Scattered across %ls."
+  IDS_DECORATED         "Scattered %d tiles of %ls"
+  IDS_DECORATED_NOTHING "Nothing scattered"
+  /* %d tiles, %ls terrain, %d units the scatter left with nowhere to stand.
+     Trees and rock block movement, so scattering them over a base removes it. */
+  IDS_DECORATED_REMOVED_ONE  "Scattered %d tiles of %ls, removing %d unit that could no longer stand"
+  IDS_DECORATED_REMOVED_MANY "Scattered %d tiles of %ls, removing %d units that could no longer stand"
+  /* The same in both forms on purpose: %ls is a unit type name from the
+     game's own table and does not inflect. A language that counts
+     differently has two hooks here rather than one. */
+  IDS_CONVERT_WOULD_ONE "The map holds %d %ls."
+  IDS_CONVERT_WOULD_MANY "The map holds %d %ls."
+  /* %d converted, %ls type, %d that could not stand as the new type. */
+  IDS_CONVERTED         "Converted %d %ls; %d could not stand there"
+  IDS_CONVERTED_NOTHING "Nothing converted"
+
+  /* ---------------------------------------------------------- statistics */
+  /* A label and its value. The tab is a real tab stop, set on the list, so
+     the columns line up in a proportional font. */
+  IDS_STAT_ROW          "%ls\t%ls"
+  IDS_STAT_HEAD_MAP     "THE MAP"
+  IDS_STAT_HEAD_TERRAIN "TERRAIN"
+  IDS_STAT_HEAD_UNITS   "UNITS"
+  IDS_STAT_HEAD_RESOURCES "RESOURCES"
+  IDS_STAT_TOTAL        "All units"
+  IDS_STAT_GOLD         "Gold"
+  IDS_STAT_OIL          "Oil"
+  IDS_FIELD_SIZE        "Size"
+  IDS_FIELD_TILESET     "Tileset"
+
+  /* -------------------------------------------------------- export a PNG */
+  IDS_PNG_SIZE          "%d x %d pixels"
+  IDS_PNG_SCALE_X       "%d x"
+  IDS_PNG_WROTE         "Wrote %ls, %d x %d pixels"
+  IDS_PNG_FAILED        "Could not write the image"
+
+  /* ------------------------------------------------------------ options */
+  IDS_ART_PORTRAIT      "Command icons"
+  IDS_ART_SPRITE        "Unit sprites"
+
+  /* ---------------------------------------------------- unit inspector */
+  IDS_INSPECT_AT        "Standing at %d, %d"
+  /* The one number the format keeps per unit means two different things. */
+  IDS_INSPECT_AMOUNT    "Amount"
+  IDS_INSPECT_FLAG      "Rescue"
+  /* %1 what a newly placed one of these carries. Typed in gold or oil, kept in
+     the file as that divided by 2,500, which is why a typed number can come
+     back rounded — so the field says so before it happens. */
+  IDS_INSPECT_STEP      "In steps of 2,500; anything else rounds to the nearest. A new one is placed with %lld."
+  IDS_INSPECT_FLAG_NOTE "0 is passive, 1 is active. Only rescuable units read it."
+  IDS_UNIT_UPDATED      "%ls updated"
+
+  /* ------------------------------------ putting the client back to new */
+  /* The confirmation names what goes, one line each, because ""settings"" on
+     its own does not tell anyone whether their recent maps are about to
+     disappear. It says what is *not* touched for the same reason. */
+  IDS_RESET_TITLE       "Reset PUDForge"
+  IDS_RESET_CONFIRM     "Forget everything PUDForge has remembered?\n\n• Options and editing preferences\n• Window size, docks, toolbar and view settings\n• The list of recent maps\n• Where Warcraft II is installed\n\nThe map you have open is not touched, and no file on disk is deleted."
+  IDS_RESET_DONE        "PUDForge has forgotten its settings.\n\nThey go back to the defaults the next time it starts, and it will ask again where Warcraft II is installed."
+
+  /* --------------------------------------------------------- the shell */
+  IDS_NO_SELECTION_TO_ZOOM "Select something first"
+  IDS_NO_START_FOR      "%ls has no start location"
+  IDS_WENT_TO_START     "%ls starts at %d, %d"
+  IDS_DROPPED_FILE      "Opened %ls"
+  IDS_INSPECT_NEEDS_UNIT "Select a unit first"
+  IDS_INSPECT_ONE_AT_A_TIME "Unit properties opens one unit at a time"
+
+  /* ------------------------------------------------------ context menu */
+  /* Shorter than the menu-bar wording: a context menu is read at a glance
+     and the thing it acts on is already under the pointer. */
+  IDS_CONTEXT_UNIT_PROPS "Unit Properties…\tEnter"
+  IDS_CONTEXT_DELETE    "Delete"
+  IDS_CONTEXT_COPY      "Copy"
+  IDS_CONTEXT_CUT       "Cut"
+  IDS_CONTEXT_PASTE     "Paste"
+  IDS_CONTEXT_FILL      "Fill the Rectangle"
+  IDS_CONTEXT_STATS     "Map Statistics…"
+  /* %ls is the type of the unit under the pointer. */
+  IDS_CONTEXT_DUPLICATE "Duplicate %ls\tCtrl+D"
+  IDS_CONTEXT_SAME_TYPE "Select Every %ls"
+
+  /* ----------------------------------------------------- movement and AI */
+  /* %d tiles, %ls scope. */
+  /* The tool is read-mostly, and what it is *for* was the missing half: every
+     number here is written by painting, so the only thing to do in this window
+     is find the tiles where that went wrong and undo them. */
+  IDS_MOVE_ABOUT        "Every tile carries a movement value in the map's SQM section — what may walk, swim, sail or fly over it. PUDForge writes it as you paint, from the tile painted, so it normally needs no attention. A tile whose value differs from the one its terrain implies is an override: a hand edit or another editor left it there, and it is the usual cause of ground that looks walkable but is not."
+  IDS_MOVE_LEGEND       "The eight values the game uses. View > Layer > Movement draws them over the map:"
+  IDS_MOVE_OVERRIDDEN_ONE  "%d tile in %ls does not match the terrain under it."
+  IDS_MOVE_OVERRIDDEN_MANY "%d tiles in %ls do not match the terrain under them."
+  IDS_MOVE_MATCHES      "Every tile matches the terrain under it."
+  /* Says what the button will touch, because the scope is whatever is selected
+     and that is decided outside this window. */
+  IDS_MOVE_HINT         "Putting them back rewrites those tiles from their terrain, as one undo step. It covers the selection when there is one, and the whole map otherwise."
+  IDS_MOVE_RESET_DONE   "Movement put back to match the terrain"
+  /* The script number, then its name. The number is what a PUD stores. */
+  IDS_AI_ROW            "%3d  %ls"
+  IDS_AI_NEEDS_GAME     "The AI scripts live in the game's own files. Point PUDForge at Warcraft II first."
+
+  /* ------------------------------------------------------ component files */
+  IDS_FILTER_COMPONENTS "Component files (*.un;*.up;*.alo)"
+  IDS_COMPONENT_IMPORTED "Imported %ls"
+  /* %ls file name, %d its length. A component file has no header, so its
+     length is the only thing that identifies it. */
+  IDS_COMPONENT_REFUSED "%ls is %d bytes, which is no component file"
+  IDS_COMPONENT_EXPORTED "Wrote %ls"
+  IDS_COMPONENT_ABSENT  "This map has no such section to export"
+
+  /* ----------------------------------------------------------- archives */
+  IDS_FILTER_ARCHIVES   "Warcraft II archives (*.mpq)"
+  IDS_ARCHIVE_FIND      "Find a map"
+  IDS_ARCHIVE_COUNT_ONE "%d map"
+  IDS_ARCHIVE_COUNT_MANY "%d maps"
+  IDS_ARCHIVE_UNREADABLE "That file is not an archive PUDForge can read"
+  IDS_ARCHIVE_NO_MAPS   "That archive holds no maps"
+  IDS_ARCHIVE_OPENED    "Opened %ls from the archive"
+
+  /* --------------------------------------------------------------- log */
+  /* The time, then the line. A warning is marked rather than coloured: a
+     read-only edit control has one colour, and the mark survives being
+     pasted into a bug report. */
+  IDS_LOG_LINE          "%ls   %ls"
+  IDS_LOG_LINE_WARN     "%ls  ! %ls"
+
+  /* --------------------------------------------------------- field labels */
+  IDS_COL_CONTROLLED_BY "Controlled by"
+  IDS_COL_RACE          "Race"
+  IDS_COL_GOLD          "Gold"
+  IDS_COL_LUMBER        "Lumber"
+  IDS_COL_OIL           "Oil"
+  IDS_COL_AI            "AI script"
+  /* The subject, then the field whose flags are being picked. */
+  IDS_BITS_TITLE        "%ls: %ls"
+  IDS_PLAYER_OWNS_ONE   "%d unit on the map"
+  IDS_PLAYER_OWNS_MANY  "%d units on the map"
+
+  /* ------------------------------------------- what the dock's glyphs mean */
+  IDS_TIP_SHAPE_SQUARE  "Square brush"
+  IDS_TIP_SHAPE_CIRCLE  "Round brush"
+  IDS_TIP_SHAPE_SCATTER "Spray"
+  IDS_TIP_SHAPE_FILL    "Fill"
+  IDS_TIP_MIRROR_NONE   "No mirroring"
+  IDS_TIP_MIRROR_LR     "Mirror left to right"
+  IDS_TIP_MIRROR_TB     "Mirror top to bottom"
+  IDS_TIP_MIRROR_SWNE   "Mirror diagonally south-west to north-east"
+  IDS_TIP_MIRROR_NWSE   "Mirror diagonally north-west to south-east"
+  IDS_TIP_DETAIL_PLAIN  "Plain terrain tiles"
+  IDS_TIP_DETAIL_MIXED  "Mixed plain and detailed terrain tiles"
+  IDS_TIP_DETAIL_DETAIL "Detailed terrain tiles"
+  IDS_TIP_SIZE          "Brush size. Also Alt+wheel, or [ and ]"
+  IDS_TIP_SHADE         "Mix the light and dark shade of the terrain being painted"
+  IDS_BRUSH_SIZED       "Brush %d x %d"
+  /* The rung below one tile: a single corner of the grid, which is a quarter
+     of what the 1 x 1 brush lays. Not phrased as a size because there is no
+     number of tiles that says it. */
+  IDS_BRUSH_SIZED_CORNER "Brush one corner"
+  IDS_STATUS_OPENS_LOG  "Map Editor Log"
+  /* The palettes' right-click menu: one question answered two ways. Spend the
+     row exactly and let the tile size fall out of it, or keep the tiles their
+     own size and let the count fall out of it. */
+  IDS_COLUMNS_AUTO      "Fit to the Panel"
+  IDS_COLUMNS_SCALE     "Scale the Tiles Automatically"
+  /* How a drag that lays units went. The first %d is how many landed, the
+     second how many the map would not take. */
+  IDS_PLACED_ALL        "%d units placed"
+  IDS_PLACED_SOME       "%d units placed, %d would not fit"
+  IDS_PLACED_NONE       "None of the %d would fit there"
+  /* Which side of the canvas a dock sits on. */
+  IDS_DOCK_LEFT         "Move Panel to the Left"
+  IDS_DOCK_RIGHT        "Move Panel to the Right"
+  /* The tabs of the map window. Short: a tab strip is read at a glance and
+     six long labels wrap it onto two rows. */
+  IDS_TAB_MAP           "Map"
+  IDS_TAB_PLAYERS       "Players"
+  IDS_TAB_UNITS         "Units"
+  IDS_TAB_UPGRADES      "Upgrades"
+  IDS_TAB_RESTRICTIONS  "Restrictions"
+  IDS_TAB_STATISTICS    "Statistics"
+  /* %ls is the map's file name. */
+  IDS_SHEETS_TITLE      "%ls - Map Properties"
+  IDS_SHEETS_NONE_CHANGED "Nothing changed"
+  /* %d tabs were written to. Each is its own undo step. */
+  IDS_SHEETS_MANY_CHANGED "%d sections of the map changed"
+  /* Escape or a right-click backed out of the terrain brush. Said at all
+     because the gesture is the only thing that told the user; the tool cell
+     beside this one already says what the tool became. */
+  IDS_BRUSH_PUT_DOWN    "Stopped painting"
+  /* Above the size the map is about to be given, so it says which is which. */
+  IDS_MAP_SIZE_NOW      "The map is %d x %d tiles."
+
+  /* --------------------------------------------- the strip along the top */
+  /* Button captions. One word each: a toolbar is read sideways, and these
+     shadow menu items whose own wording is in PUDForge.rc. */
+  IDS_TB_NEW            "New"
+  IDS_TB_OPEN           "Open"
+  IDS_TB_SAVE           "Save"
+  IDS_TB_UNDO           "Undo"
+  IDS_TB_REDO           "Redo"
+  IDS_TB_DELETE         "Delete"
+  IDS_TB_COPY           "Copy"
+  IDS_TB_CUT            "Cut"
+  IDS_TB_PASTE          "Paste"
+  /* The two select tools. Two words each: "Select" alone would not say which
+     half of the editor is being selected in. */
+  IDS_TB_SELECT_TERRAIN "Select Tiles"
+  IDS_TB_SELECT_UNITS   "Select Units"
+  /* What each button does, and the key that does it. The caption is one word
+     and has no room for a shortcut; this is where the shortcut is said. */
+  IDS_TBTIP_NEW         "New map   Ctrl+N"
+  IDS_TBTIP_OPEN        "Open a map   Ctrl+O"
+  IDS_TBTIP_SAVE        "Save   Ctrl+S"
+  IDS_TBTIP_UNDO        "Undo   Ctrl+Z"
+  IDS_TBTIP_REDO        "Redo   Ctrl+Y"
+  IDS_TBTIP_DELETE      "Delete the selected units   Del"
+  IDS_TBTIP_COPY        "Copy the selection in the current mode   Ctrl+C"
+  IDS_TBTIP_CUT         "Cut the selected units   Ctrl+X"
+  IDS_TBTIP_PASTE       "Arm a paste; the next click drops it   Ctrl+V"
+  IDS_TBTIP_SELECT_TERRAIN "Drag out a rectangle of terrain"
+  IDS_TBTIP_SELECT_UNITS   "Click or band-select units"
+
+  /* ------------------------------------------------- the terrain dock, more */
+  IDS_TOOL_PICK         "Eyedropper"
+  IDS_TIP_PICK          "Pick terrain"
+  IDS_PICK_ARMED        "Click a tile to take its terrain"
+  IDS_PICK_OFF          "Eyedropper off"
+  IDS_SHADE_LIGHT       "Light"
+  IDS_SHADE_DARK        "Dark"
+  IDS_TIP_SHADE_LIGHT   "Paint the light shade"
+  IDS_TIP_SHADE_DARK    "Paint the dark shade"
+  IDS_MIX_SHADES_SHORT  "Mix"
+  /* Slipped inside the brackets of a player's name, after its colour, so the
+     dropdown reads "Player 1 (Red, Orc)". */
+  IDS_PLAYER_RACE_SUFFIX ", %ls"
+
+  /* ------------------------------------------------------- component files */
+  IDS_SECTION_IMPORT    "Import…"
+  IDS_SECTION_EXPORT    "Export…"
+  IDS_SECTION_IMPORT_TIP "Read this section out of a component file, replacing what the map carries"
+  IDS_SECTION_EXPORT_TIP "Write this section to a component file other editors can read"
+
+  /* ----------------------------------------------------- start locations */
+  IDS_STARTS_MISSING_TITLE "Start Locations"
+  /* %d units on the map, %d start locations placed. A map needs two to be
+     playable at all, which is why this is asked rather than only noted. */
+  IDS_STARTS_MISSING    "This map has %d units but only %d start locations, so the game cannot start a match on it.\n\nPlace the missing start locations before saving?"
+
+  /* ------------------------------------------- switching a player's race */
+  /* %ls player, %ls race, %d units swapped, %d left alone. */
+  IDS_RACE_FOLLOWED     "%ls is now %ls, so %d units swapped; %d had no counterpart and were left alone"
+
+  /* ------------------------------------------- the tool and the hint cell */
+  /* Which tool is in hand, in its own cell beside the hints. A verb, because
+     it answers "what am I doing" rather than "what is this button called". */
+  IDS_TOOL_PAINTING     "Painting"
+  IDS_TOOL_RECT         "Selecting tiles"
+  IDS_TOOL_PLACING      "Placing units"
+  IDS_TOOL_PICKING      "Selecting units"
+  IDS_TOOL_PASTING      "Pasting"
+
+  /* ------------------------------------------------------ the hint cell */
+  /* One line of keyboard help for whatever tool is in hand, in its own cell
+     on the status bar. Each of these is a chord that does something useful
+     and that nobody finds on their own. Keep them short: the cell gives way
+     first when the window is narrow. */
+  IDS_HINT_TERRAIN_PAINT "Shift to draw straight   Alt to swap shade   Alt+wheel to resize"
+  IDS_HINT_TERRAIN_RECT  "Drag to select   Shift+drag to add   Alt+drag to exclude"
+  IDS_HINT_UNIT_PLACE    "Drag to place a row   Esc to stop   Ctrl+click to pick"
+  IDS_HINT_UNIT_SELECT   "Shift+click to add   Drag to move   Double-click to open"
+  IDS_HINT_PASTE         "Click to paste   R/F/M to rotate   Right-click to cancel"
+
+  /* --------------------------------- putting one row back to the default */
+  /* %ls is the field's name, e.g. "Put Hit Points back to the game default". */
+  IDS_FORM_RESET        "Reset %ls to default"
+  IDS_FORM_RESET_ONE    "Reset to default"
+  /* %ls is the unit under the pointer, e.g. "Footman Unit Properties". */
+  IDS_UNIT_PROPS_FOR    "%ls Unit Properties"
+  /* Beside the accent colour on a changed list row. A colour alone is not a
+     mark everyone can see. */
+  IDS_CHANGED_MARK      "★"
+  /* %ls is the row's own name, e.g. "Put Footman back to the game defaults". */
+  IDS_ROW_RESET         "Reset %ls to default"
+  IDS_ROW_RESET_DONE    "%ls is reset to default"
+
+  /* ---------------------------------------------------------------- help */
+  IDS_ABOUT_TITLE       "About PUDForge"
+  /* %ls is this application's version.
+
+     The lines are wrapped by hand because this is shown through MessageBox,
+     which sizes itself to the longest one: left to itself the Blizzard notice
+     would set the width of the whole dialog. */
+  IDS_ABOUT_BODY        "PUDForge is a Warcraft II map editor.\n\nVersion %ls\n\nAcknowledgements and thanks to:\n\nDaniel Lemberg, Simon Pelsser and Lasse Jensen — PUD.TXT revision 3,\nthe community format specification\nAlexander Cech — PUDDraft and WarDraft\nSimon Pelsser — War2Unit\nScott Sipe — UDTAed\nMistral — War2mod and the War2 Trigger Editor\nLadislav Zezula — StormLib\nMark Adler — zlib's blast.c, which the PKWARE decoder derives from\n\nWarcraft II and all related intellectual property are owned by\nBlizzard Entertainment. This project is an unofficial fan-made tool\nand is not affiliated with, endorsed by, or sponsored by Blizzard\nEntertainment. All rights reserved."
+  IDS_GUIDE_FAILED      "Could not open the user guide"
+  IDS_FILLED_EVERYWHERE "Filled %d tiles of that terrain"
+  /* %d is roughly how many tiles across one feature of this octave is. */
+  IDS_GEN_FEATURE_WIDTH "about %d tiles across"
+  IDS_TIP_VIEW_AI       "View AI Scripts"
+  IDS_TOOL_FILLING      "Filling"
+  IDS_HINT_TERRAIN_FILL "Click to fill this region   Shift+click for every tile of that terrain   Ctrl+click to pick"
+
+  /* ------------------------------------------------------ the Units menu */
+  /* The same groups the units palette shows, in a menu's voice rather than a
+     palette heading's. Joined by IDS_GROUP_HEADING, e.g. "Human Land Units". */
+  IDS_MENU_RACE_HUMAN   "Human"
+  IDS_MENU_RACE_ORC     "Orc"
+  IDS_MENU_KIND_LAND    "Land Units"
+  IDS_MENU_KIND_AIR     "Air Units"
+  IDS_MENU_KIND_WATER   "Water Units"
+  IDS_MENU_KIND_BUILDINGS "Buildings"
+  IDS_MENU_KIND_HEROES  "Heroes"
+  IDS_MENU_GROUP_NEUTRAL "Neutral"
+  IDS_MENU_GROUP_MARKERS "Markers"
+END
