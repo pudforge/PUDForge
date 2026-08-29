@@ -16,6 +16,7 @@ transcribed from the game.
 | `named_heroes.cpp` | Which units are heroes, where the game's flag is wrong |
 | `hidden_units.cpp` | Which units a palette keeps behind an opt-in |
 | `unit_footprints.cpp` | How many tiles the ships and fliers cover, where `unitSize` is wrong |
+| `shared_tiles.cpp` | Which two units may stand on the same tiles |
 
 ## Rules for anything added here
 

@@ -229,6 +229,11 @@ bool unit_footprint_override(int unit_id, int& w, int& h);
 int oversize_unit_count();
 int oversize_unit_id(int index);
 
+/// Whether two units standing on the same tiles is an arrangement the game
+/// intends rather than a fault. See overrides/shared_tiles.cpp; a gold mine is
+/// deliberately not one of them.
+bool units_may_share_tiles(int a, int b);
+
 /// What a newly placed unit's `value` should start at. See
 /// overrides/editing_policy.cpp; `resource` is a pf_resource.
 int unit_default_value(int unit_id, int resource);

@@ -1003,4 +1003,49 @@ TEST(opening_a_map_does_not_offer_to_delete_much) {
   CHECK(shipped_flagged * 50 <= shipped_units);
 }
 
+
+/**
+ * Which units the map check lets stand on each other.
+ *
+ * The short list in overrides/shared_tiles.cpp. Everything else that shares a
+ * tile is a fault worth reporting, so the list has to stay short — and a gold
+ * mine has to stay off it, because nothing stands on a gold mine.
+ */
+TEST(only_a_few_units_may_share_tiles) {
+  const int kFootman = 0x00, kTownHall = 0x4a, kGoldMine = 0x5c;
+  const int kOilPatch = 0x5d, kHumanStart = 0x5e, kOrcStart = 0x5f;
+  const int kCircleOfPower = 0x64;
+
+  // A marker under anything, which is how nearly every map places a base.
+  CHECK(pf::units_may_share_tiles(kHumanStart, kTownHall));
+  CHECK(pf::units_may_share_tiles(kTownHall, kOrcStart));
+  // A resource you harvest by moving onto it, and the spot a unit is meant to
+  // stand on.
+  CHECK(pf::units_may_share_tiles(kOilPatch, 0x1e));   // a destroyer on a patch
+  CHECK(pf::units_may_share_tiles(kFootman, kCircleOfPower));
+
+  // A gold mine is not one of them: a worker goes inside it rather than onto
+  // it, and a hall too close to one is caught by its own clearance rule.
+  CHECK(!pf::units_may_share_tiles(kFootman, kGoldMine));
+  CHECK(!pf::units_may_share_tiles(kGoldMine, kTownHall));
+  CHECK(!pf::units_may_share_tiles(kFootman, kFootman));
+  CHECK(!pf::units_may_share_tiles(kTownHall, kTownHall));
+
+  // And the map check agrees, which is the half that matters: a footman on a
+  // mine is offered up, a footman on a circle is not.
+  pf_status st = PF_OK;
+  pf_map* map = pf_map_create(32, 32, PF_TILESET_FOREST, &st);
+  if (!map) { CHECK(false); return; }
+  pf_map_set_allow_illegal_placement(map, 1);
+  CHECK(pf_map_add_unit(map, 4, 4, kGoldMine, 15, 2400) >= 0);
+  CHECK(pf_map_add_unit(map, 4, 4, kFootman, 0, 0) >= 0);
+  pf_map_set_allow_illegal_placement(map, 0);
+  CHECK_EQ(pf_map_misplaced_units(map, PF_MISPLACED_OVERLAP, nullptr, 0), 1);
+
+  CHECK(pf_map_add_unit(map, 20, 20, kCircleOfPower, 15, 0) >= 0);
+  CHECK(pf_map_add_unit(map, 20, 20, kFootman, 0, 0) >= 0);
+  CHECK_EQ(pf_map_misplaced_units(map, PF_MISPLACED_OVERLAP, nullptr, 0), 1);
+  pf_map_free(map);
+}
+
 }  // namespace pft

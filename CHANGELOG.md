@@ -18,7 +18,7 @@ section therefore covers all the commits after the previous tag.
 `scripts/prep-release.ps1` collects those commits as a start. See
 `docs/releasing.md`.
 
-## 0.1.29
+## 0.1.30
 
 **Units**
 
@@ -39,8 +39,11 @@ section therefore covers all the commits after the previous tag.
   until you change it.
 - The editor asks only about the rules that your options keep. If you permit
   units on top of each other, the editor does not ask about them.
-- The editor keeps a start location below a town hall, and a unit on a gold
-  mine or an oil patch. These positions are correct.
+- The editor does not count these correct positions as a fault: a start
+  location below a town hall, a ship on an oil patch, and a ground unit on a
+  Circle of Power.
+- The editor still counts a unit on a gold mine as a fault. No unit can stand
+  on a gold mine.
 
 **Options**
 
