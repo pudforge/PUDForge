@@ -132,14 +132,6 @@ const struct { UINT name; int category; } kKinds[] = {
     {IDS_KIND_HEROES, PF_CATEGORY_HERO},
 };
 
-/// Whether a palette offers this unit at all, whoever is chosen.
-///
-/// The opt-in dozen stay behind an option, the way PUDDraft's did.
-bool UnitIsOffered(int id) {
-  return !pf_unit_is_unused(id) && !pf_unit_never_offered(id) &&
-         !pf_unit_needs_opt_in(id);
-}
-
 }  // namespace
 
 std::wstring UnitGroupHeading(int id) {
@@ -158,7 +150,7 @@ std::wstring UnitGroupHeading(int id) {
   return Str(IDS_GROUP_NEUTRAL);
 }
 
-std::vector<int> UnitsInPaletteOrder(char lead) {
+std::vector<int> UnitsInPaletteOrder(char lead, bool with_unused) {
   std::vector<int> ids;
   ids.reserve(PF_UNIT_COUNT);
   const char first = lead == 'o' ? 'o' : 'h';
@@ -166,7 +158,7 @@ std::vector<int> UnitsInPaletteOrder(char lead) {
   for (char race : {first, second}) {
     for (const auto& kind : kKinds) {
       for (int id = 0; id < PF_UNIT_COUNT; id++) {
-        if (!UnitIsOffered(id) || pf_unit_race(id) != race ||
+        if (!Editor::ListsUnit(id, with_unused) || pf_unit_race(id) != race ||
             pf_unit_category(id) != kind.category) {
           continue;
         }
@@ -176,11 +168,13 @@ std::vector<int> UnitsInPaletteOrder(char lead) {
   }
   // Everything neutral: critters, mines, oil, the buildings you rescue.
   for (int id = 0; id < PF_UNIT_COUNT; id++) {
-    if (UnitIsOffered(id) && pf_unit_race(id) == 'n') ids.push_back(id);
+    if (Editor::ListsUnit(id, with_unused) && pf_unit_race(id) == 'n') {
+      ids.push_back(id);
+    }
   }
   // Then the markers, which the runs above deliberately did not take.
   for (int id = 0; id < PF_UNIT_COUNT; id++) {
-    if (UnitIsOffered(id) && pf_unit_race(id) != 'n' &&
+    if (Editor::ListsUnit(id, with_unused) && pf_unit_race(id) != 'n' &&
         pf_unit_category(id) == PF_CATEGORY_SPECIAL) {
       ids.push_back(id);
     }
@@ -928,7 +922,8 @@ void UnitsPanel::RebuildPalette() {
   // cannot disagree about where one ends.
   std::vector<PaletteGrid::Entry> entries;
   std::wstring open;
-  for (int id : UnitsInPaletteOrder(LeadingRace())) {
+  for (int id : UnitsInPaletteOrder(LeadingRace(),
+                                    editor_ && editor_->offer_unused_units)) {
     // The chosen player's race, unless the option says otherwise. Whole sections
     // vanish rather than being greyed: an orc palette with the human half greyed
     // is the same scrolling for half the use, and the headings would still be
@@ -1035,9 +1030,11 @@ void UnitsPanel::Refresh() {
   const pf_map* map = editor_->map();
   const int race =
       map ? pf_map_race(map, editor_->placing_owner) : int(PF_RACE_NEUTRAL);
-  if (race != palette_race_ || editor_->show_all_races != palette_all_races_) {
+  if (race != palette_race_ || editor_->show_all_races != palette_all_races_ ||
+      editor_->offer_unused_units != palette_unused_) {
     palette_race_ = race;
     palette_all_races_ = editor_->show_all_races;
+    palette_unused_ = editor_->offer_unused_units;
     // Before the rebuild: the armed unit may no longer be one this palette has a
     // cell for, and the cell to show as selected is the one it became.
     editor_->RetargetPlacingType();

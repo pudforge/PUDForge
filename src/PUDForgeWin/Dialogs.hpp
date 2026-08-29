@@ -107,8 +107,10 @@ pf_map* ShowGenerate(HWND owner, HINSTANCE instance, int tileset);
 /// `lead_race` is which race's sections come first, so an empty query lists the
 /// units in the same order as the grid this shadows.
 /// @return the chosen unit id, or -1 when dismissed
+/// `with_unused` is Editor::offer_unused_units, so a search finds exactly what
+/// the grid offers rather than a set of its own.
 int ShowQuickPick(HWND owner, HINSTANCE instance, IconCache* icons,
-                  char lead_race);
+                  char lead_race, bool with_unused);
 
 /// Every tile the artwork can draw, grouped by the terrain it mostly shows.
 /// The corner model will not produce roughly a third of a tileset on its own,

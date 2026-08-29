@@ -932,6 +932,17 @@ bool Editor::EraseAt(int x, int y) {
   return true;
 }
 
+bool Editor::ListsUnit(int type, bool with_unused) {
+  // Never, whatever the option says: walls are terrain here, and the core
+  // marks the two wall-as-unit ids as ones no editor should offer.
+  if (pf_unit_never_offered(type)) return false;
+  if (with_unused) return true;
+  // `pf_unit_is_unused` is a subset of the opt-in set — the corpus test asserts
+  // it — but both are asked so a future unused id that nobody remembered to add
+  // to the opt-in table is still kept out of the palette.
+  return !pf_unit_is_unused(type) && !pf_unit_needs_opt_in(type);
+}
+
 bool Editor::OffersUnit(int type) const {
   if (show_all_races) return true;
   const char race = pf_unit_race(type);

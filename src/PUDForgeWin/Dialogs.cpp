@@ -2798,6 +2798,8 @@ struct QuickSheet {
   std::vector<int> rows;
   /// Which race's sections lead, matching the grid this shadows.
   char lead_race = 'h';
+  /// Editor::offer_unused_units, so the search lists what the grid lists.
+  bool with_unused = false;
 };
 
 /// The 40 best matches, the way the web client caps it: past that the list is
@@ -2812,7 +2814,7 @@ void RefreshQuickRows(HWND dialog, QuickSheet& sheet) {
   wchar_t typed[128] = {};
   GetDlgItemTextW(dialog, IDC_QUICK_SEARCH, typed, 128);
 
-  sheet.rows = UnitsInPaletteOrder(sheet.lead_race);
+  sheet.rows = UnitsInPaletteOrder(sheet.lead_race, sheet.with_unused);
   const int kept = pf_unit_name_filter(ToUtf8(typed).c_str(), sheet.rows.data(),
                                        int(sheet.rows.size()));
   sheet.rows.resize(size_t(std::max(0, std::min(kept, kQuickRows))));
@@ -2973,10 +2975,11 @@ INT_PTR CALLBACK QuickPickProc(HWND dialog, UINT message, WPARAM wparam,
 }  // namespace
 
 int ShowQuickPick(HWND owner, HINSTANCE instance, IconCache* icons,
-                  char lead_race) {
+                  char lead_race, bool with_unused) {
   QuickSheet sheet;
   sheet.icons = icons;
   sheet.lead_race = lead_race;
+  sheet.with_unused = with_unused;
   if (DialogBoxParamW(instance, MAKEINTRESOURCEW(IDD_QUICK_PICK), owner,
                       QuickPickProc, LPARAM(&sheet)) != IDOK) {
     return -1;

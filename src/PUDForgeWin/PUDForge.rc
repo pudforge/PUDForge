@@ -514,7 +514,11 @@ END
  * Generate. Every control redraws the preview, because the numbers mean very
  * little written down and a great deal shown.
  */
-IDD_GENERATE DIALOGEX 0, 0, 380, 312
+// The preview is the control that decides this sheet's size: it is what a
+// mapper actually reads while moving the sliders, and at a third of the width
+// it was a thumbnail you had to lean into. Everything else keeps its place and
+// the window grows around it.
+IDD_GENERATE DIALOGEX 0, 0, 578, 404
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "Generate a Map"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
@@ -562,14 +566,18 @@ BEGIN
   AUTOCHECKBOX    "Place gold &mines", IDC_GEN_MINES, 8, 234, 100, 10
   AUTOCHECKBOX    "Place start &locations", IDC_GEN_STARTS, 8, 248, 110, 10
 
-  CONTROL "", IDC_GEN_PREVIEW, "STATIC", SS_OWNERDRAW | WS_BORDER, 240, 10, 132, 132
-  LTEXT           "", IDC_GEN_NOTE, 240, 150, 132, 40
+  // 2.5x what it was in both axes. Owner-drawn and stretched to whatever rect
+  // it is given, so the size lives here and nowhere else.
+  CONTROL "", IDC_GEN_PREVIEW, "STATIC", SS_OWNERDRAW | WS_BORDER, 240, 10, 330, 330
+  // One line's worth rather than three: the note is the same length as before
+  // and the box it wraps inside is now two and a half times as wide.
+  LTEXT           "", IDC_GEN_NOTE, 240, 348, 330, 24
 
   // Bottom left, away from Create: it throws the whole sheet away and rolls it
   // again, which is the one button here nobody wants to press by aiming at OK.
-  PUSHBUTTON      "&Randomize", IDC_GEN_RANDOMIZE, 8, 290, 60, 14
-  DEFPUSHBUTTON   "Create", IDOK, 264, 290, 50, 14
-  PUSHBUTTON      "Cancel", IDCANCEL, 318, 290, 50, 14
+  PUSHBUTTON      "&Randomize", IDC_GEN_RANDOMIZE, 8, 382, 60, 14
+  DEFPUSHBUTTON   "Create", IDOK, 466, 382, 50, 14
+  PUSHBUTTON      "Cancel", IDCANCEL, 520, 382, 50, 14
 END
 
 /*
@@ -705,7 +713,7 @@ END
  * them — and they outgrew it: a menu shows one at a time and says nothing
  * about which belong together.
  */
-IDD_OPTIONS DIALOGEX 0, 0, 250, 240
+IDD_OPTIONS DIALOGEX 0, 0, 250, 254
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "Options"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
@@ -721,7 +729,7 @@ BEGIN
   AUTOCHECKBOX    "Allow units on the map &edge", IDC_OPT_EDGE, 16, 116, 218, 10
   AUTOCHECKBOX    "&Mark special units", IDC_OPT_MARK_SPECIAL, 16, 130, 218, 10
 
-  GROUPBOX        "Unit display", -1, 8, 156, 234, 58
+  GROUPBOX        "Unit display", -1, 8, 156, 234, 72
   LTEXT           "&Unit artwork", -1, 16, 170, 50, 8
   COMBOBOX        IDC_OPT_UNIT_ART, 70, 168, 80, 60, CBS_DROPDOWNLIST | WS_TABSTOP
   AUTOCHECKBOX    "&Vary rotation", IDC_OPT_FACING, 158, 170, 76, 10
@@ -732,12 +740,17 @@ BEGIN
   // Off by default. With it off the palette follows the chosen player and
   // handing a unit to the other race converts it; see Editor::show_all_races.
   AUTOCHECKBOX    "Unit Toolbar: Show units from &all races", IDC_OPT_ALL_RACES, 16, 198, 218, 10
+  // Off by default, and a warning rather than a preference: five of these are
+  // slots the game has no unit for, and a map that places one crashes it. The
+  // wall-as-unit ids stay hidden even with this on, because walls are terrain
+  // here. See Editor::offer_unused_units.
+  AUTOCHECKBOX    "Offer un&used and special units (may crash the game)", IDC_OPT_UNUSED_UNITS, 16, 212, 218, 10
 
   // Away from OK and Cancel, on the other side of the row: it is the one
   // button on this page that discards something.
-  PUSHBUTTON      "&Reset Everything…", IDC_OPT_RESET, 8, 220, 80, 14
-  DEFPUSHBUTTON   "OK", IDOK, 138, 220, 50, 14
-  PUSHBUTTON      "Cancel", IDCANCEL, 192, 220, 50, 14
+  PUSHBUTTON      "&Reset Everything…", IDC_OPT_RESET, 8, 234, 80, 14
+  DEFPUSHBUTTON   "OK", IDOK, 138, 234, 50, 14
+  PUSHBUTTON      "Cancel", IDCANCEL, 192, 234, 50, 14
 END
 
 /*

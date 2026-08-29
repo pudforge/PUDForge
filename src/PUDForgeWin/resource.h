@@ -360,6 +360,10 @@
    stale dialog template lands on the wrong control. Nothing uses it. */
 #define IDC_OPT_WATER         691
 
+/// Offer the units an editor normally keeps back — the dead slots, the runtime
+/// leftovers, the campaign workers. 692 rather than reusing retired 691.
+#define IDC_OPT_UNUSED_UNITS  692
+
 /* 700 was the keyboard shortcut list box, retired with its dialog. */
 
 #define IDC_NEW_TILESET       710

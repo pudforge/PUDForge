@@ -1492,6 +1492,52 @@ TEST(keeping_stranded_units_holds_them_through_a_scatter) {
   pf_map_free(map);
 }
 
+/**
+ * The option that offers what an editor normally keeps back.
+ *
+ * The set is PUDDraft's "Unused/Special Units" submenu: five slots the game has
+ * no unit for, the runtime leftovers, and the two campaign workers. Off it is a
+ * palette anybody can hand to a beginner; on it is the escape hatch for people
+ * who really do build maps with these.
+ */
+TEST(unused_units_are_offered_only_when_asked_for) {
+  // Ordinary units are listed either way — the option adds, it never removes.
+  for (int unit : {0x00, 0x02, 0x06, 0x5c}) {   // footman, peasant, knight, mine
+    CHECK(Editor::ListsUnit(unit, false));
+    CHECK(Editor::ListsUnit(unit, true));
+  }
+
+  // One of each reason the override gives for holding a unit back.
+  const int kept_back[] = {
+      0x22,   // a slot the game has no unit for; placing one crashes it
+      0x69,   // a corpse, which only exists once the game is running
+      0x10,   // Attack Peasant, a campaign stand-in for an ordinary worker
+  };
+  for (int unit : kept_back) {
+    CHECK(!Editor::ListsUnit(unit, false));
+    CHECK(Editor::ListsUnit(unit, true));
+  }
+
+  // The wall-as-unit ids are the exception the option does not reach. Walls are
+  // terrain in this editor, so a second way to place one that does not auto-tile
+  // would make walls the wall tool cannot fix.
+  for (int unit : {0x67, 0x68}) {
+    CHECK(!Editor::ListsUnit(unit, false));
+    CHECK(!Editor::ListsUnit(unit, true));
+  }
+
+  // Exactly the opt-in set appears, less the two walls that never do. Counted
+  // rather than spot-checked, so a unit added to the override without a thought
+  // for this option shows up here.
+  int off = 0, on = 0;
+  for (int unit = 0; unit < PF_UNIT_COUNT; unit++) {
+    if (Editor::ListsUnit(unit, false)) off++;
+    if (Editor::ListsUnit(unit, true)) on++;
+  }
+  CHECK(off > 0);
+  CHECK_EQ(on - off, pf_unit_needs_opt_in_count() - 2);
+}
+
 TEST(converting_a_unit_type_keeps_position_owner_and_value) {
   pf_map* map = blank();
   Editor ed(map);

@@ -163,6 +163,22 @@ class Editor {
   /// filtered and nothing is converted. See OffersUnit and TypeForOwner.
   bool show_all_races = false;
 
+  /// Offer the units an editor normally keeps back: the five slots the game has
+  /// no unit for, the runtime leftovers — corpses, rubble — and the two
+  /// campaign workers. The membership is PUDDraft's "Unused/Special Units"
+  /// submenu; see `overrides/hidden_units.cpp` for what is in it and why.
+  ///
+  /// Off by default, because placing one of the dead slots crashes the game.
+  /// Opt-in rather than forbidden, because people really do build maps with
+  /// these — and this governs only what the palette and the Units menu offer,
+  /// never what a file may hold. A map that already contains one has always
+  /// loaded, edited and saved unchanged whatever this says.
+  ///
+  /// The two wall-as-unit ids stay hidden even with this on. Walls are terrain
+  /// in this editor, so a second way to place one that does not auto-tile makes
+  /// walls the wall tool cannot fix — which is a bug, not a choice.
+  bool offer_unused_units = false;
+
   /// The three escape hatches from the placement rules.
   ///
   /// Accessors rather than fields, and the setters push straight down: the rules
@@ -364,6 +380,17 @@ class Editor {
   /// a Footman ends up under an orc player.
   /// @return the unit's index afterwards, which a conversion moves, or -1
   int SetUnitOwnerAndValue(int index, int owner, int value);
+
+  /// Whether a palette should list this type at all, before any player filter.
+  ///
+  /// The catalogue question, where OffersUnit is the chosen-player one; a
+  /// palette asks both, and the quick pick asks this one alone.
+  ///
+  /// Static, and `with_unused` is passed rather than read off the instance,
+  /// because the quick pick has no Editor to ask and answering the question
+  /// twice in two places is how the grid and the search end up disagreeing
+  /// about what exists.
+  static bool ListsUnit(int type, bool with_unused);
 
   /// Whether the units palette should offer this type for the chosen player.
   ///

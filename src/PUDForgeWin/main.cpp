@@ -484,6 +484,9 @@ struct App : Host {
     // A preference about the palette rather than about a map, so it is kept
     // with the rest of them. Off by default: see Editor::show_all_races.
     editor.show_all_races = LoadSetting(L"ShowAllRaces", 0) != 0;
+    // Off by default: five of these are slots the game has no unit for, so a
+    // map that places one crashes it. See Editor::offer_unused_units.
+    editor.offer_unused_units = LoadSetting(L"OfferUnusedUnits", 0) != 0;
     icons.SetPreferSprites(unit_art != 0);
     canvas.SetWaterAnimated(LoadSetting(L"Water", 1) != 0);
     terrain_panel.SetColumns(LoadSetting(L"TerrainColumns", 0));
@@ -511,6 +514,7 @@ struct App : Host {
     SaveSetting(L"PaintDark", editor.paint_dark);
     SaveSetting(L"Variation", editor.variation_policy());
     SaveSetting(L"ShowAllRaces", editor.show_all_races);
+    SaveSetting(L"OfferUnusedUnits", editor.offer_unused_units);
     SaveSetting(L"Water", canvas.water_animated());
     SaveSetting(L"TerrainColumns", terrain_panel.columns());
     SaveSetting(L"UnitColumns", units_panel.columns());
@@ -1186,10 +1190,7 @@ struct App : Host {
       HMENU sub = CreatePopupMenu();
       if (!sub) return;
       for (int id = 0; id < PF_UNIT_COUNT; id++) {
-        if (pf_unit_is_unused(id) || pf_unit_never_offered(id) ||
-            pf_unit_needs_opt_in(id)) {
-          continue;
-        }
+        if (!Editor::ListsUnit(id, editor.offer_unused_units)) continue;
         if (!belongs(pf_unit_race(id), pf_unit_category(id))) continue;
         const char* name = pf_unit_name(id);
         AppendMenuW(sub, MF_STRING, UINT(IDM_UNITS_FIRST + id),
@@ -1515,7 +1516,8 @@ struct App : Host {
                              ? pf_map_race(canvas.map(), editor.placing_owner)
                              : int(PF_RACE_HUMAN);
         const int unit = ShowQuickPick(main, instance, &icons,
-                                       race == PF_RACE_ORC ? 'o' : 'h');
+                                       race == PF_RACE_ORC ? 'o' : 'h',
+                                       editor.offer_unused_units);
         if (unit < 0) return true;
         // Choosing a unit means placing one, so the tool follows rather than
         // leaving the choice armed behind whatever mode was on screen.

@@ -59,7 +59,10 @@ int AskDockMenu(HWND owner, POINT at, int pinned, bool on_right,
 ///
 /// Shared with the quick pick: the two showing the same set in two different
 /// orders would make a search feel like a different program from the grid.
-std::vector<int> UnitsInPaletteOrder(char lead);
+/// `with_unused` is Editor::offer_unused_units. Passed rather than defaulted,
+/// so a caller has to decide: a search that quietly listed a different set from
+/// the grid is the disagreement this function exists to prevent.
+std::vector<int> UnitsInPaletteOrder(char lead, bool with_unused);
 
 /// The heading a unit sits under. Derived from the unit rather than looped over,
 /// so the sections and the running order above cannot disagree about where one
@@ -214,6 +217,7 @@ class UnitsPanel {
   /// exist, and neither is something an edit changes often.
   int palette_race_ = -1;
   bool palette_all_races_ = false;
+  bool palette_unused_ = false;
   /// The palette's right-click menu: what to do with the unit under the
   /// pointer, then how the cells are sized and which side the dock is on.
   /// `unit` is -1 when the click did not land on a cell.
