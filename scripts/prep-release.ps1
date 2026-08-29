@@ -113,8 +113,9 @@ if ($notes -match "(?m)^## $([regex]::Escape($version))\s*$") {
     if (-not $commits.Count) { $commits = @('(no commits since ' + $since + ')') }
 
     $seed = @("## $version", '')
-    $seed += '<!-- Written from these commits' + $(if ($since) { " since $since" }) + '; rewrite them'
-    $seed += '     into what a person needs to know, then delete this block. -->'
+    $seed += '<!-- Written from these commits' + $(if ($since) { " since $since" }) + '. Rewrite them'
+    $seed += '     as short ASD-STE100 bullets about what is different for a user -'
+    $seed += '     see the top of this file - then delete this block. -->'
     foreach ($c in $commits) { $seed += "<!-- $c -->" }
     $seed += ''
 
@@ -129,7 +130,7 @@ if ($notes -match "(?m)^## $([regex]::Escape($version))\s*$") {
     $noBom = New-Object System.Text.UTF8Encoding $false
     [System.IO.File]::WriteAllText($changelog, ($out -join "`r`n") + "`r`n", $noBom)
     Note "opened a $version section seeded with $($commits.Count) commit(s) since $since"
-    Note 'Rewrite it before committing - it is the release notes verbatim.'
+    Note 'Rewrite it as ASD-STE100 bullets - it is the release notes verbatim.'
 }
 
 # ------------------------------------------------------- build and prove it

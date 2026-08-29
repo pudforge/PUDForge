@@ -1,60 +1,65 @@
 # Changelog
 
-What changed in each released version, newest first. This is the source for
-the GitHub release notes: CI reads the section matching `version.h` and posts
-it verbatim, so what is written here is what people read.
+What changed in each release, newest first. CI reads the section for the
+version in `version.h` and posts it as the GitHub release notes. What you write
+here is what people read.
 
-`version.h` gets a patch bump on every commit, but only the version sitting on
-`master` when CI runs is tagged and released. A section here is therefore keyed
-to a *release* and covers every commit since the previous tag, not one commit
-each. `scripts/prep-release.ps1` collects those commits as a starting point;
-the words are still a person's job. See `docs/releasing.md`.
+Write it in ASD-STE100 (Simplified Technical English), as short bullet points
+that tell a user what is different:
 
-## 0.1.28
+- One idea in each sentence. No more than 25 words.
+- The active voice, the present tense, and the same word for the same thing.
+- No metaphors, no jargon, and no words that only the code explains.
+- Say what a person can now do, or which problem is corrected.
 
-**Ships and flying units are 2x2.** They were one tile, because that is what
-`UDTA`'s `unitSize` field says about every mobile unit in the game's own
-defaults — which would fit a battleship in a one-tile pond. The game plainly
-disagrees, and its data says so twice: `boxSize` gives all ten ships and all
-six fliers 63–71 px against 31–42 for infantry, and every ship and flier in the
-shipped maps sits on an even tile, which is the signature of a 2x2 unit
-anchored at its top-left corner. Placing, overlap and validation all follow the
-real size now, so a destroyer needs water it actually fits in. Ballista and
-Catapult carry the same big artwork and stay one tile: they appear at both
-parities, so they are land units that merely look large.
+A section is for a *release*, not for a commit. `version.h` gets a patch bump
+on every commit, but only the version on `master` when CI runs gets a tag. A
+section therefore covers all the commits after the previous tag.
+`scripts/prep-release.ps1` collects those commits as a start. See
+`docs/releasing.md`.
 
-**Unit placement options are remembered.** "Allow placing units at illegal
-positions", "Allow units on top of each other", "Allow units on the map edge"
-and "Mark special units" were read out of the Options dialog and written
-nowhere, so every session opened with the rules back on. All of them persist
-now, along with the two terrain-fitting options and "Keep units the terrain no
-longer supports".
+## 0.1.29
 
-**Opening a map offers to remove units the game cannot place.** A `.pud` may
-hold a footman in the sea, two units on one tile or a building hanging off the
-edge; other editors write them, and this one has always loaded them unchanged.
-Now it says so once, with a count, and offers to take them away as a single
-undo step. It asks only about the rules you are actually keeping — turn
-stacking on and it stops asking about stacks — and the answer defaults to No.
-Start locations under a town hall and oil wells on their patch are what the
-game intends and are never counted.
+**Units**
 
-**Convert Units can be narrowed to the selection.** A new "Only the selected
-units" switch, off by default, because the whole map is what the tool is for.
-Greyed out when nothing is selected.
+- Ships and flying units now occupy 2 x 2 tiles. This is the area that
+  Warcraft II gives them. The editor gave them one tile.
+- The editor now refuses to put a ship in water that is too small for it. It
+  also refuses to put two ships in the same place.
+- The map check finds ships and flying units in positions that the game cannot
+  use.
+- The Convert Units window has a new option: **Only the selected units**. The
+  option is off. The editor makes the option unavailable if you select no
+  units.
 
-**Unused and special units are available behind an option.** "Offer unused and
-special units" in Options adds PUDDraft's *Unused/Special Units* set to the
-palette, the Units menu and the quick pick: the slots the game has no unit for,
-the runtime leftovers, and the two campaign workers. Off by default and marked
-as risky, because placing one of the dead slots crashes the game. The two
-wall-as-unit ids stay hidden either way — walls are terrain here, and a second
-way to place one that does not auto-tile makes walls the wall tool cannot fix.
+**Maps**
 
-**A bigger Generate window.** The preview is what you actually read while
-moving the sliders, and at 132 dlu square it was a thumbnail. It is 2.5x in
-both directions now, with the sheet grown around it.
+- When you open a map, the editor counts the units that the game cannot place.
+  It shows the count and asks if you want to remove them. The answer is No
+  until you change it.
+- The editor asks only about the rules that your options keep. If you permit
+  units on top of each other, the editor does not ask about them.
+- The editor keeps a start location below a town hall, and a unit on a gold
+  mine or an oil patch. These positions are correct.
+
+**Options**
+
+- The editor now keeps these options after you close it: **Allow placing units
+  at illegal positions**, **Allow units on top of each other**, **Allow units
+  on the map edge**, **Mark special units**, **Adjust surrounding terrain when
+  editing**, **Adjust edges when pasting**, and **Keep units the terrain no
+  longer supports**. The editor did not keep them, and each session started
+  with the default values.
+- A new option, **Offer unused and special units**, adds the unused units, the
+  corpses, the rubble and the two campaign workers to the unit palette, the
+  Units menu and the quick pick. The option is off. Five of these units can
+  stop the game.
+
+**Windows**
+
+- The Generate a Map window is larger. The preview is 2.5 times as wide and as
+  high, and it is easier to read while you move the sliders.
 
 ## 0.1.26
 
-First public release.
+- The first public release.

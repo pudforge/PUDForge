@@ -46,6 +46,14 @@ game is required. So the section is written for whoever lands on the releases
 page, not for whoever wrote the commit — the seeded commit subjects are a
 reminder of what happened, not the notes.
 
+**Write the section in ASD-STE100** (Simplified Technical English), as short
+bullets about what is different for a user: one idea per sentence, 25 words at
+most, active voice, present tense, the same word for the same thing every time,
+and no metaphors or jargon. "Feature X now supports Y", or "a problem that
+caused Z is corrected" — not the reasoning behind the change, which belongs in
+the commit message and the code. `CHANGELOG.md` repeats these rules at the top,
+where whoever is editing it will see them.
+
 A section is keyed to a *release*, not to a commit. `version.h` is bumped on
 every commit, but only the version sitting on `master` when CI runs gets a tag,
 so several patch bumps can fold into one released version. The section covers

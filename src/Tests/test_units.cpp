@@ -959,4 +959,48 @@ TEST(a_ship_needs_water_for_its_whole_footprint) {
   pf_map_free(map);
 }
 
+
+/**
+ * Opening a real map must not cry wolf.
+ *
+ * The client offers, once, to delete the units it thinks the game could not
+ * place. An offer like that is only worth making if it is nearly always right,
+ * and the way to get it wrong is a rule that is too strict rather than too
+ * loose: giving ships their real 2x2 footprint turned every warship parked on
+ * an oil patch into an "overlap" — eight of them on one fixture — until
+ * resources were excluded the way start-location markers already were.
+ *
+ * A share rather than a count, and measured rather than asserted from memory.
+ */
+TEST(opening_a_map_does_not_offer_to_delete_much) {
+  if (!have_corpus()) { skip("no maps"); return; }
+  long units = 0, flagged = 0, shipped_units = 0, shipped_flagged = 0;
+  std::string worst;
+  long worst_n = 0;
+
+  for (const std::string& path : g_corpus) {
+    pf_status st = PF_OK;
+    pf_map* map = pf_map_open_file(path.c_str(), &st);
+    if (!map) continue;
+    const long n = pf_map_misplaced_units(map, PF_MISPLACED_ALL, nullptr, 0);
+    const long total = pf_map_unit_count(map);
+    units += total;
+    flagged += n;
+    if (n > worst_n) { worst_n = n; worst = path; }
+    if (is_shipped(path) || !g_corpus_is_shipped) {
+      shipped_units += total;
+      shipped_flagged += n;
+    }
+    pf_map_free(map);
+  }
+
+  std::printf("     %ld of %ld units would be offered up (%ld of %ld shipped)\n",
+              flagged, units, shipped_flagged, shipped_units);
+  if (worst_n) std::printf("     worst: %ld in %s\n", worst_n, worst.c_str());
+  CHECK(units > 0);
+  // Under 2%. Blizzard's own maps were made by the tool that defined the
+  // format, so a rule that flags many of their units is the rule being wrong.
+  CHECK(shipped_flagged * 50 <= shipped_units);
+}
+
 }  // namespace pft

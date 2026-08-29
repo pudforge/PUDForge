@@ -2772,8 +2772,25 @@ namespace {
 /// maps "invalid".
 constexpr int kRealPlayers = 8;
 constexpr int kGoldMine = 92;
+constexpr int kOilPatch = 93;
 constexpr int kHumanStart = 94;
 constexpr int kOrcStart = 95;
+
+/// Whether two units sharing tiles are an arrangement the game intends.
+///
+/// Start locations are markers rather than things, and sit under a town hall on
+/// almost every map. A resource is a place rather than an obstruction: it is
+/// harvested by standing on it, and the fixtures park a tanker or a warship on
+/// each oil patch eight times over on one map. Nothing is lost by not calling
+/// that an overlap — a town hall crowding a gold mine has a rule of its own,
+/// which measures clearance rather than contact.
+bool overlap_is_intended(int a, int b) {
+  const bool marker = a == kHumanStart || a == kOrcStart ||
+                      b == kHumanStart || b == kOrcStart;
+  const bool resource = a == kGoldMine || b == kGoldMine ||
+                        a == kOilPatch || b == kOilPatch;
+  return marker || resource;
+}
 
 void add_issue(std::vector<pf_issue>& out, int severity, int code, int player,
                int x, int y, const char* message) {
@@ -2888,12 +2905,7 @@ int pf_map_validate(const pf_map* map, pf_issue* out, int capacity) {
       const bool apart = int(a.x) + aw <= int(b.x) || int(b.x) + bw <= int(a.x) ||
                          int(a.y) + ah <= int(b.y) || int(b.y) + bh <= int(a.y);
       if (apart) continue;
-      // Intended arrangements: a marker under anything, and a well on its patch.
-      const bool marker = a.type == 94 || a.type == 95 || b.type == 94 || b.type == 95;
-      const bool well_on_patch =
-          ((a.type == 86 || a.type == 87) && b.type == 93) ||
-          ((b.type == 86 || b.type == 87) && a.type == 93);
-      if (marker || well_on_patch) continue;
+      if (overlap_is_intended(a.type, b.type)) continue;
       std::snprintf(text, sizeof(text), "%s overlaps %s",
                     pf_unit_name(a.type) ? pf_unit_name(a.type) : "unit",
                     pf_unit_name(b.type) ? pf_unit_name(b.type) : "unit");
@@ -3012,12 +3024,7 @@ void collect_misplaced(const pf_map* map, int what, std::vector<int>& out) {
         const bool apart = int(a.x) + aw <= int(b.x) || int(b.x) + bw <= int(a.x) ||
                            int(a.y) + ah <= int(b.y) || int(b.y) + bh <= int(a.y);
         if (apart) continue;
-        // Intended arrangements: a marker under anything, a well on its patch.
-        const bool marker = a.type == kHumanStart || a.type == kOrcStart ||
-                            b.type == kHumanStart || b.type == kOrcStart;
-        const bool well_on_patch = ((a.type == 86 || a.type == 87) && b.type == 93) ||
-                                   ((b.type == 86 || b.type == 87) && a.type == 93);
-        if (marker || well_on_patch) continue;
+        if (overlap_is_intended(a.type, b.type)) continue;
         flagged[size_t(j)] = 1;
       }
     }
