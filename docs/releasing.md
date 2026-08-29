@@ -47,7 +47,8 @@ page, not for whoever wrote the commit — the seeded commit subjects are a
 reminder of what happened, not the notes.
 
 **Write the section in ASD-STE100** (Simplified Technical English), as a short
-list of what is different for a user — one bullet per change, no headings: one idea per sentence, 25 words at
+list of what is different for a user — one bullet per change, under **Fixed**,
+**New** or **Changed**: one idea per sentence, 25 words at
 most, active voice, present tense, the same word for the same thing every time,
 and no metaphors or jargon. "Feature X now supports Y", or "a problem that
 caused Z is corrected" — not the reasoning behind the change, which belongs in
