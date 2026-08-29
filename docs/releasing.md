@@ -23,7 +23,8 @@ gh run watch --repo pudforge/PUDForge
 
 ## What the script does
 
-`scripts/prep-release.ps1 [-Part patch|minor|major] [-SkipTests] [-AllowDirty]`
+`scripts/prep-release.ps1 [-Part patch|minor|major] [-NoBump] [-SkipTests]
+[-AllowDirty]`
 
 1. Refuses to run off `master`, or on a dirty tree unless `-AllowDirty` (which
    is the usual case: the release commit and the changes it ships are normally
@@ -37,6 +38,11 @@ gh run watch --repo pudforge/PUDForge
    stale unrelinked exe is a release without the change in it — and runs
    `ctest`.
 5. Prints what is left. It never pushes, tags, or calls `gh`.
+
+`-NoBump` checks the version that is already in `version.h` instead of moving
+it. Use it for the last look before a push when the release was prepared over
+several commits: `version.h` asks for a bump on every commit, so by then the
+number is already the one that will ship.
 
 ## The changelog is the release notes
 

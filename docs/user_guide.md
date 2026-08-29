@@ -159,12 +159,19 @@ controller, starting resources and AI script.
 | 1 to 8 | Assign the selection to that player |
 | Ctrl+D | Place another of the selected unit |
 
-The editor refuses placements the game would refuse: a ship on land, a town
-hall too close to a gold mine, a unit on the map edge. The status bar names the
-unit and the reason. Each refusal can be disabled in **Tools ▸ Options…**.
+A unit covers the tiles the game gives it, and the editor keeps that area
+clear. Most units cover one tile, buildings cover two to four, and ships and
+flying units cover four in a two by two square.
 
-Existing maps that break these rules load unchanged. The editor does not
-correct a map it opened; it only declines to introduce new violations.
+The editor refuses placements the game would refuse: a ship on land, a ship in
+water too small for it, a town hall too close to a gold mine, a unit on the map
+edge. The status bar names the unit and the reason. Each refusal can be
+disabled in **Tools ▸ Options…**.
+
+Existing maps that break these rules load unchanged. On the first sight of such
+a map the editor says how many units are in a position the game cannot use, and
+offers to remove them; see **Checking a map**. If you decline, the map stays as
+it is.
 
 ## Selections
 
@@ -275,6 +282,18 @@ Conditions that are merely unusual are reported as measurements rather than
 faults. An uneven gold split is reported as a number, because the shipped maps
 range from even to heavily lopsided.
 
+The editor makes part of this check when you open a map, and asks once whether
+to remove the units it finds: units outside the map, units on terrain they
+cannot occupy, and units on top of each other. It removes them as one step,
+which **Edit ▸ Undo** reverses. The answer is No until you change it.
+
+It asks only about the rules you keep. If **Allow units on top of each other**
+is on, it does not ask about units on top of each other.
+
+Some units share tiles because the game intends it, and the editor never
+reports those: a start location below a town hall, a ship on an oil patch, and
+a ground unit on a Circle of Power. Nothing may share a gold mine.
+
 **Map ▸ Place Start Locations** adds the missing start locations on open ground,
 away from each other and near gold. The editor offers this on save if a map has
 units but fewer than two start locations.
@@ -292,7 +311,7 @@ The seed makes a result reproducible: the same values produce the same map.
 
 | Command | Function |
 |---|---|
-| Convert Units… | Replace every unit of one type with another |
+| Convert Units… | Replace units of one type with another, across the map or within the selection |
 | AI Scripts… | The AI script table the map's players refer to |
 | Export to a PNG… | Render the map to an image file |
 | Log… (Ctrl+L) | Every message the editor has produced this session |
@@ -308,11 +327,20 @@ blends into its surroundings, and whether units the terrain no longer supports
 are kept rather than removed.
 
 **Unit placement.** Three overrides: allow illegal positions, allow units on
-top of each other, and allow units on the map edge. All are off by default.
+top of each other, and allow units on the map edge. A fourth setting marks
+special units on the map. All are off by default.
 
 **Unit display.** Unit artwork as command-button icons or as sprites, varied
-facing, the game's unit sounds, and whether the palette lists every race or
-only the selected player's.
+facing, the game's unit sounds, whether the palette lists every race or only
+the selected player's, and whether it offers the unused and special units.
+
+The unused and special units are the ones an editor normally holds back: the
+slots the game has no unit for, the corpses and rubble the game makes while it
+runs, and the two campaign workers. Leave this off unless you need them. Five
+of the slots have no unit behind them, and a map that places one stops the
+game. Walls stay out of the palette either way, because walls are terrain here.
+
+Everything in this window is kept between sessions.
 
 ## Resetting the editor
 

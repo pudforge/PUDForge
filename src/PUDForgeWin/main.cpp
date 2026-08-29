@@ -509,6 +509,10 @@ struct App : Host {
     SaveSetting(L"UnitsOnRight", units_right);
     SaveSetting(L"MinimapOnRight", minimap_right);
   }
+  /// The Units popup, held from the first fill. See FillUnitsMenu for why it
+  /// cannot be found again once it has been filled.
+  HMENU units_menu_ = nullptr;
+
   /// Where the context menu was opened, for the items that act on a tile.
   POINT context_tile_{};
 
@@ -1198,9 +1202,23 @@ struct App : Host {
   /// about where a Dragon lives. Ours is only the order of the groups, which is
   /// PUDDraft's. The opt-in dozen are left out, as they are in the palette.
   void FillUnitsMenu() {
-    HMENU units = FindPopupContaining(GetMenu(main), IDM_UNITS_FIRST);
+    // Found once and then kept. The search is for the popup holding
+    // IDM_UNITS_FIRST, and that is the template's placeholder only until the
+    // first pass replaces it — after that the id belongs to Footman, who lives
+    // inside "Human Land Units", so searching again returns that submenu and
+    // the rebuild lands one level down inside it.
+    if (!units_menu_) {
+      units_menu_ = FindPopupContaining(GetMenu(main), IDM_UNITS_FIRST);
+    }
+    HMENU units = units_menu_;
     if (!units) return;
-    DeleteMenu(units, IDM_UNITS_FIRST, MF_BYCOMMAND);
+    // Everything, not the placeholder alone. This runs again when the game
+    // folder changes and when an option changes which units are listed, and a
+    // second pass that removed only the placeholder appended a whole second
+    // copy of the menu — twelve more submenus under the same twelve headings.
+    // DeleteMenu by position destroys the popups it removes; RemoveMenu would
+    // leak them.
+    while (GetMenuItemCount(units) > 0) DeleteMenu(units, 0, MF_BYPOSITION);
 
     // One submenu, or nothing at all when no unit belongs in it. An empty
     // submenu is a word you can point at that does nothing.
@@ -1246,6 +1264,7 @@ struct App : Host {
     // deliberately did not take them.
     group(Str(IDS_MENU_GROUP_MARKERS),
           [](char r, int c) { return r != 'n' && c == PF_CATEGORY_SPECIAL; });
+    DrawMenuBar(main);
   }
 
   /// Show or hide the docks, the minimap and the status bar, then relayout.
@@ -1590,6 +1609,12 @@ struct App : Host {
           // The palette holds no icons of its own — it reads the cache — but it
           // does need telling that what the cache answers has changed.
           units_panel.SetArtwork(&icons, art, pf_map_tileset(canvas.map()));
+          // The palette rebuilds itself from OnEditorChanged below, but the
+          // menu is a resource that is written once and then left alone, so it
+          // has to be told. Unconditional rather than only when the unused
+          // units were toggled: it is a hundred AppendMenuW calls behind a
+          // dialog somebody just pressed OK on.
+          FillUnitsMenu();
           canvas.SetVaryFacing(vary_facing);
           canvas.MarkMapChanged();
           OnEditorChanged();
@@ -2302,12 +2327,6 @@ int APIENTRY wWinMain(HINSTANCE instance, HINSTANCE, LPWSTR, int show) {
   // answered nothing, and must ask again rather than start silently next time.
   SaveSetting(L"SetupSeen", 1);
 
-  // After the game folder, not before: adopting it installs the game's own
-  // string table, and this menu writes a hundred unit names into a resource once
-  // and never looks at them again. Built first, it was the one place still
-  // saying "Archer" while everything else said "Elven Archer".
-  app.FillUnitsMenu();
-
   // A path on the command line, so the exe can be a file association and so
   // `PUDForge.exe map.pud` is the first thing that ever works.
   int argc = 0;
@@ -2324,6 +2343,16 @@ int APIENTRY wWinMain(HINSTANCE instance, HINSTANCE, LPWSTR, int show) {
   // The size and the settings the last run was left with. Restored after the
   // map is open so the toggles land on a window that has something in it.
   app.RestoreSettings();
+
+  // After the game folder, not before: adopting it installs the game's own
+  // string table, and this menu writes a hundred unit names into a resource
+  // once. Built first, it was the one place still saying "Archer" while
+  // everything else said "Elven Archer".
+  //
+  // And after the settings, not before, which is the newer half of the rule:
+  // which units the menu lists is one of them, so a menu built first is a menu
+  // built from the defaults whatever the person chose last time.
+  app.FillUnitsMenu();
   app.terrain_panel.Refresh();
   app.units_panel.Refresh();
   app.Layout();

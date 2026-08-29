@@ -355,9 +355,17 @@ const char* pf_unit_name(int unit_id) {
   // The game's own table when a host has installed one, so a localised or
   // modded install is described in its own words. Unit ids run one behind the
   // table, and a blank entry means the game does not name that unit.
+  //
+  // Bounded by where the upgrades begin, because the unit block is 105 long
+  // where kUnitCount is 110 — see tbl.hpp. Without the bound the last five ids
+  // read the first five upgrade captions, so Corpse came out as "Upgrade Sword
+  // Strength 1", newline and all. Nothing offered those ids until an option
+  // did, which is how five years of correct-looking menus stayed correct.
   if (const pf_strings* s = pf::installed_strings()) {
-    const std::string& named = s->tbl.at(pf::kFirstUnitString + unit_id);
-    if (!named.empty()) return named.c_str();
+    if (pf::kFirstUnitString + unit_id < pf::kFirstUpgradeString) {
+      const std::string& named = s->tbl.at(pf::kFirstUnitString + unit_id);
+      if (!named.empty()) return named.c_str();
+    }
   }
   return pf::kUnits[unit_id].name;
 }

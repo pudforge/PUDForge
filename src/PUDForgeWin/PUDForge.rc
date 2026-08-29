@@ -740,7 +740,7 @@ BEGIN
   // Off unless asked for, and it needs the game to hand: the clips are read
   // out of the archives the user already owns, like every other byte of
   // artwork. Nothing in the editor depends on one having been heard.
-  AUTOCHECKBOX    "Play unit sounds &sounds", IDC_OPT_SOUNDS, 16, 184, 218, 10
+  AUTOCHECKBOX    "Play unit &sounds", IDC_OPT_SOUNDS, 16, 184, 218, 10
   // Off by default. With it off the palette follows the chosen player and
   // handing a unit to the other race converts it; see Editor::show_all_races.
   AUTOCHECKBOX    "Unit Toolbar: Show units from &all races", IDC_OPT_ALL_RACES, 16, 198, 218, 10

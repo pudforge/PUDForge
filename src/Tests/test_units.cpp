@@ -6,6 +6,8 @@
 
 #include <cstdlib>   // free, for the bytes pf_data_source_read hands back
 
+#include "tbl.hpp"   // where the unit block of the game's string table ends
+
 TEST_GROUP("units")
 
 namespace pft {
@@ -1046,6 +1048,28 @@ TEST(only_a_few_units_may_share_tiles) {
   CHECK(pf_map_add_unit(map, 20, 20, kFootman, 0, 0) >= 0);
   CHECK_EQ(pf_map_misplaced_units(map, PF_MISPLACED_OVERLAP, nullptr, 0), 1);
   pf_map_free(map);
+}
+
+
+/**
+ * The unit block in the game's string table ends before the upgrades.
+ *
+ * 105 names for 110 units, so a lookup that does not stop at the boundary
+ * gives the last five ids the first five upgrade captions. This runs without
+ * the game, where the check against the real table cannot; it pins the two
+ * offsets that the bound is made of.
+ */
+TEST(the_unit_name_block_stops_before_the_upgrades) {
+  CHECK_EQ(pf::kFirstUpgradeString - pf::kFirstUnitString, 105);
+  CHECK(pf::kFirstUnitString + pf::kUnitCount > pf::kFirstUpgradeString);
+
+  // The ids the game does not name, which are the ones the bound protects.
+  for (int unit = 105; unit < pf::kUnitCount; unit++) {
+    const char* name = pf_unit_name(unit);
+    CHECK(name != nullptr && *name != 0);
+    CHECK(std::string(name).find("Upgrade") == std::string::npos);
+  }
+  CHECK(std::string(pf_unit_name(0x69)) == "Corpse");
 }
 
 }  // namespace pft

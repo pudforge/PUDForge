@@ -29,7 +29,13 @@ param(
     # Prepare against a tree that is not clean. Prints what is uncommitted and
     # carries on, for the usual case where the release commit is being written
     # at the same time as the changes it ships.
-    [switch]$AllowDirty
+    [switch]$AllowDirty,
+
+    # Check the version that is already in version.h rather than moving it. For
+    # the last look before a push, when the bump happened as part of the work:
+    # version.h asks for one on every commit, so a release prepared over
+    # several commits arrives here already at the number it will ship as.
+    [switch]$NoBump
 )
 
 $ErrorActionPreference = 'Stop'
@@ -57,7 +63,7 @@ Note "on $branch"
 
 # ------------------------------------------------------------- the version
 
-Step 'Bumping the version'
+Step $(if ($NoBump) { 'Reading the version' } else { 'Bumping the version' })
 # Read through .NET rather than Get-Content: Windows PowerShell 5.1 decodes as
 # the system codepage, which turns every em dash in these files into mojibake
 # on the way back out. Sources here are UTF-8, and .NET reads them as UTF-8.
@@ -70,10 +76,12 @@ if ($text -notmatch '#define PF_APP_VERSION_PATCH (\d+)') { throw "no PATCH in $
 $patch = [int]$Matches[1]
 $was = "$major.$minor.$patch"
 
-switch ($Part) {
-    'major' { $major++; $minor = 0; $patch = 0 }
-    'minor' { $minor++; $patch = 0 }
-    'patch' { $patch++ }
+if (-not $NoBump) {
+    switch ($Part) {
+        'major' { $major++; $minor = 0; $patch = 0 }
+        'minor' { $minor++; $patch = 0 }
+        'patch' { $patch++ }
+    }
 }
 $version = "$major.$minor.$patch"
 
@@ -84,17 +92,21 @@ if (-not [string]::IsNullOrWhiteSpace($existing)) {
     throw "v$version is already tagged on origin. Bump further."
 }
 
-$text = $text -replace '#define PF_APP_VERSION_MAJOR \d+', "#define PF_APP_VERSION_MAJOR $major"
-$text = $text -replace '#define PF_APP_VERSION_MINOR \d+', "#define PF_APP_VERSION_MINOR $minor"
-$text = $text -replace '#define PF_APP_VERSION_PATCH \d+', "#define PF_APP_VERSION_PATCH $patch"
-$text = $text -replace '#define PF_APP_VERSION_STR "[^"]*"', "#define PF_APP_VERSION_STR `"$version`""
-$text = $text -replace '#define PF_APP_VERSION_WSTR L"[^"]*"', "#define PF_APP_VERSION_WSTR L`"$version`""
-# Written without a BOM: Windows PowerShell's -Encoding utf8 adds one, and a
-# release commit whose only visible change is three bytes at the top of a
-# header is a diff nobody can read.
-$noBom = New-Object System.Text.UTF8Encoding $false
-[System.IO.File]::WriteAllText($versionFile, $text, $noBom)
-Note "$was -> $version"
+if ($NoBump) {
+    Note "$version, as version.h already has it"
+} else {
+    $text = $text -replace '#define PF_APP_VERSION_MAJOR \d+', "#define PF_APP_VERSION_MAJOR $major"
+    $text = $text -replace '#define PF_APP_VERSION_MINOR \d+', "#define PF_APP_VERSION_MINOR $minor"
+    $text = $text -replace '#define PF_APP_VERSION_PATCH \d+', "#define PF_APP_VERSION_PATCH $patch"
+    $text = $text -replace '#define PF_APP_VERSION_STR "[^"]*"', "#define PF_APP_VERSION_STR `"$version`""
+    $text = $text -replace '#define PF_APP_VERSION_WSTR L"[^"]*"', "#define PF_APP_VERSION_WSTR L`"$version`""
+    # Written without a BOM: Windows PowerShell's -Encoding utf8 adds one, and a
+    # release commit whose only visible change is three bytes at the top of a
+    # header is a diff nobody can read.
+    $noBom = New-Object System.Text.UTF8Encoding $false
+    [System.IO.File]::WriteAllText($versionFile, $text, $noBom)
+    Note "$was -> $version"
+}
 
 # ----------------------------------------------------------- the changelog
 

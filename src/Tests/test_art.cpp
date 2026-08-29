@@ -141,6 +141,17 @@ TEST(unit_names_come_from_the_games_own_string_table) {
   // and the orc wall are the whole of that set.
   CHECK(std::string(pf_unit_name(0x22)) == "Unused #34");
   CHECK(std::string(pf_unit_name(0x68)) == "Orc Wall");
+  // And the five ids past the end of the block, which is the other way to have
+  // no name: the unit block is 105 long where kUnitCount is 110, so an
+  // unbounded read gives these the first five upgrade captions. Corpse came out
+  // as the three lines of the first upgrade button, which is how it was found.
+  CHECK(std::string(pf_unit_name(0x69)) == "Corpse");
+  CHECK(std::string(pf_unit_name(0x6a)) == "1x1 Rubble");
+  CHECK(std::string(pf_unit_name(0x6d)) == "4x4 Rubble");
+  for (int unit = 0; unit < pf::kUnitCount; unit++) {
+    // A name with a line break in it is a name read out of the button block.
+    CHECK(std::string(pf_unit_name(unit)).find(0x0a) == std::string::npos);
+  }
   // And every unit still has a name of some kind, which is the property the
   // palette and every list depend on.
   int named = 0;

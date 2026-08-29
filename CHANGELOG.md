@@ -22,7 +22,7 @@ section therefore covers all the commits after the previous tag.
 `scripts/prep-release.ps1` collects those commits as a start. See
 `docs/releasing.md`.
 
-## 0.1.33
+## 0.1.35
 
 **Fixed**
 
@@ -31,6 +31,8 @@ section therefore covers all the commits after the previous tag.
   small.
 - The editor keeps the unit placement and terrain options after you close it.
   Each session started with the default values.
+- The Units menu shows each group one time after you change the Warcraft II
+  folder. It showed every group two times.
 
 **New**
 

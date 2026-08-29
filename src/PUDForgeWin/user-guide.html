@@ -292,8 +292,9 @@ Path=D:\Games\Warcraft II</pre>
 <td>Place another of the selected unit</td>
 </tr>
 </tbody></table>
-<p>The editor refuses placements the game would refuse: a ship on land, a town hall too close to a gold mine, a unit on the map edge. The status bar names the unit and the reason. Each refusal can be disabled in <strong>Tools ▸ Options…</strong>.</p>
-<p>Existing maps that break these rules load unchanged. The editor does not correct a map it opened; it only declines to introduce new violations.</p>
+<p>A unit covers the tiles the game gives it, and the editor keeps that area clear. Most units cover one tile, buildings cover two to four, and ships and flying units cover four in a two by two square.</p>
+<p>The editor refuses placements the game would refuse: a ship on land, a ship in water too small for it, a town hall too close to a gold mine, a unit on the map edge. The status bar names the unit and the reason. Each refusal can be disabled in <strong>Tools ▸ Options…</strong>.</p>
+<p>Existing maps that break these rules load unchanged. On the first sight of such a map the editor says how many units are in a position the game cannot use, and offers to remove them; see <strong>Checking a map</strong>. If you decline, the map stays as it is.</p>
 <h2 id="selections">Selections</h2>
 <p>Terrain and units have separate selections and are edited independently.</p>
 <p><strong>Tiles</strong> (Ctrl+T). Drag a rectangle. <strong>Shift+drag</strong> adds a rectangle, <strong>Alt+drag</strong> subtracts one. The status bar reports the tile count and the bounding box separately.</p>
@@ -400,6 +401,9 @@ Path=D:\Games\Warcraft II</pre>
 <h2 id="checking-a-map">Checking a map</h2>
 <p><strong>Map ▸ Check Map</strong> reports conditions that make a map unplayable or unusual: players with no start location, units on terrain they cannot occupy, buildings too close to a gold mine, and start locations with no gold within reach. Errors sort before warnings.</p>
 <p>Conditions that are merely unusual are reported as measurements rather than faults. An uneven gold split is reported as a number, because the shipped maps range from even to heavily lopsided.</p>
+<p>The editor makes part of this check when you open a map, and asks once whether to remove the units it finds: units outside the map, units on terrain they cannot occupy, and units on top of each other. It removes them as one step, which <strong>Edit ▸ Undo</strong> reverses. The answer is No until you change it.</p>
+<p>It asks only about the rules you keep. If <strong>Allow units on top of each other</strong> is on, it does not ask about units on top of each other.</p>
+<p>Some units share tiles because the game intends it, and the editor never reports those: a start location below a town hall, a ship on an oil patch, and a ground unit on a Circle of Power. Nothing may share a gold mine.</p>
 <p><strong>Map ▸ Place Start Locations</strong> adds the missing start locations on open ground, away from each other and near gold. The editor offers this on save if a map has units but fewer than two start locations.</p>
 <h2 id="generating-a-map">Generating a map</h2>
 <p><strong>File ▸ Generate a Map…</strong> (Ctrl+G) builds a map from layered noise. Set the proportions of water, coast, forest and rock, the number of clearings to carve for bases, and a seed. Every control redraws a preview of the map that <strong>Create</strong> would produce.</p>
@@ -411,7 +415,7 @@ Path=D:\Games\Warcraft II</pre>
 </tr></thead><tbody>
 <tr>
 <td>Convert Units…</td>
-<td>Replace every unit of one type with another</td>
+<td>Replace units of one type with another, across the map or within the selection</td>
 </tr>
 <tr>
 <td>AI Scripts…</td>
@@ -437,8 +441,10 @@ Path=D:\Games\Warcraft II</pre>
 <h2 id="options">Options</h2>
 <p><strong>Tools ▸ Options…</strong> contains three groups.</p>
 <p><strong>Terrain.</strong> Whether painting adjusts the surrounding terrain, whether a paste blends into its surroundings, and whether units the terrain no longer supports are kept rather than removed.</p>
-<p><strong>Unit placement.</strong> Three overrides: allow illegal positions, allow units on top of each other, and allow units on the map edge. All are off by default.</p>
-<p><strong>Unit display.</strong> Unit artwork as command-button icons or as sprites, varied facing, the game's unit sounds, and whether the palette lists every race or only the selected player's.</p>
+<p><strong>Unit placement.</strong> Three overrides: allow illegal positions, allow units on top of each other, and allow units on the map edge. A fourth setting marks special units on the map. All are off by default.</p>
+<p><strong>Unit display.</strong> Unit artwork as command-button icons or as sprites, varied facing, the game's unit sounds, whether the palette lists every race or only the selected player's, and whether it offers the unused and special units.</p>
+<p>The unused and special units are the ones an editor normally holds back: the slots the game has no unit for, the corpses and rubble the game makes while it runs, and the two campaign workers. Leave this off unless you need them. Five of the slots have no unit behind them, and a map that places one stops the game. Walls stay out of the palette either way, because walls are terrain here.</p>
+<p>Everything in this window is kept between sessions.</p>
 <h2 id="resetting-the-editor">Resetting the editor</h2>
 <p><strong>Tools ▸ Options… ▸ Reset Everything</strong> discards everything PUDForge has stored: the options, the window size and layout, the view settings, the list of recent maps, and the game installation path. The command lists what will be discarded and asks for confirmation.</p>
 <p>No map file is affected and the open map stays open. The defaults apply from the next start, and the editor asks again which installation to use.</p>
