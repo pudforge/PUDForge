@@ -225,6 +225,11 @@ void default_unit_footprint(int unit_id, int& w, int& h);
 /// map's own UDTA. False, leaving w and h alone, for every other unit.
 bool unit_footprint_override(int unit_id, int& w, int& h);
 
+/// The tile grid a unit is placed on: 2 for the ships and flying units, 1 for
+/// everything else. The game's editor never puts one on an odd tile — see
+/// overrides/unit_footprints.cpp for the count behind that.
+int unit_placement_step(int unit_id);
+
 /// The units that table names, for the tests that check it.
 int oversize_unit_count();
 int oversize_unit_id(int index);

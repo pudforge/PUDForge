@@ -581,12 +581,14 @@ TEST(units_cannot_be_placed_on_terrain_they_cannot_stand_on) {
   CHECK(pf_map_add_unit(map, 2, 2, 0, 0, 0) >= 0);
   CHECK_EQ(pf_map_add_unit(map, 15, 15, 0, 0, 0), -1);
 
-  // Ship: the mirror image.
-  CHECK_EQ(pf_map_placement_check(map, 15, 15, 26), int(PF_PLACE_OK));
+  // Ship: the mirror image. On an even tile, because a ship covers 2x2 and is
+  // laid on a 2x2 grid — 15,15 is the tile between two of its blocks.
+  CHECK_EQ(pf_map_placement_check(map, 14, 14, 26), int(PF_PLACE_OK));
   CHECK_EQ(pf_map_placement_check(map, 2, 2, 26), int(PF_PLACE_NEEDS_WATER));
+  CHECK_EQ(pf_map_placement_check(map, 15, 15, 26), int(PF_PLACE_OFF_GRID));
 
-  // Flying units go anywhere.
-  CHECK_EQ(pf_map_placement_check(map, 15, 15, 40), int(PF_PLACE_OK));
+  // Flying units go anywhere, on the same grid.
+  CHECK_EQ(pf_map_placement_check(map, 14, 14, 40), int(PF_PLACE_OK));
   CHECK_EQ(pf_map_placement_check(map, 2, 2, 40), int(PF_PLACE_OK));
   CHECK_EQ(pf_map_placement_check(map, 2, 2, 92), int(PF_PLACE_OK));
   CHECK(pf_map_placement_check(map, 15, 15, 92) != PF_PLACE_OK);   // mine in a lake
@@ -644,8 +646,9 @@ TEST(ground_units_stay_off_blocking_terrain) {
   for (const auto& kind : {PF_TERRAIN_FOREST, PF_TERRAIN_MOUNTAIN}) {
     pf_map_paint_terrain(map, 5, 5, kind, 3);
     CHECK_EQ(pf_map_placement_check(map, 5, 5, footman), PF_PLACE_BLOCKED);
-    // Flying over it is fine, which is the whole of the exception.
-    CHECK_EQ(pf_map_placement_check(map, 5, 5, dragon), PF_PLACE_OK);
+    // Flying over it is fine, which is the whole of the exception. On an even
+    // tile: a dragon covers 2x2 and is laid on a 2x2 grid like every flier.
+    CHECK_EQ(pf_map_placement_check(map, 4, 4, dragon), PF_PLACE_OK);
     // A building is refused too, but for needing ground rather than for this.
     CHECK_EQ(pf_map_placement_check(map, 5, 5, farm), PF_PLACE_NEEDS_GROUND);
     pf_map_paint_terrain(map, 5, 5, PF_TERRAIN_GROUND_LIGHT, 5);
@@ -818,47 +821,60 @@ TEST(ships_and_fliers_cover_two_by_two) {
 }
 
 /**
- * The evidence the 2x2 table rests on, measured rather than asserted.
+ * Ships and flying units sit on a two-tile grid.
  *
- * A 2x2 unit anchored at its top-left corner on an even grid lands on even
- * coordinates and nothing else. Ships and fliers do; land units and buildings,
- * which the same maps place at both parities, do not.
+ * The evidence the 2x2 table rests on, and the reason placement snaps. A 2x2
+ * unit anchored at its top-left corner on an even grid lands on even
+ * coordinates and nothing else.
  *
- * A share rather than an absolute: one hand-edited community map with a ship
- * nudged onto an odd tile is not evidence against the rule, and should not turn
- * this red.
+ * Split by who wrote the map, the way the region rule is: a `REGM` carrying
+ * the 0xfffa shore sentinel came from the game's own editor, and that
+ * population has to be perfect. Maps from other tools are measured and
+ * reported, not asserted — one of them is where every exception lives.
  */
 TEST(ships_and_fliers_sit_on_even_tiles) {
   if (!have_corpus()) { skip("no maps"); return; }
-  long big_even = 0, big_total = 0, small_even = 0, small_total = 0;
+  long by_editor = 0, by_editor_even = 0;
+  long elsewhere = 0, elsewhere_even = 0;
+  long small = 0, small_even = 0;
 
   for (const std::string& path : g_corpus) {
     pf_status st = PF_OK;
     pf_map* map = pf_map_open_file(path.c_str(), &st);
     if (!map) continue;
+    const int tiles = pf_map_width(map) * pf_map_height(map);
+    const uint16_t* regions = pf_map_regions(map);
+    bool game_editor = false;
+    if (regions) {
+      for (int i = 0; i < tiles; i++) {
+        if (regions[i] == 0xfffa) { game_editor = true; break; }
+      }
+    }
     for (int i = 0, n = pf_map_unit_count(map); i < n; i++) {
       pf_unit u;
       if (pf_map_unit(map, i, &u) != PF_OK) continue;
-      int w = 1, h = 1;
-      pf_map_unit_footprint(map, u.type, &w, &h);
-      int ow = 1, oh = 1;
-      const bool oversize = pf::unit_footprint_override(u.type, ow, oh);
       const bool even = (u.x % 2) == 0 && (u.y % 2) == 0;
-      // Buildings are 2x2 and larger without being in the table, and they are
-      // not held to the parity — they are the control group here.
-      if (oversize) { big_total++; big_even += even; }
-      else if (w == 1 && h == 1) { small_total++; small_even += even; }
+      if (pf_unit_placement_step(u.type) > 1) {
+        if (game_editor) { by_editor++; by_editor_even += even; }
+        else { elsewhere++; elsewhere_even += even; }
+      } else {
+        int w = 1, h = 1;
+        pf_map_unit_footprint(map, u.type, &w, &h);
+        if (w == 1 && h == 1) { small++; small_even += even; }
+      }
     }
     pf_map_free(map);
   }
 
-  std::printf("     %ld/%ld ships and fliers on even tiles, %ld/%ld 1x1 units\n",
-              big_even, big_total, small_even, small_total);
-  CHECK(big_total > 0);
-  // Within 1%: the rule, not an accident of the sample.
-  CHECK((big_total - big_even) * 100 <= big_total);
+  std::printf("     %ld/%ld on even tiles in maps by the game's editor, "
+              "%ld/%ld elsewhere, %ld/%ld 1x1 units\n",
+              by_editor_even, by_editor, elsewhere_even, elsewhere,
+              small_even, small);
+  CHECK(by_editor + elsewhere > 0);
+  // No share and no threshold for the population that decides the rule.
+  CHECK_EQ(by_editor_even, by_editor);
   // And the control group is nowhere near it, or the parity means nothing.
-  CHECK(small_even * 2 < small_total);
+  if (small > 100) CHECK(small_even * 2 < small);
 }
 
 
@@ -950,7 +966,9 @@ TEST(a_ship_needs_water_for_its_whole_footprint) {
     }
   }
   CHECK_EQ(pf_map_placement_check(map, 4, 4, 0x1e), PF_PLACE_NEEDS_WATER);
-  CHECK_EQ(pf_map_placement_check(map, 21, 21, 0x1e), PF_PLACE_OK);
+  CHECK_EQ(pf_map_placement_check(map, 20, 20, 0x1e), PF_PLACE_OK);
+  // And the tile between two of its blocks is not a place it may start.
+  CHECK_EQ(pf_map_placement_check(map, 21, 21, 0x1e), PF_PLACE_OFF_GRID);
   // And two ships a tile apart are on top of each other, which they were not
   // when both were a single tile.
   CHECK(pf_map_add_unit(map, 20, 20, 0x1e, 0, 0) >= 0);
@@ -958,6 +976,9 @@ TEST(a_ship_needs_water_for_its_whole_footprint) {
            PF_PLACE_OCCUPIED);
   CHECK_EQ(pf_map_placement_check_ex(map, 22, 22, 0x1e, nullptr, 0),
            PF_PLACE_OK);
+  // The next block along is free; the odd tile beside it is not a placement.
+  CHECK_EQ(pf_map_placement_check_ex(map, 23, 22, 0x1e, nullptr, 0),
+           PF_PLACE_OFF_GRID);
   pf_map_free(map);
 }
 

@@ -2007,8 +2007,12 @@ TEST(converting_can_be_narrowed_to_the_selection) {
  *
  * The whole path the canvas uses — PlaceOrigin to turn the pointer into an
  * origin, then PlaceUnit — rather than the core call underneath it, because
- * that is where a report of stacked ships comes from. A ship covers 2x2, so
- * the three neighbours of a placed one are all refused.
+ * that is where a report of stacked ships comes from.
+ *
+ * Two rules meet here. A ship covers 2x2, and it goes on a 2x2 grid, so every
+ * tile of a block points at the same origin and the blocks tile the map
+ * without touching. Pointing anywhere inside one that is taken is refused;
+ * there is no offset left over to overlap by.
  */
 TEST(a_ship_cannot_be_placed_on_another_ship) {
   pf_map* map = blank();
@@ -2022,8 +2026,6 @@ TEST(a_ship_cannot_be_placed_on_another_ship) {
   ed.SetTool(Tool::kPlace);
   ed.placing_type = 0x1e;   // Elven Destroyer
   ed.placing_owner = 0;
-
-  // A fresh editor keeps the rules, and SetMap has pushed them to the map.
   CHECK_EQ(pf_map_allows_stacked_units(map), 0);
 
   auto click = [&](int tx, int ty) {
@@ -2031,28 +2033,92 @@ TEST(a_ship_cannot_be_placed_on_another_ship) {
     ed.PlaceOrigin(tx, ty, ed.placing_type, ox, oy);
     return ed.PlaceUnit(ox, oy);
   };
+  // A predicate, not a pair: a comma inside CHECK is two macro arguments.
+  auto sits_at = [&](int index, int x, int y) {
+    pf_unit u{};
+    if (pf_map_unit(map, index, &u) != PF_OK) return false;
+    return int(u.x) == x && int(u.y) == y;
+  };
 
+  // Pointing at an odd tile lands on the even corner of its block.
   CHECK(click(21, 21) >= 0);
-  CHECK_EQ(pf_map_unit_count(map), 1);
-  // Every tile the first one covers, and every offset that would share one.
+  CHECK(sits_at(0, 20, 20));
+
+  // Every tile of that block is the same block, and it is taken.
   for (int dy = 0; dy <= 1; dy++) {
     for (int dx = 0; dx <= 1; dx++) {
-      if (!dx && !dy) continue;
-      CHECK_EQ(click(21 + dx, 21 + dy), -1);
+      CHECK_EQ(click(20 + dx, 20 + dy), -1);
       CHECK(ed.last_refusal.find("already there") != std::string::npos);
     }
   }
   CHECK_EQ(pf_map_unit_count(map), 1);
 
-  // Clear of it by one tile in each direction, which is where the next one fits.
+  // The neighbouring blocks are free, and land two tiles away.
   CHECK(click(23, 21) >= 0);
+  CHECK(sits_at(1, 22, 20));
   CHECK(click(21, 23) >= 0);
+  CHECK(sits_at(2, 20, 22));
   CHECK_EQ(pf_map_unit_count(map), 3);
+
+  // A unit put on an odd tile by something other than the pointer — a paste, a
+  // map from another editor — is still caught by the overlap rule.
+  pf_map_set_allow_illegal_placement(map, 1);
+  CHECK(pf_map_add_unit(map, 25, 25, 0x1e, 0, 0) >= 0);
+  pf_map_set_allow_illegal_placement(map, 0);
+  CHECK_EQ(click(26, 26), -1);
+  CHECK(ed.last_refusal.find("already there") != std::string::npos);
 
   // And with the escape hatch on it is the person's business, as with every
   // other placement rule.
   ed.SetAllowStackedUnits(true);
-  CHECK(click(21, 22) >= 0);
-  CHECK_EQ(pf_map_unit_count(map), 4);
+  CHECK(click(26, 26) >= 0);
+  pf_map_free(map);
+}
+
+/**
+ * A ship cannot reach an odd tile by any route.
+ *
+ * Snapping the pointer is not enough on its own: a paste arrives at whatever
+ * offset it is dropped at, and a dragged selection carries its own delta. Both
+ * ask the core, so the rule lives there and all three paths obey it.
+ */
+TEST(nothing_can_move_a_ship_onto_an_odd_tile) {
+  pf_map* map = blank();
+  for (int y = 4; y < 50; y++) {
+    for (int x = 4; x < 50; x++) {
+      pf_map_paint_terrain(map, x, y, PF_TERRAIN_WATER_DARK, 1);
+    }
+  }
+  Editor ed(map);
+  ed.SetMode(pfwin::Mode::kUnit);
+  ed.placing_type = 0x1e;
+  CHECK(pf_map_add_unit(map, 20, 20, 0x1e, 0, 0) >= 0);
+
+  // Moving. One tile is refused whichever way it goes; two is fine.
+  CHECK_EQ(ed.SelectAt(20, 20, false), 0);
+  for (int i = 0; i < 4; i++) {
+    const int dx = (i == 0) - (i == 1), dy = (i == 2) - (i == 3);
+    CHECK(!ed.MoveSelectionBy(dx, dy, true));
+    CHECK(ed.last_refusal.find("odd tile") != std::string::npos);
+  }
+  CHECK(ed.MoveSelectionBy(2, 0, true));
+  pf_unit u{};
+  CHECK_EQ(pf_map_unit(map, 0, &u), PF_OK);
+  CHECK_EQ(int(u.x), 22);
+  CHECK_EQ(int(u.y), 20);
+
+  // Pasting. A fragment holding a ship lands its units only where the grid
+  // allows, so an odd drop leaves the ship behind rather than misplacing it.
+  ed.ClearSelection();
+  ed.SelectAt(22, 20, false);
+  CHECK(ed.Copy() > 0);
+  const int before = pf_map_unit_count(map);
+  ed.PasteAt(31, 31);
+  CHECK_EQ(pf_map_unit_count(map), before);   // odd offset: nothing landed
+  ed.PasteAt(30, 30);
+  CHECK_EQ(pf_map_unit_count(map), before + 1);
+  CHECK_EQ(pf_map_unit(map, before, &u), PF_OK);
+  CHECK_EQ(int(u.x) % 2, 0);
+  CHECK_EQ(int(u.y) % 2, 0);
   pf_map_free(map);
 }

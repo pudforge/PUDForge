@@ -331,6 +331,17 @@ PF_API const char *pf_terrain_name(int terrain, int tileset);
 PF_API int pf_unit_needs_opt_in_count(void);
 
 /**
+ * The tile grid a unit is placed on: 2 for the ships and flying units, 1 for
+ * everything else.
+ *
+ * They cover 2x2 tiles and the game's editor lays them out in 2x2 blocks, so a
+ * ship's corner is always on an even tile. Across the maps that editor wrote,
+ * all 330 of them are; not one is odd. An editor that offers the tiles between
+ * offers placements the game was never given.
+ */
+PF_API int pf_unit_placement_step(int unit_id);
+
+/**
  * The other race's equivalent of a unit, or -1 when it has none.
  *
  * A footman answers a grunt, a farm a pig farm, a keep a stronghold. Reads
@@ -1214,8 +1225,12 @@ typedef enum pf_placement {
   PF_PLACE_NEEDS_SHORE = 6,    /**< a shipyard, foundry or refinery inland   */
   PF_PLACE_TOO_NEAR_MINE = 7,  /**< a town hall crowding a gold mine         */
   PF_PLACE_OCCUPIED = 8,       /**< another unit is already standing there   */
-  PF_PLACE_ON_EDGE = 9         /**< touching the map edge, where the game
-                                    will not let a unit stand              */
+  /** Touching the map edge, where the game will not let a unit stand. */
+  PF_PLACE_ON_EDGE = 9,
+  /** A ship or flying unit on an odd tile. They cover 2x2 and the game's own
+   *  editor lays them on a 2x2 grid, so the tiles between are not placements
+   *  it ever made. Lifted by pf_map_set_allow_illegal_placement. */
+  PF_PLACE_OFF_GRID = 10
 } pf_placement;
 
 typedef enum pf_domain {

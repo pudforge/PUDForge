@@ -23,6 +23,16 @@
 // `ships_and_fliers_sit_on_even_tiles` measures this against whatever corpus is
 // present, so the claim is checked rather than asserted.
 //
+// The same units are placed on a two-tile grid, and that is the other half of
+// the rule: across 43 maps whose `REGM` carries the game editor's own shore
+// sentinel, all 330 ships and flying units sit on an even x *and* an even y.
+// Not one is odd. The 1x1 units on those maps are at both parities, near
+// enough a quarter of them even, which is what chance looks like.
+//
+// So the editor lays them out in 2x2 blocks rather than anywhere they fit, and
+// a ship on an odd tile is a ship the game was never given. `My_Map.pud`, made
+// with some other tool, holds all 19 of the exceptions on this machine.
+//
 // Ballista and Catapult are the near miss: a 63 px box like the ships, but they
 // appear at both parities in the fixtures, so they are land units with big
 // artwork and stay 1x1.
@@ -69,6 +79,11 @@ bool unit_footprint_override(int unit_id, int& w, int& h) {
     return true;
   }
   return false;
+}
+
+int unit_placement_step(int unit_id) {
+  int w = 0, h = 0;
+  return unit_footprint_override(unit_id, w, h) ? 2 : 1;
 }
 
 int oversize_unit_count() {
