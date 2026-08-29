@@ -46,8 +46,8 @@ game is required. So the section is written for whoever lands on the releases
 page, not for whoever wrote the commit — the seeded commit subjects are a
 reminder of what happened, not the notes.
 
-**Write the section in ASD-STE100** (Simplified Technical English), as short
-bullets about what is different for a user: one idea per sentence, 25 words at
+**Write the section in ASD-STE100** (Simplified Technical English), as a short
+list of what is different for a user — one bullet per change, no headings: one idea per sentence, 25 words at
 most, active voice, present tense, the same word for the same thing every time,
 and no metaphors or jargon. "Feature X now supports Y", or "a problem that
 caused Z is corrected" — not the reasoning behind the change, which belongs in
