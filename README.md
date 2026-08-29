@@ -9,6 +9,10 @@ PUDForge is a Warcraft II map editor for Windows. It reads and writes `.pud` fil
 
 - [`docs/user_guide.md`](docs/user_guide.md) - the editor: what is on screen,
   what the tools do, and the behaviours that are not obvious.
+- [`CHANGELOG.md`](CHANGELOG.md) - what changed in each release. It is also
+  what the GitHub release notes are made of.
+- [`docs/releasing.md`](docs/releasing.md) - how a release is cut, which is a
+  push to `master` with a new version in `version.h`.
 
 ## Building
 

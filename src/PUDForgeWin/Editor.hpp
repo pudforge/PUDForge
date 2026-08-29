@@ -216,6 +216,29 @@ class Editor {
   /// Push the placement option down to the core, which enforces it.
   void ApplyPlacementOption();
 
+  // ------------------------------------------------------- saved options
+  /// One preference that outlives a session: the key it is stored under, what
+  /// a fresh install gets, and the two halves of reaching it.
+  ///
+  /// Capture-less lambdas, so this is a plain table of function pointers and
+  /// the host needs nothing from us but a loop.
+  struct Option {
+    /// Never renamed. The name in a user's settings is the only link between
+    /// what they chose last time and what they get this time.
+    const char* name;
+    int fallback;
+    int (*get)(const Editor&);
+    void (*set)(Editor&, int);
+  };
+
+  /// Every option the host should save and restore, in one place.
+  ///
+  /// A table rather than a line each at two call sites in the window: the four
+  /// unit-placement options shipped unsaved because adding an option and
+  /// remembering to persist it were separate edits, the second in a file no
+  /// test can reach. `saved_options_round_trip` reaches this one.
+  static const std::vector<Option>& SavedOptions();
+
   /// Mirror axes (pf_mirror flags). They combine; kNone clears them all.
   int mirrors = PF_MIRROR_NONE;
   /// Turn one mirror on or off; PF_MIRROR_NONE clears them all.
@@ -381,6 +404,21 @@ class Editor {
   /// @return the unit's index afterwards, which a conversion moves, or -1
   int SetUnitOwnerAndValue(int index, int owner, int value);
 
+  /// Which misplacement checks the current options are asking for, as
+  /// pf_misplaced flags.
+  ///
+  /// Off the map is always one of them: a unit outside its own map is broken
+  /// however the options are set. The other two are the escape hatches read
+  /// back — somebody who has turned stacking on is not to be asked whether to
+  /// delete the units they stacked on purpose.
+  int MisplacementChecks() const;
+
+  /// How many units those checks find. Nothing is changed.
+  int MisplacedUnitCount() const;
+
+  /// Delete them, as one undo step. Returns how many went.
+  int RemoveMisplacedUnits(int checks);
+
   /// Whether a palette should list this type at all, before any player filter.
   ///
   /// The catalogue question, where OffersUnit is the chosen-player one; a
@@ -504,9 +542,20 @@ class Editor {
   /// @param density fraction of tiles to seed, 0..1
   BulkResult DecorateTerrain(int terrain, double density, uint32_t seed);
 
-  /// Turn every unit of one type into another, keeping position, owner and
-  /// value. Units that could not stand as the new type are left alone.
-  BulkResult ReplaceUnitType(int from, int to);
+  /// Turn units of one type into another, keeping position, owner and value.
+  /// Units that could not stand as the new type are left alone.
+  ///
+  /// `selected_only` narrows it to the current selection — off by default in
+  /// the dialog, because the whole map is what the tool is for and a scope
+  /// that follows an invisible selection is how you convert three units and
+  /// wonder where the rest went. Passed rather than defaulted, so the caller
+  /// has to have decided.
+  BulkResult ReplaceUnitType(int from, int to, bool selected_only);
+
+  /// How many units of a type the map holds, or the selection does. What the
+  /// convert dialog says before the press, so the count and the conversion
+  /// cannot disagree about what is in scope.
+  int CountUnitsOfType(int type, bool selected_only) const;
 
   /// Swap a player to the other race: every unit becomes its opposite number
   /// and `SIDE` follows, since the two disagreeing is what makes a base

@@ -331,6 +331,9 @@
 #define IDC_CONVERT_FROM      640
 #define IDC_CONVERT_TO        641
 #define IDC_CONVERT_NOTE      642
+/* Narrow the conversion to the selected units. Off by default, and disabled
+   when nothing is selected: see Editor::ReplaceUnitType. */
+#define IDC_CONVERT_SELECTED  643
 
 #define IDC_STATS_LIST        660
 

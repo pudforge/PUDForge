@@ -248,6 +248,10 @@
 /* 1376 and 1377 belonged to the Switch a player's race dialog, which is gone:
    changing the race on the player page is what swaps the units now, and it
    says so with IDS_RACE_FOLLOWED. */
+/* The same count, said of the selection instead of the map. 1378 rather than
+   the two retired ids above. */
+#define IDS_CONVERT_SEL_ONE       1378
+#define IDS_CONVERT_SEL_MANY      1379
 
 // ------------------------------------------------------- map statistics
 #define IDS_STAT_ROW              1390
@@ -503,6 +507,14 @@
 #define IDS_RESET_DONE            1855
 
 // ------------------------------------------- what a scatter took away with it
+/* Asked when a map is opened holding units the game could not place. The
+   title is IDS_CHECK_TITLE: it is the same check, said at another moment.
+   1858 was a second copy of that title and is left unused. */
+#define IDS_MISPLACED_ONE          1859
+#define IDS_MISPLACED_MANY         1860
+#define IDS_MISPLACED_REMOVED_ONE  1861
+#define IDS_MISPLACED_REMOVED_MANY 1862
+
 #define IDS_DECORATED_REMOVED_ONE  1856
 #define IDS_DECORATED_REMOVED_MANY 1857
 

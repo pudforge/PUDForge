@@ -644,7 +644,7 @@ BEGIN
   PUSHBUTTON      "Cancel", IDCANCEL, 172, 80, 50, 14
 END
 
-IDD_CONVERT_UNITS DIALOGEX 0, 0, 230, 96
+IDD_CONVERT_UNITS DIALOGEX 0, 0, 230, 110
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "Convert Units"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
@@ -653,9 +653,13 @@ BEGIN
   COMBOBOX        IDC_CONVERT_FROM, 72, 10, 150, 240, CBS_DROPDOWNLIST | CBS_OWNERDRAWFIXED | CBS_HASSTRINGS | WS_TABSTOP | WS_VSCROLL
   LTEXT           "&into", -1, 8, 32, 60, 8
   COMBOBOX        IDC_CONVERT_TO, 72, 30, 150, 240, CBS_DROPDOWNLIST | CBS_OWNERDRAWFIXED | CBS_HASSTRINGS | WS_TABSTOP | WS_VSCROLL
-  LTEXT           "", IDC_CONVERT_NOTE, 8, 52, 214, 20
-  DEFPUSHBUTTON   "Convert", IDOK, 118, 76, 50, 14
-  PUSHBUTTON      "Cancel", IDCANCEL, 172, 76, 50, 14
+  // Off by default: the whole map is what this tool is for, and a scope that
+  // silently followed a selection made somewhere else is how you convert three
+  // units and wonder where the rest went. Disabled while nothing is selected.
+  AUTOCHECKBOX    "Only the &selected units", IDC_CONVERT_SELECTED, 8, 52, 214, 10
+  LTEXT           "", IDC_CONVERT_NOTE, 8, 66, 214, 20
+  DEFPUSHBUTTON   "Convert", IDOK, 118, 90, 50, 14
+  PUSHBUTTON      "Cancel", IDCANCEL, 172, 90, 50, 14
 END
 
 /* IDD_SWITCH_RACE is gone. Swapping a player's units to the other race is

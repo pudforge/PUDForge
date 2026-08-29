@@ -68,10 +68,32 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $v = '${{ steps.version.outputs.version }}'
-          # Built as an array rather than a here-string: a PowerShell here-string
-          # wants its closing '@ in column 0, which is not something a YAML block
-          # scalar can promise.
-          $notes = @(
+          # The notes are CHANGELOG.md's section for this version, verbatim:
+          # the words somebody wrote while making the change are better than
+          # anything generated here, and having one place to write them is why
+          # the file exists. A version with no section still ships - a release
+          # held back over a missing heading helps nobody - it just carries the
+          # standing text alone.
+          # Read through .NET, so the em dashes in it survive whatever the
+          # runner's default codepage turns out to be.
+          $lines = [System.IO.File]::ReadAllLines((Resolve-Path CHANGELOG.md))
+          $from = ($lines | Select-String -Pattern "^## $([regex]::Escape($v))\s*$" |
+                   Select-Object -First 1).LineNumber
+          $body = ''
+          if ($from) {
+            $rest = $lines[$from..($lines.Count - 1)]
+            $next = ($rest | Select-String -Pattern '^## ' | Select-Object -First 1).LineNumber
+            $section = if ($next) { $rest[0..($next - 2)] } else { $rest }
+            $body = ($section -join "`n").Trim()
+            "release notes: $($section.Count) lines from CHANGELOG.md"
+          } else {
+            "no '## $v' section in CHANGELOG.md - shipping the standing text alone"
+          }
+          # What is true of every release, under whatever this one changed.
+          # Built as an array rather than a here-string: a PowerShell
+          # here-string wants its closing '@ in column 0, which is not
+          # something a YAML block scalar can promise.
+          $standing = @(
             'A Warcraft II map editor for Windows.',
             '',
             '`PUDForge.exe` is the whole download. It is statically linked, so',
@@ -84,6 +106,7 @@ jobs:
             'Remastered works, and dropping the exe into the game folder is',
             'enough.'
           ) -join "`n"
+          $notes = if ($body) { "$body`n`n---`n`n$standing" } else { $standing }
           # PUDForgeTest.exe is deliberately not uploaded: it is a byte copy of
           # the same binary under a second name, for running the editor while
           # still being able to relink it. Shipping it suggests two programs.

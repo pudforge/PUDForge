@@ -298,6 +298,11 @@ enum StatusCell {
   kCellCount,
 };
 
+/// Asked once a freshly opened map is on screen: whether to delete the units
+/// in it the game could not place. Posted rather than called, so it lands on
+/// the message loop with the window up and the settings restored.
+constexpr UINT kMsgOfferCleanup = WM_APP + 1;
+
 struct App : Host {
   HWND main = nullptr;
   /// The Recent Maps popup, looked up once. See RefreshRecentMenu.
@@ -467,26 +472,13 @@ struct App : Host {
   /// toggles, and how the brush was left. Not the map: which file to open is
   /// the command line's business, and reopening one silently is a surprise.
   void RestoreSettings() {
-    editor.show_grid = LoadSetting(L"Grid", 0) != 0;
-    // Floored at one tile, so a run always opens on a brush that covers a tile
-    // even if the last one ended on the corner rung. The corner brush is a
-    // deliberate reach for something smaller than the grid, and inheriting it
-    // silently from a previous session means the first stroke of a new map is a
-    // quarter the size the pointer looks like it is.
-    editor.brush_size = std::max(1, LoadSetting(L"BrushSize", 1));
-    editor.brush_shape = LoadSetting(L"BrushShape", PF_BRUSH_SQUARE);
-    editor.mix_shades = LoadSetting(L"MixShades", 0) != 0;
-    // Which drawing of a terrain the brush lays, kept for the same reason the
-    // shape and the size are: it is a setting about how you paint, not about
-    // any one map.
-    editor.paint_dark = LoadSetting(L"PaintDark", 0) != 0;
-    editor.SetVariationPolicy(LoadSetting(L"Variation", PF_VARIATION_PLAIN));
-    // A preference about the palette rather than about a map, so it is kept
-    // with the rest of them. Off by default: see Editor::show_all_races.
-    editor.show_all_races = LoadSetting(L"ShowAllRaces", 0) != 0;
-    // Off by default: five of these are slots the game has no unit for, so a
-    // map that places one crashes it. See Editor::offer_unused_units.
-    editor.offer_unused_units = LoadSetting(L"OfferUnusedUnits", 0) != 0;
+    // Every editor preference in one loop. Which ones there are, what they are
+    // called and what a fresh install gets are Editor::SavedOptions', so that
+    // adding one cannot mean remembering to come back here.
+    for (const Editor::Option& option : Editor::SavedOptions()) {
+      option.set(editor, LoadSetting(FromUtf8(option.name).c_str(),
+                                     option.fallback));
+    }
     icons.SetPreferSprites(unit_art != 0);
     canvas.SetWaterAnimated(LoadSetting(L"Water", 1) != 0);
     terrain_panel.SetColumns(LoadSetting(L"TerrainColumns", 0));
@@ -507,14 +499,9 @@ struct App : Host {
     SaveSetting(L"UnitArt", unit_art);
     SaveSetting(L"VaryFacing", vary_facing);
     SaveSetting(L"UnitSounds", unit_sounds);
-    SaveSetting(L"Grid", editor.show_grid);
-    SaveSetting(L"BrushSize", editor.brush_size);
-    SaveSetting(L"BrushShape", editor.brush_shape);
-    SaveSetting(L"MixShades", editor.mix_shades);
-    SaveSetting(L"PaintDark", editor.paint_dark);
-    SaveSetting(L"Variation", editor.variation_policy());
-    SaveSetting(L"ShowAllRaces", editor.show_all_races);
-    SaveSetting(L"OfferUnusedUnits", editor.offer_unused_units);
+    for (const Editor::Option& option : Editor::SavedOptions()) {
+      SaveSetting(FromUtf8(option.name).c_str(), option.get(editor));
+    }
     SaveSetting(L"Water", canvas.water_animated());
     SaveSetting(L"TerrainColumns", terrain_panel.columns());
     SaveSetting(L"UnitColumns", units_panel.columns());
@@ -906,7 +893,38 @@ struct App : Host {
     }
     AdoptMap(map, file);
     AddRecent(file);
+    // Posted rather than asked here: at startup this runs before the window is
+    // shown and before RestoreSettings, so a question asked now would appear
+    // over nothing and would read the options the user has not been given back
+    // yet. On the loop it is the first thing they see with the map open.
+    PostMessageW(main, kMsgOfferCleanup, 0, 0);
     return true;
+  }
+
+  /// A map can hold units the game will not put on the board — off the edge,
+  /// on terrain they cannot stand on, or stacked. That is the file's business
+  /// and not ours until somebody opens it here, which is the moment to say so.
+  ///
+  /// Only what the options are actually enforcing: turning stacking on and
+  /// then being asked to delete the stacks would be the editor arguing with
+  /// itself. Defaults to No — this deletes part of somebody's map.
+  void OfferToRemoveMisplaced() {
+    if (!canvas.map()) return;
+    const int checks = editor.MisplacementChecks();
+    const int found = editor.MisplacedUnitCount();
+    if (found <= 0) return;
+    if (MessageBoxW(main,
+                    Format(Plural(found, IDS_MISPLACED_ONE, IDS_MISPLACED_MANY),
+                           found).c_str(),
+                    Str(IDS_CHECK_TITLE).c_str(),
+                    MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2) != IDYES) {
+      return;
+    }
+    const int removed = editor.RemoveMisplacedUnits(checks);
+    canvas.MarkMapChanged();
+    OnStatus(Format(Plural(removed, IDS_MISPLACED_REMOVED_ONE,
+                           IDS_MISPLACED_REMOVED_MANY), removed), false);
+    OnMapEdited();
   }
 
   void NewMap() {
@@ -2109,6 +2127,10 @@ LRESULT CALLBACK MainProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
 
     case WM_INITMENUPOPUP:
       if (app) app->OnMenuOpening();
+      return 0;
+
+    case kMsgOfferCleanup:
+      if (app) app->OfferToRemoveMisplaced();
       return 0;
 
     case WM_DROPFILES: {

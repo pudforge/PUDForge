@@ -145,6 +145,64 @@ void Editor::ApplyPlacementOption() {
   pf_map_set_allow_edge_placement(map_, allow_edge_placement_ ? 1 : 0);
 }
 
+const std::vector<Editor::Option>& Editor::SavedOptions() {
+  // The order is the order they were added, and nothing depends on it.
+  static const std::vector<Option> kOptions = {
+      // How you paint. Settings about the brush, not about any one map.
+      {"Grid", 0, [](const Editor& e) { return int(e.show_grid); },
+       [](Editor& e, int v) { e.show_grid = v != 0; }},
+      // Floored at one tile, so a run always opens on a brush that covers a
+      // tile even if the last one ended on the corner rung. The corner brush is
+      // a deliberate reach for something smaller than the grid, and inheriting
+      // it silently means the first stroke of a new map is a quarter the size
+      // the pointer looks like it is.
+      {"BrushSize", 1, [](const Editor& e) { return e.brush_size; },
+       [](Editor& e, int v) { e.brush_size = v < 1 ? 1 : v; }},
+      {"BrushShape", PF_BRUSH_SQUARE,
+       [](const Editor& e) { return e.brush_shape; },
+       [](Editor& e, int v) { e.brush_shape = v; }},
+      {"MixShades", 0, [](const Editor& e) { return int(e.mix_shades); },
+       [](Editor& e, int v) { e.mix_shades = v != 0; }},
+      {"PaintDark", 0, [](const Editor& e) { return int(e.paint_dark); },
+       [](Editor& e, int v) { e.paint_dark = v != 0; }},
+      {"Variation", PF_VARIATION_PLAIN,
+       [](const Editor& e) { return e.variation_policy(); },
+       [](Editor& e, int v) { e.SetVariationPolicy(v); }},
+
+      // What the terrain tools do to what is already there.
+      {"FitEdges", 1, [](const Editor& e) { return int(e.auto_fit_edges); },
+       [](Editor& e, int v) { e.auto_fit_edges = v != 0; }},
+      {"FitPasted", 1, [](const Editor& e) { return int(e.fit_pasted_edges); },
+       [](Editor& e, int v) { e.fit_pasted_edges = v != 0; }},
+      {"KeepStranded", 0,
+       [](const Editor& e) { return int(e.keep_stranded_units); },
+       [](Editor& e, int v) { e.keep_stranded_units = v != 0; }},
+
+      // The three escape hatches from the placement rules, and the marker.
+      // Through the setters, which push each one down to the core.
+      {"AllowIllegal", 0,
+       [](const Editor& e) { return int(e.allow_illegal_placement()); },
+       [](Editor& e, int v) { e.SetAllowIllegalPlacement(v != 0); }},
+      {"AllowStacked", 0,
+       [](const Editor& e) { return int(e.allow_stacked_units()); },
+       [](Editor& e, int v) { e.SetAllowStackedUnits(v != 0); }},
+      {"AllowEdge", 0,
+       [](const Editor& e) { return int(e.allow_edge_placement()); },
+       [](Editor& e, int v) { e.SetAllowEdgePlacement(v != 0); }},
+      {"MarkSpecial", 0,
+       [](const Editor& e) { return int(e.mark_special_units); },
+       [](Editor& e, int v) { e.mark_special_units = v != 0; }},
+
+      // What the palette offers.
+      {"ShowAllRaces", 0, [](const Editor& e) { return int(e.show_all_races); },
+       [](Editor& e, int v) { e.show_all_races = v != 0; }},
+      {"OfferUnusedUnits", 0,
+       [](const Editor& e) { return int(e.offer_unused_units); },
+       [](Editor& e, int v) { e.offer_unused_units = v != 0; }},
+  };
+  return kOptions;
+}
+
 int Editor::ToggleMirror(int flag) {
   mirrors = flag == PF_MIRROR_NONE ? PF_MIRROR_NONE : (mirrors ^ flag);
   return mirrors;
@@ -932,6 +990,32 @@ bool Editor::EraseAt(int x, int y) {
   return true;
 }
 
+int Editor::MisplacementChecks() const {
+  int checks = PF_MISPLACED_OFF_MAP;
+  if (!allow_illegal_placement_) checks |= PF_MISPLACED_TERRAIN;
+  if (!allow_stacked_units_) checks |= PF_MISPLACED_OVERLAP;
+  return checks;
+}
+
+int Editor::MisplacedUnitCount() const {
+  if (!map_) return 0;
+  return pf_map_misplaced_units(map_, MisplacementChecks(), nullptr, 0);
+}
+
+int Editor::RemoveMisplacedUnits(int checks) {
+  if (!map_) return 0;
+  // Counted before the checkpoint rather than undone after an empty removal:
+  // inside a group Checkpoint is a no-op, and the undo would then pop a step
+  // belonging to whatever the group is doing.
+  if (pf_map_misplaced_units(map_, checks, nullptr, 0) <= 0) return 0;
+  Checkpoint();
+  const int removed = pf_map_remove_misplaced_units(map_, checks);
+  // Every index after a removed unit has moved, so no held selection survives.
+  ClearSelection();
+  Bump();
+  return removed;
+}
+
 bool Editor::ListsUnit(int type, bool with_unused) {
   // Never, whatever the option says: walls are terrain here, and the core
   // marks the two wall-as-unit ids as ones no editor should offer.
@@ -1281,7 +1365,19 @@ Editor::BulkResult Editor::DecorateTerrain(int terrain, double density,
   return result;
 }
 
-Editor::BulkResult Editor::ReplaceUnitType(int from, int to) {
+int Editor::CountUnitsOfType(int type, bool selected_only) const {
+  if (!map_) return 0;
+  int n = 0;
+  const int count = pf_map_unit_count(map_);
+  for (int i = 0; i < count; i++) {
+    if (selected_only && !selected_.count(i)) continue;
+    pf_unit unit{};
+    if (pf_map_unit(map_, i, &unit) == PF_OK && unit.type == type) n++;
+  }
+  return n;
+}
+
+Editor::BulkResult Editor::ReplaceUnitType(int from, int to, bool selected_only) {
   BulkResult result;
   if (!map_ || from == to) return result;
 
@@ -1292,6 +1388,7 @@ Editor::BulkResult Editor::ReplaceUnitType(int from, int to) {
   std::vector<Target> legal;
   const int count = pf_map_unit_count(map_);
   for (int i = 0; i < count; i++) {
+    if (selected_only && !selected_.count(i)) continue;
     pf_unit unit{};
     if (pf_map_unit(map_, i, &unit) != PF_OK || unit.type != from) continue;
     if (allow_illegal_placement_ ||

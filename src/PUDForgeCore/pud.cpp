@@ -234,6 +234,9 @@ void Map::unit_footprint(int type, int& w, int& h) const {
   default_unit_footprint(type, w, h);
   if (udta_.size_x[type]) w = udta_.size_x[type];
   if (udta_.size_y[type]) h = udta_.size_y[type];
+  // Last word, over the file: every map ever shipped carries 1x1 for the ships
+  // and fliers, so a table that yielded to `unitSize` would never apply.
+  unit_footprint_override(type, w, h);
 }
 
 int Map::add_unit(int x, int y, int type, int owner, int value) {

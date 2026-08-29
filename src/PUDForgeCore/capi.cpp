@@ -2956,6 +2956,102 @@ int pf_map_validate(const pf_map* map, pf_issue* out, int capacity) {
   return int(issues.size());
 }
 
+namespace {
+
+/// The unit indices `what` finds, ascending.
+///
+/// The rules are pf_map_validate's, down to the exclusions: they were tuned
+/// against the shipped maps, and a second set of them here would eventually
+/// disagree and offer to delete something Blizzard put there on purpose.
+void collect_misplaced(const pf_map* map, int what, std::vector<int>& out) {
+  const pf::Map& m = *map->map;
+  const int count = int(m.units().size());
+  std::vector<char> flagged(size_t(count > 0 ? count : 1), 0);
+
+  if (what & PF_MISPLACED_OFF_MAP) {
+    for (int i = 0; i < count; i++) {
+      const pf::Unit& u = m.units()[size_t(i)];
+      const int x = int(u.x), y = int(u.y);
+      int fw = 1, fh = 1;
+      m.unit_footprint(u.type, fw, fh);
+      if (x < 0 || y < 0 || x >= m.width() || y >= m.height() ||
+          x + fw > m.width() || y + fh > m.height()) {
+        flagged[size_t(i)] = 1;
+      }
+    }
+  }
+
+  // Terrain, through the call validation uses, and only its two "this unit
+  // cannot be here at all" answers. A building on ground the editor would
+  // refuse is a judgement, and community maps are full of them.
+  if (what & PF_MISPLACED_TERRAIN) {
+    for (int i = 0; i < count; i++) {
+      if (flagged[size_t(i)]) continue;
+      const pf::Unit& u = m.units()[size_t(i)];
+      if (int(u.x) >= m.width() || int(u.y) >= m.height()) continue;
+      const int code = pf_map_placement_check(map, int(u.x), int(u.y), u.type);
+      if (code == PF_PLACE_NEEDS_LAND || code == PF_PLACE_NEEDS_WATER) {
+        flagged[size_t(i)] = 1;
+      }
+    }
+  }
+
+  // Overlap. The later unit of a pair is the one named, so removing the whole
+  // list leaves the first of a pile standing rather than clearing the tile.
+  if (what & PF_MISPLACED_OVERLAP) {
+    for (int i = 0; i < count; i++) {
+      if (flagged[size_t(i)]) continue;
+      const pf::Unit& a = m.units()[size_t(i)];
+      int aw = 1, ah = 1;
+      m.unit_footprint(a.type, aw, ah);
+      for (int j = i + 1; j < count; j++) {
+        if (flagged[size_t(j)]) continue;
+        const pf::Unit& b = m.units()[size_t(j)];
+        int bw = 1, bh = 1;
+        m.unit_footprint(b.type, bw, bh);
+        const bool apart = int(a.x) + aw <= int(b.x) || int(b.x) + bw <= int(a.x) ||
+                           int(a.y) + ah <= int(b.y) || int(b.y) + bh <= int(a.y);
+        if (apart) continue;
+        // Intended arrangements: a marker under anything, a well on its patch.
+        const bool marker = a.type == kHumanStart || a.type == kOrcStart ||
+                            b.type == kHumanStart || b.type == kOrcStart;
+        const bool well_on_patch = ((a.type == 86 || a.type == 87) && b.type == 93) ||
+                                   ((b.type == 86 || b.type == 87) && a.type == 93);
+        if (marker || well_on_patch) continue;
+        flagged[size_t(j)] = 1;
+      }
+    }
+  }
+
+  for (int i = 0; i < count; i++) {
+    if (flagged[size_t(i)]) out.push_back(i);
+  }
+}
+
+}  // namespace
+
+int pf_map_misplaced_units(const pf_map* map, int what, int* out, int capacity) {
+  if (!map) return -1;
+  if (what == 0) return 0;
+  std::vector<int> found;
+  collect_misplaced(map, what, found);
+  if (out && capacity > 0) {
+    const int n = int(found.size()) < capacity ? int(found.size()) : capacity;
+    for (int i = 0; i < n; i++) out[i] = found[i];
+  }
+  return int(found.size());
+}
+
+int pf_map_remove_misplaced_units(pf_map* map, int what) {
+  if (!map) return -1;
+  if (what == 0) return 0;
+  std::vector<int> found;
+  collect_misplaced(map, what, found);
+  // Back to front: every removal shifts the indices after it.
+  for (size_t i = found.size(); i > 0; i--) map->map->remove_unit(found[i - 1]);
+  return int(found.size());
+}
+
 // ------------------------------------------------------------------ undo
 
 pf_status pf_map_checkpoint(pf_map* map) {

@@ -1548,7 +1548,7 @@ TEST(converting_a_unit_type_keeps_position_owner_and_value) {
   ed.placing_type = 0x02;                 // Peasant, which must be left alone
   CHECK(ed.PlaceUnit(18, 18) >= 0);
 
-  const Editor::BulkResult result = ed.ReplaceUnitType(0x00, 0x01);   // to Grunt
+  const Editor::BulkResult result = ed.ReplaceUnitType(0x00, 0x01, false);   // to Grunt
   CHECK_EQ(result.changed, 2);
   CHECK_EQ(result.skipped, 0);
 
@@ -1566,7 +1566,7 @@ TEST(converting_a_unit_type_keeps_position_owner_and_value) {
 
   // One undo step for all of it, and converting nothing costs no step.
   CHECK(ed.Undo());
-  CHECK_EQ(ed.ReplaceUnitType(0x63, 0x00).changed, 0);   // a type the map has none of
+  CHECK_EQ(ed.ReplaceUnitType(0x63, 0x00, false).changed, 0);   // a type the map has none of
   pf_map_free(map);
 }
 
@@ -1658,7 +1658,7 @@ TEST(bulk_edited_maps_stay_loadable) {
   CHECK(ed.ReplaceTerrain(PF_TERRAIN_GROUND_LIGHT, PF_TERRAIN_WATER_LIGHT) > 0);
   CHECK(ed.DecorateTerrain(PF_TERRAIN_FOREST, 0.1, 4242).changed >= 0);
   ed.ClearTerrainSelection();
-  ed.ReplaceUnitType(0x00, 0x01);             // Footman to Grunt
+  ed.ReplaceUnitType(0x00, 0x01, false);      // Footman to Grunt
   ed.SwitchPlayerRace(0, 1);
   ed.ResetMovement();
 
@@ -1834,5 +1834,170 @@ TEST(a_scatter_brush_stays_inside_its_own_footprint) {
     }
   }
   CHECK(painted > 0);
+  pf_map_free(map);
+}
+
+/**
+ * Every editor preference survives a restart.
+ *
+ * Written after four of them did not: the three placement escape hatches and
+ * "mark special units" were read out of the Options dialog and never written
+ * anywhere, so every session opened with the rules back on. They were missing
+ * from the window's settings code, which no test can drive — hence the table,
+ * which one can.
+ */
+TEST(saved_options_round_trip) {
+  // Spelled out, in order. An option added to SavedOptions and not to this
+  // list is a deliberate addition and this line is where it is admitted to;
+  // an option added to the editor and never listed there is the bug above,
+  // and the only defence against it is that this list has to be looked at.
+  const char* const expected[] = {
+      "Grid", "BrushSize", "BrushShape", "MixShades", "PaintDark", "Variation",
+      "FitEdges", "FitPasted", "KeepStranded",
+      "AllowIllegal", "AllowStacked", "AllowEdge", "MarkSpecial",
+      "ShowAllRaces", "OfferUnusedUnits",
+  };
+  const std::vector<Editor::Option>& options = Editor::SavedOptions();
+  CHECK_EQ(int(options.size()), int(sizeof(expected) / sizeof(expected[0])));
+  std::set<std::string> names;
+  for (size_t i = 0; i < options.size() && i < sizeof(expected) / sizeof(expected[0]); i++) {
+    CHECK(std::string(options[i].name) == expected[i]);
+    // Two options under one key would silently overwrite each other.
+    CHECK(names.insert(options[i].name).second);
+  }
+
+  pf_map* map = blank();
+  Editor before(map);
+
+  // The fallback in the table has to be what a fresh editor already is, or a
+  // first run and a run after a reset disagree about the defaults.
+  for (const Editor::Option& option : options) {
+    CHECK_EQ(option.get(before), option.fallback);
+  }
+
+  // Move every one of them off its default. Which value does not matter, only
+  // that `get` reports something other than the fallback afterwards — a bool
+  // takes 0 or 1 and a policy takes the next value along.
+  std::map<std::string, int> stored;
+  for (const Editor::Option& option : options) {
+    for (int candidate : {option.fallback + 1, option.fallback - 1}) {
+      option.set(before, candidate);
+      if (option.get(before) != option.fallback) break;
+    }
+    CHECK(option.get(before) != option.fallback);
+    stored[option.name] = option.get(before);
+  }
+
+  // A second editor, loaded from the store the way a new session is.
+  Editor after(map);
+  for (const Editor::Option& option : options) {
+    option.set(after, stored[option.name]);
+  }
+  for (const Editor::Option& option : options) {
+    CHECK_EQ(option.get(after), stored[option.name]);
+  }
+
+  // The three placement hatches are the map's, not the editor's, so restoring
+  // them has to have reached the core as well.
+  CHECK_EQ(pf_map_allows_illegal_placement(map), 1);
+  CHECK_EQ(pf_map_allows_stacked_units(map), 1);
+  CHECK_EQ(pf_map_allows_edge_placement(map), 1);
+  pf_map_free(map);
+}
+
+/**
+ * What a freshly opened map is asked about follows the options.
+ *
+ * The client offers to delete the units the game could not place, which is
+ * only sensible for the rules the person is actually keeping: somebody who has
+ * turned stacking on is not to be asked whether to delete the units they
+ * stacked on purpose. Off the map is asked about either way — a unit outside
+ * its own map is broken however the options are set.
+ */
+TEST(misplacement_checks_follow_the_placement_options) {
+  pf_map* map = blank();
+  Editor ed(map);
+
+  CHECK_EQ(ed.MisplacementChecks(),
+           PF_MISPLACED_OFF_MAP | PF_MISPLACED_TERRAIN | PF_MISPLACED_OVERLAP);
+  ed.SetAllowStackedUnits(true);
+  CHECK_EQ(ed.MisplacementChecks(), PF_MISPLACED_OFF_MAP | PF_MISPLACED_TERRAIN);
+  ed.SetAllowIllegalPlacement(true);
+  CHECK_EQ(ed.MisplacementChecks(), PF_MISPLACED_OFF_MAP);
+  ed.SetAllowStackedUnits(false);
+  ed.SetAllowIllegalPlacement(false);
+
+  // A map arriving with two units on one tile and a footman in the sea, the
+  // way one written by another editor does.
+  for (int y = 20; y < 30; y++) {
+    for (int x = 20; x < 30; x++) {
+      pf_map_paint_terrain(map, x, y, PF_TERRAIN_WATER_DARK, 1);
+    }
+  }
+  pf_map_set_allow_illegal_placement(map, 1);
+  pf_map_add_unit(map, 5, 5, 0x00, 0, 0);
+  pf_map_add_unit(map, 5, 5, 0x00, 0, 0);
+  pf_map_add_unit(map, 25, 25, 0x00, 0, 0);
+  pf_map_set_allow_illegal_placement(map, 0);
+  CHECK_EQ(pf_map_unit_count(map), 3);
+  CHECK_EQ(ed.MisplacedUnitCount(), 2);
+
+  // Selecting first, because the indices it holds do not survive a removal.
+  CHECK_EQ(ed.SelectAt(5, 5, false), 1);
+  CHECK(ed.HasSelection());
+
+  CHECK_EQ(ed.RemoveMisplacedUnits(ed.MisplacementChecks()), 2);
+  CHECK_EQ(pf_map_unit_count(map), 1);
+  CHECK(!ed.HasSelection());
+  CHECK(ed.Dirty());
+
+  // One undo step, and it puts all of them back.
+  CHECK(ed.Undo());
+  CHECK_EQ(pf_map_unit_count(map), 3);
+
+  // Nothing to do is not an undo step: with stacking and terrain allowed there
+  // is nothing left to find on this map.
+  ed.SetAllowStackedUnits(true);
+  ed.SetAllowIllegalPlacement(true);
+  CHECK_EQ(ed.MisplacedUnitCount(), 0);
+  CHECK_EQ(ed.RemoveMisplacedUnits(ed.MisplacementChecks()), 0);
+  CHECK_EQ(pf_map_unit_count(map), 3);
+  pf_map_free(map);
+}
+
+/**
+ * Converting only the selected units.
+ *
+ * The dialog's scope switch. Off is the whole map, which is what the tool is
+ * for; on is the escape hatch for turning three of a dozen footmen into grunts
+ * without picking them off one at a time.
+ */
+TEST(converting_can_be_narrowed_to_the_selection) {
+  pf_map* map = blank();
+  Editor ed(map);
+  for (int i = 0; i < 4; i++) CHECK(pf_map_add_unit(map, 4 + i * 2, 4, 0x00, 0, 0) >= 0);
+  CHECK_EQ(ed.CountUnitsOfType(0x00, false), 4);
+  CHECK_EQ(ed.CountUnitsOfType(0x00, true), 0);   // nothing selected yet
+
+  CHECK_EQ(ed.SelectAt(4, 4, false), 0);   // SelectAt answers with the index
+  CHECK_EQ(ed.SelectAt(6, 4, true), 1);
+  CHECK_EQ(int(ed.selected().size()), 2);
+  CHECK_EQ(ed.CountUnitsOfType(0x00, true), 2);
+  // The count the dialog shows and the conversion it then runs are the same
+  // question asked twice, so they are asked of the same function.
+  CHECK_EQ(ed.ReplaceUnitType(0x00, 0x01, true).changed, 2);
+  CHECK_EQ(ed.CountUnitsOfType(0x00, false), 2);
+  CHECK_EQ(ed.CountUnitsOfType(0x01, false), 2);
+
+  // And with the switch off it takes what is left, selection or no selection.
+  CHECK_EQ(ed.ReplaceUnitType(0x00, 0x01, false).changed, 2);
+  CHECK_EQ(ed.CountUnitsOfType(0x00, false), 0);
+  CHECK_EQ(ed.CountUnitsOfType(0x01, false), 4);
+
+  // On with an empty selection converts nothing rather than everything, which
+  // is why the dialog greys the box out instead of leaving it to mean "all".
+  ed.ClearSelection();
+  CHECK_EQ(ed.ReplaceUnitType(0x01, 0x00, true).changed, 0);
+  CHECK_EQ(ed.CountUnitsOfType(0x01, false), 4);
   pf_map_free(map);
 }

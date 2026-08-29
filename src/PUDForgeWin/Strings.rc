@@ -91,6 +91,13 @@ BEGIN
   IDS_SEVERITY_ERROR    "Error: "
   IDS_SEVERITY_WARNING  "Warning: "
   IDS_SEVERITY_NOTE     "Note: "
+  /* On opening a map that holds units the game could not put on the board.
+     The count, then what to do about it; No is the default. It reuses
+     IDS_CHECK_TITLE, because it is the same check said at a different moment. */
+  IDS_MISPLACED_ONE     "%d unit in this map is somewhere the game cannot place it.\n\nRemove it?"
+  IDS_MISPLACED_MANY    "%d units in this map are somewhere the game cannot place them.\n\nRemove them?"
+  IDS_MISPLACED_REMOVED_ONE  "%d misplaced unit removed"
+  IDS_MISPLACED_REMOVED_MANY "%d misplaced units removed"
 
   /* ------------------------------------------------------------- editing */
   IDS_STARTS_PLACED_ONE  "%d start location placed"
@@ -331,6 +338,8 @@ BEGIN
      differently has two hooks here rather than one. */
   IDS_CONVERT_WOULD_ONE "The map holds %d %ls."
   IDS_CONVERT_WOULD_MANY "The map holds %d %ls."
+  IDS_CONVERT_SEL_ONE   "The selection holds %d %ls."
+  IDS_CONVERT_SEL_MANY  "The selection holds %d %ls."
   /* %d converted, %ls type, %d that could not stand as the new type. */
   IDS_CONVERTED         "Converted %d %ls; %d could not stand there"
   IDS_CONVERTED_NOTHING "Nothing converted"

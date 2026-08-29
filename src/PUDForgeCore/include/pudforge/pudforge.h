@@ -1440,6 +1440,43 @@ typedef struct pf_issue {
 PF_API int pf_map_validate(const pf_map *map, pf_issue *out, int capacity);
 
 /**
+ * Which kinds of misplacement pf_map_misplaced_units looks for. They combine.
+ *
+ * The same three findings pf_map_validate reports, and deliberately not the
+ * rest of them: these are the ones whose only fix is to take the unit away. A
+ * player with two start locations or a map with no gold is something to go and
+ * edit, not something to delete.
+ */
+typedef enum pf_misplaced {
+  PF_MISPLACED_OFF_MAP = 1, /**< outside the map, or its footprint hangs off */
+  PF_MISPLACED_TERRAIN = 2, /**< ground the unit cannot stand on             */
+  PF_MISPLACED_OVERLAP = 4, /**< sharing tiles with a unit listed before it  */
+  PF_MISPLACED_ALL = 7
+} pf_misplaced;
+
+/**
+ * The units a map holds in places the game cannot put them.
+ *
+ * Fills up to `capacity` unit indices in ascending order and returns the total
+ * found, which may exceed `capacity` — pass NULL/0 to count first.
+ *
+ * Overlap names the *later* of a pair, so removing everything this returns
+ * leaves the first of each pile standing rather than emptying the tile. The
+ * arrangements the game intends are not overlaps: a start location under a
+ * hall, an oil well on its patch.
+ */
+PF_API int pf_map_misplaced_units(const pf_map *map, int what, int *out,
+                                  int capacity);
+
+/**
+ * Delete those units. Returns how many went, or -1 for a bad argument.
+ *
+ * Does not checkpoint: the caller decides whether this is one undo step of its
+ * own or part of a larger one.
+ */
+PF_API int pf_map_remove_misplaced_units(pf_map *map, int what);
+
+/**
  * Gold within working reach of a player's start location, or -1 for a player
  * with no start location.
  *

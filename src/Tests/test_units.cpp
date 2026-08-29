@@ -715,7 +715,6 @@ TEST(validation_catches_a_broken_map) {
   CHECK_EQ(pf_map_validate(map, nullptr, 0), total);
   pf_map_free(map);
 }
-}  // namespace pft
 
 TEST(name_matching_ranks_the_one_that_was_meant_first) {
   // Ranking is the whole job. These are the same cases PUDForgeWeb's fuzzy.mjs
@@ -756,3 +755,208 @@ TEST(name_matching_ranks_the_one_that_was_meant_first) {
   CHECK_EQ(ids[0], 5);
   CHECK_EQ(ids[3], 3);
 }
+
+/**
+ * Ships and flying units cover 2x2 tiles, whatever `unitSize` says.
+ *
+ * The field reads 1x1 for every mobile unit in the retail defaults, which would
+ * fit a battleship in a one-tile pond. See overrides/unit_footprints.cpp for
+ * what the game actually does and how that was established.
+ */
+TEST(ships_and_fliers_cover_two_by_two) {
+  pf_status st = PF_OK;
+  pf_map* map = pf_map_create(64, 64, PF_TILESET_FOREST, &st);
+  CHECK(map != nullptr);
+  if (!map) return;
+
+  auto boxed = [&](int type, int side) {
+    int w = 0, h = 0;
+    pf_map_unit_footprint(map, type, &w, &h);
+    return w == side && h == side;
+  };
+
+  CHECK_EQ(pf::oversize_unit_count(), 16);
+  for (int i = 0; i < pf::oversize_unit_count(); i++) {
+    const int id = pf::oversize_unit_id(i);
+    CHECK(boxed(id, 2));
+    // The no-UDTA path has to agree, or a map without the section lays its
+    // ships out differently from one with it.
+    int dw = 1, dh = 1;
+    pf::default_unit_footprint(id, dw, dh);
+    CHECK_EQ(dw, 2);
+    CHECK_EQ(dh, 2);
+  }
+
+  // Land units keep their tile, Ballista and Catapult included: they carry a
+  // 63 px box like the ships, and are the reason the table is a list of ids
+  // rather than a threshold on `boxSize`.
+  for (int id : {0x00, 0x02, 0x06, 0x04, 0x05, 0x37, 0x39}) {
+    CHECK(boxed(id, 1));
+  }
+  // And buildings still come from the file, which is right about those.
+  CHECK(boxed(0x3a, 2));    // Farm
+  CHECK(boxed(0x4a, 4));    // Town Hall
+  CHECK(boxed(0x5c, 3));    // Gold Mine
+  pf_map_free(map);
+
+  // The override outranks a map's own UDTA, which is the whole point: every
+  // map ever written carries Blizzard's 1x1 for these.
+  if (g_corpus.empty()) return;
+  for (const std::string& path : g_corpus) {
+    pf_map* real = pf_map_open_file(path.c_str(), &st);
+    if (!real) continue;
+    if (pf_map_has_unit_data(real)) {
+      int w = 0, h = 0;
+      pf_map_unit_footprint(real, 0x1e, &w, &h);   // Elven Destroyer
+      CHECK_EQ(w, 2);
+      CHECK_EQ(h, 2);
+    }
+    pf_map_free(real);
+  }
+}
+
+/**
+ * The evidence the 2x2 table rests on, measured rather than asserted.
+ *
+ * A 2x2 unit anchored at its top-left corner on an even grid lands on even
+ * coordinates and nothing else. Ships and fliers do; land units and buildings,
+ * which the same maps place at both parities, do not.
+ *
+ * A share rather than an absolute: one hand-edited community map with a ship
+ * nudged onto an odd tile is not evidence against the rule, and should not turn
+ * this red.
+ */
+TEST(ships_and_fliers_sit_on_even_tiles) {
+  if (!have_corpus()) { skip("no maps"); return; }
+  long big_even = 0, big_total = 0, small_even = 0, small_total = 0;
+
+  for (const std::string& path : g_corpus) {
+    pf_status st = PF_OK;
+    pf_map* map = pf_map_open_file(path.c_str(), &st);
+    if (!map) continue;
+    for (int i = 0, n = pf_map_unit_count(map); i < n; i++) {
+      pf_unit u;
+      if (pf_map_unit(map, i, &u) != PF_OK) continue;
+      int w = 1, h = 1;
+      pf_map_unit_footprint(map, u.type, &w, &h);
+      int ow = 1, oh = 1;
+      const bool oversize = pf::unit_footprint_override(u.type, ow, oh);
+      const bool even = (u.x % 2) == 0 && (u.y % 2) == 0;
+      // Buildings are 2x2 and larger without being in the table, and they are
+      // not held to the parity — they are the control group here.
+      if (oversize) { big_total++; big_even += even; }
+      else if (w == 1 && h == 1) { small_total++; small_even += even; }
+    }
+    pf_map_free(map);
+  }
+
+  std::printf("     %ld/%ld ships and fliers on even tiles, %ld/%ld 1x1 units\n",
+              big_even, big_total, small_even, small_total);
+  CHECK(big_total > 0);
+  // Within 1%: the rule, not an accident of the sample.
+  CHECK((big_total - big_even) * 100 <= big_total);
+  // And the control group is nowhere near it, or the parity means nothing.
+  CHECK(small_even * 2 < small_total);
+}
+
+
+/**
+ * The units a map holds in places the game cannot put them, and taking them
+ * away.
+ *
+ * A `.pud` may contain anything; the parser's job is to load it unchanged.
+ * This is the separate question of what an editor should offer to do about it
+ * once somebody has it open.
+ */
+TEST(misplaced_units_are_found_and_removed) {
+  pf_status st = PF_OK;
+  pf_map* map = pf_map_create(32, 32, PF_TILESET_FOREST, &st);
+  if (!map) { CHECK(false); return; }
+  for (int y = 10; y < 20; y++) {
+    for (int x = 10; x < 20; x++) {
+      pf_map_paint_terrain(map, x, y, PF_TERRAIN_WATER_DARK, 1);
+    }
+  }
+  // Built the way a foreign editor would have written it, which is the only
+  // way to get these on a map at all.
+  pf_map_set_allow_illegal_placement(map, 1);
+
+  CHECK(pf_map_add_unit(map, 1, 1, 0x00, 0, 0) >= 0);     // fine: a footman on grass
+  CHECK(pf_map_add_unit(map, 12, 12, 0x00, 0, 0) >= 0);   // a footman in the lake
+  CHECK(pf_map_add_unit(map, 2, 2, 0x1e, 0, 0) >= 0);     // a destroyer on dry land
+  CHECK(pf_map_add_unit(map, 5, 5, 0x00, 0, 0) >= 0);     // and two in one place
+  CHECK(pf_map_add_unit(map, 5, 5, 0x00, 0, 0) >= 0);
+  CHECK(pf_map_add_unit(map, 30, 30, 0x4a, 0, 0) >= 0);   // a 4x4 hall two tiles from the edge
+  // The arrangements the game intends, which must survive all of this: a start
+  // location under a building, and a marker is not an overlap.
+  CHECK(pf_map_add_unit(map, 22, 22, 0x5e, 0, 0) >= 0);
+  CHECK(pf_map_add_unit(map, 22, 22, 0x3a, 0, 0) >= 0);
+  const int total = pf_map_unit_count(map);
+  CHECK_EQ(total, 8);
+
+  pf_map_set_allow_illegal_placement(map, 0);
+
+  CHECK_EQ(pf_map_misplaced_units(map, PF_MISPLACED_OFF_MAP, nullptr, 0), 1);
+  CHECK_EQ(pf_map_misplaced_units(map, PF_MISPLACED_TERRAIN, nullptr, 0), 2);
+  CHECK_EQ(pf_map_misplaced_units(map, PF_MISPLACED_OVERLAP, nullptr, 0), 1);
+  CHECK_EQ(pf_map_misplaced_units(map, PF_MISPLACED_ALL, nullptr, 0), 4);
+  CHECK_EQ(pf_map_misplaced_units(map, 0, nullptr, 0), 0);
+
+  // Ascending, and the *later* of the overlapping pair: index 4, not 3.
+  int found[8] = {};
+  CHECK_EQ(pf_map_misplaced_units(map, PF_MISPLACED_ALL, found, 8), 4);
+  CHECK_EQ(found[0], 1);
+  CHECK_EQ(found[1], 2);
+  CHECK_EQ(found[2], 4);
+  CHECK_EQ(found[3], 5);
+
+  CHECK_EQ(pf_map_remove_misplaced_units(map, PF_MISPLACED_ALL), 4);
+  CHECK_EQ(pf_map_unit_count(map), 4);
+  CHECK_EQ(pf_map_misplaced_units(map, PF_MISPLACED_ALL, nullptr, 0), 0);
+
+  // What is left is the clean footman, the first of the pile, and the pair the
+  // game means to overlap.
+  int kept[8] = {};
+  for (int i = 0; i < pf_map_unit_count(map); i++) {
+    pf_unit u;
+    CHECK_EQ(pf_map_unit(map, i, &u), PF_OK);
+    kept[i] = u.type;
+  }
+  CHECK_EQ(kept[0], 0x00);
+  CHECK_EQ(kept[1], 0x00);
+  CHECK_EQ(kept[2], 0x5e);
+  CHECK_EQ(kept[3], 0x3a);
+  pf_map_free(map);
+}
+
+/**
+ * A ship needs two tiles of water in each direction, which is the practical
+ * half of the 2x2 footprint: at 1x1 the editor would put a destroyer in a
+ * puddle and the game would not have it.
+ */
+TEST(a_ship_needs_water_for_its_whole_footprint) {
+  pf_status st = PF_OK;
+  pf_map* map = pf_map_create(32, 32, PF_TILESET_FOREST, &st);
+  if (!map) { CHECK(false); return; }
+  // A single tile of water, then a pool big enough to float in. Painted wide,
+  // because the corner model turns the rim of a lake into shore and only what
+  // is inside that is open water.
+  pf_map_paint_terrain(map, 4, 4, PF_TERRAIN_WATER_DARK, 1);
+  for (int y = 18; y < 28; y++) {
+    for (int x = 18; x < 28; x++) {
+      pf_map_paint_terrain(map, x, y, PF_TERRAIN_WATER_DARK, 1);
+    }
+  }
+  CHECK_EQ(pf_map_placement_check(map, 4, 4, 0x1e), PF_PLACE_NEEDS_WATER);
+  CHECK_EQ(pf_map_placement_check(map, 21, 21, 0x1e), PF_PLACE_OK);
+  // And two ships a tile apart are on top of each other, which they were not
+  // when both were a single tile.
+  CHECK(pf_map_add_unit(map, 20, 20, 0x1e, 0, 0) >= 0);
+  CHECK_EQ(pf_map_placement_check_ex(map, 21, 21, 0x1e, nullptr, 0),
+           PF_PLACE_OCCUPIED);
+  CHECK_EQ(pf_map_placement_check_ex(map, 22, 22, 0x1e, nullptr, 0),
+           PF_PLACE_OK);
+  pf_map_free(map);
+}
+
+}  // namespace pft

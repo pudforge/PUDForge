@@ -64,6 +64,7 @@ add_library(pudforge STATIC
   PUDForgeCore/overrides/hall_clearance.cpp
   PUDForgeCore/overrides/tile_variations.cpp
   PUDForgeCore/overrides/ai_opcodes.cpp
+  PUDForgeCore/overrides/unit_footprints.cpp
   PUDForgeCore/ai_script.cpp
   PUDForgeCore/noise.cpp
   PUDForgeCore/png.cpp

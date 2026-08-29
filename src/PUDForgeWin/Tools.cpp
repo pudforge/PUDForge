@@ -279,6 +279,8 @@ struct ConvertSheet {
   IconCache* icons = nullptr;
   std::vector<int> ids;
   int from = -1, to = -1;
+  /// Editor::ReplaceUnitType's scope. Off unless the box is ticked.
+  bool selected_only = false;
 
   const Icon* IconFor(int row) {
     if (!icons || row < 0 || row >= int(ids.size())) return nullptr;
@@ -286,16 +288,6 @@ struct ConvertSheet {
   }
 };
 
-/// How many units of a type the map holds. Shown before the press: converting a
-/// type the map has none of is the most likely slip and the cheapest to catch.
-int CountUnitsOfType(const pf_map* map, int type) {
-  int n = 0;
-  for (int i = 0; i < pf_map_unit_count(map); i++) {
-    pf_unit unit{};
-    if (pf_map_unit(map, i, &unit) == PF_OK && unit.type == type) n++;
-  }
-  return n;
-}
 
 void RefreshConvertNote(HWND dialog, ConvertSheet& sheet) {
   const int from_row = ComboIndex(dialog, IDC_CONVERT_FROM);
@@ -308,11 +300,15 @@ void RefreshConvertNote(HWND dialog, ConvertSheet& sheet) {
     EnableWindow(GetDlgItem(dialog, IDOK), FALSE);
     return;
   }
-  const int n = CountUnitsOfType(sheet.editor->map(), sheet.from);
+  // The count is the editor's, and so is the conversion, so the two cannot
+  // disagree about what the tick box put in scope.
+  const int n = sheet.editor->CountUnitsOfType(sheet.from, sheet.selected_only);
   const char* name = pf_unit_name(sheet.from);
+  const UINT said = sheet.selected_only
+                        ? Plural(n, IDS_CONVERT_SEL_ONE, IDS_CONVERT_SEL_MANY)
+                        : Plural(n, IDS_CONVERT_WOULD_ONE, IDS_CONVERT_WOULD_MANY);
   SetDlgItemTextW(dialog, IDC_CONVERT_NOTE,
-                  Format(Plural(n, IDS_CONVERT_WOULD_ONE, IDS_CONVERT_WOULD_MANY), n,
-                         name ? FromUtf8(name).c_str() : L"").c_str());
+                  Format(said, n, name ? FromUtf8(name).c_str() : L"").c_str());
   EnableWindow(GetDlgItem(dialog, IDOK), n > 0);
 }
 
@@ -342,6 +338,10 @@ INT_PTR CALLBACK ConvertProc(HWND dialog, UINT message, WPARAM wparam, LPARAM lp
       std::vector<int> unused;
       FillUnitCombo(GetDlgItem(dialog, IDC_CONVERT_TO), unused,
                     sheet->editor->placing_type);
+      // Nothing selected, nothing to narrow to: the box would be a way to
+      // arm Convert and have it do nothing.
+      EnableWindow(GetDlgItem(dialog, IDC_CONVERT_SELECTED),
+                   sheet->editor->HasSelection());
       RefreshConvertNote(dialog, *sheet);
       return TRUE;
     }
@@ -350,6 +350,12 @@ INT_PTR CALLBACK ConvertProc(HWND dialog, UINT message, WPARAM wparam, LPARAM lp
       if (!sheet) return FALSE;
       const int id = LOWORD(wparam), code = HIWORD(wparam);
       if ((id == IDC_CONVERT_FROM || id == IDC_CONVERT_TO) && code == CBN_SELCHANGE) {
+        RefreshConvertNote(dialog, *sheet);
+        return TRUE;
+      }
+      if (id == IDC_CONVERT_SELECTED) {
+        sheet->selected_only =
+            IsDlgButtonChecked(dialog, IDC_CONVERT_SELECTED) == BST_CHECKED;
         RefreshConvertNote(dialog, *sheet);
         return TRUE;
       }
@@ -1351,7 +1357,8 @@ bool ShowConvertUnits(HWND owner, HINSTANCE instance, Editor& editor,
                       ConvertProc, LPARAM(&sheet)) != IDOK) {
     return false;
   }
-  const Editor::BulkResult result = editor.ReplaceUnitType(sheet.from, sheet.to);
+  const Editor::BulkResult result =
+      editor.ReplaceUnitType(sheet.from, sheet.to, sheet.selected_only);
   const char* from = pf_unit_name(sheet.from);
   note = result.changed
              ? Format(IDS_CONVERTED, result.changed,

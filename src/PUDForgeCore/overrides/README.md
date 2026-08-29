@@ -15,6 +15,7 @@ transcribed from the game.
 | `race_counterparts.cpp` | What a unit becomes when a base changes race |
 | `named_heroes.cpp` | Which units are heroes, where the game's flag is wrong |
 | `hidden_units.cpp` | Which units a palette keeps behind an opt-in |
+| `unit_footprints.cpp` | How many tiles the ships and fliers cover, where `unitSize` is wrong |
 
 ## Rules for anything added here
 

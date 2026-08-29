@@ -219,6 +219,16 @@ UnitDomain default_unit_domain(int unit_id);
 /// Footprint from the retail defaults, for maps carrying no UDTA.
 void default_unit_footprint(int unit_id, int& w, int& h);
 
+/// The footprint the game uses where `unitSize` does not say it: the ships and
+/// flying units, which the field calls 1x1 and the game lays out 2x2. See
+/// overrides/unit_footprints.cpp for the evidence and for why this wins over a
+/// map's own UDTA. False, leaving w and h alone, for every other unit.
+bool unit_footprint_override(int unit_id, int& w, int& h);
+
+/// The units that table names, for the tests that check it.
+int oversize_unit_count();
+int oversize_unit_id(int index);
+
 /// What a newly placed unit's `value` should start at. See
 /// overrides/editing_policy.cpp; `resource` is a pf_resource.
 int unit_default_value(int unit_id, int resource);

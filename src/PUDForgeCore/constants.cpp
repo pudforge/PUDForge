@@ -720,6 +720,7 @@ void default_unit_footprint(int unit_id, int& w, int& h) {
   const uint32_t sy = read_default(size_field, unit_id, 1);
   if (sx) w = int(sx);
   if (sy) h = int(sy);
+  unit_footprint_override(unit_id, w, h);
 }
 
 int udta_offset(int segment) {
