@@ -13,6 +13,8 @@ is gone, and that is a different question from what is new.
 - The active voice, the present tense, and the same word for the same thing.
 - No metaphors, no jargon, and no words that only the code explains.
 - Under **Fixed**, say what the editor does now, then what it did before.
+- Leave out the conditions, the defaults and the exceptions. Most people want
+  to know what is different, not when it applies. The user guide has the rest.
 
 A section is for a *release*, not for a commit. `version.h` gets a patch bump
 on every commit, but only the version on `master` when CI runs gets a tag. A
@@ -20,33 +22,27 @@ section therefore covers all the commits after the previous tag.
 `scripts/prep-release.ps1` collects those commits as a start. See
 `docs/releasing.md`.
 
-## 0.1.32
+## 0.1.33
 
 **Fixed**
 
 - Ships and flying units occupy 2 x 2 tiles, the area Warcraft II gives them.
-  The editor gave them one tile, and let you put a ship in water that is too
-  small for it.
+  The editor gave them one tile, and let you put a ship in a space that is too
+  small.
 - The editor keeps the unit placement and terrain options after you close it.
   Each session started with the default values.
 
 **New**
 
-- When you open a map, the editor counts the units that the game cannot place
-  and offers to remove them. The default answer is No.
-- The map check accepts a start location below a town hall, a ship on an oil
-  patch, and a ground unit on a Circle of Power. It does not accept a unit on a
-  gold mine.
-- Convert Units has an option, **Only the selected units**. The option is off,
-  and is unavailable if you select no units.
-- An option, **Offer unused and special units**, adds the unused units, the
-  corpses, the rubble and the campaign workers to the palette and the menus.
-  The option is off, because five of these units can stop the game.
+- When you open a map, the editor finds the units that the game cannot place
+  and offers to remove them.
+- Convert Units can change only the units that you select.
+- An option adds the unused and special units to the palette and the menus.
+  The option is off, because some of these units can stop the game.
 
 **Changed**
 
-- The Generate a Map window is larger. Its preview is 2.5 times as wide and as
-  high.
+- The Generate a Map window is larger, with a much bigger preview.
 
 ## 0.1.26
 

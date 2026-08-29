@@ -52,7 +52,8 @@ list of what is different for a user — one bullet per change, under **Fixed**,
 most, active voice, present tense, the same word for the same thing every time,
 and no metaphors or jargon. "Feature X now supports Y", or "a problem that
 caused Z is corrected" — not the reasoning behind the change, which belongs in
-the commit message and the code. `CHANGELOG.md` repeats these rules at the top,
+the commit message and the code, and not the conditions and defaults, which
+belong in the user guide. `CHANGELOG.md` repeats these rules at the top,
 where whoever is editing it will see them.
 
 A section is keyed to a *release*, not to a commit. `version.h` is bumped on
