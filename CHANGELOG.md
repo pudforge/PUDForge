@@ -23,12 +23,11 @@ section therefore covers all the commits after the previous tag.
 `scripts/prep-release.ps1` collects those commits as a start. See
 `docs/releasing.md`.
 
-## 0.1.39
+## 0.1.40
 
 **Fixed**
 
-- Ships and flying units sit on a two-tile grid. You cannot place, paste or
-  move one onto an odd tile, and the editor snaps to the grid as you point.
+- Placement rules for water and air units.
 
 ## 0.1.37
 
