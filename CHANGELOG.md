@@ -22,6 +22,17 @@ section therefore covers all the commits after the previous tag.
 `scripts/prep-release.ps1` collects those commits as a start. See
 `docs/releasing.md`.
 
+## 0.1.37
+
+**Fixed**
+
+- Computer players use transports again. PUDForge joined separate landmasses
+  into one region, so the AI believed it could walk to every target.
+- The editor writes the region data the game expects for tiles on the
+  waterline. It gave them a landmass, and the game's own editor does not.
+- PUDForge rebuilds the region data every time it saves. Open an affected map
+  and save it to correct it.
+
 ## 0.1.35
 
 **Fixed**

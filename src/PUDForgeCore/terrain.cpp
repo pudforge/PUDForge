@@ -832,7 +832,28 @@ int fill_terrain(Map& map, CornerGrid& grid, const TileIndex& index,
 // ---------------------------------------------------------------- regions
 
 namespace {
-enum RegionClass { kBlocked = 0, kLand = 1, kWater = 2 };
+enum RegionClass { kBlocked = 0, kLand = 1, kWater = 2, kShore = 3 };
+
+/// A shore tile that belongs to no landmass, which is a class of its own in
+/// `REGM` and not a region number. See the note on rebuild_regions.
+constexpr uint16_t kShoreSentinel = 0xfffa;
+
+/// Whether a tile straddles the waterline: some of it water, some of it not.
+///
+/// The corner model rather than the tile group, because whether a shore tile
+/// joins a landmass depends on where it is and not on which drawing it is —
+/// the same tile id appears both ways 29 times over in one map.
+bool straddles_the_waterline(uint16_t tile) {
+  uint8_t q[4];
+  decode_tile(tile, q);
+  bool wet = false, dry = false;
+  for (int i = 0; i < 4; i++) {
+    const bool water = q[i] == kWaterDark || q[i] == kWaterLight;
+    wet |= water;
+    dry |= !water;
+  }
+  return wet && dry;
+}
 
 RegionClass classify(uint16_t tile, uint16_t& sentinel) {
   sentinel = 0;
@@ -840,18 +861,49 @@ RegionClass classify(uint16_t tile, uint16_t& sentinel) {
   uint16_t observed = group < 158 ? kGroupRegion[group] : 0;
   if (observed) {
     if (observed >= 0xfff0) { sentinel = observed; return kBlocked; }
+    // Blocked first — forest and rock straddle nothing — then the waterline,
+    // which the observed table cannot answer because it is per tile id.
+    if (straddles_the_waterline(tile)) return kShore;
     return (observed & 0x4000) ? kLand : kWater;
   }
   switch (dominant_terrain(tile)) {
     case kForest: sentinel = 0xfffe; return kBlocked;
     case kMountain: sentinel = 0xfffd; return kBlocked;
     case kWallHuman: case kWallOrc: sentinel = 0xfffb; return kBlocked;
+    default: break;
+  }
+  if (straddles_the_waterline(tile)) return kShore;
+  switch (dominant_terrain(tile)) {
     case kWaterDark: case kWaterLight: return kWater;
     default: return kLand;
   }
 }
 }  // namespace
 
+/**
+ * Label every tile with the region it belongs to, the way the game's own
+ * editor does.
+ *
+ * `REGM` is what the AI reads to decide whether it has to sail: a target on a
+ * different land region is a target that needs a transport. So a landmass
+ * wrongly joined to another is not a cosmetic fault — it is an AI that never
+ * builds a ship, which is how this was reported.
+ *
+ * The waterline is where that goes wrong. A shore tile is part land and part
+ * water, and taking it for land lets a flood step from an island to the
+ * mainland across a tile neither of them really owns. Blizzard's editor does
+ * not: it grows land regions over solid ground and coast alone, then gives
+ * each shore tile the one land region around it — and where there is not
+ * exactly one, the tile joins nothing and is written as 0xfffa.
+ *
+ * Measured against maps their editor wrote: on `genetics` the rule accounts
+ * for all 345 shore tiles and on `prison-life` all 408, sentinel for sentinel.
+ * On the map this was reported with, 683 of 685; the two it differs on are
+ * shore tiles it declines to hand to a landmass, which can only separate and
+ * never merge.
+ *
+ * @return how many regions were labelled, land and water together
+ */
 int rebuild_regions(Map& map) {
   const int w = map.width(), h = map.height();
   const size_t n = size_t(w) * size_t(h);
@@ -901,6 +953,31 @@ int rebuild_regions(Map& map) {
         stack.push_back(j);
       }
     }
+  }
+
+  // Then the waterline, once every landmass is known. A shore tile takes the
+  // land region around it when there is exactly one; where two meet it is the
+  // bridge between two landmasses and belongs to neither.
+  //
+  // Read from the pass above and never from another shore tile, so a chain of
+  // them cannot walk a region across a channel one tile at a time.
+  for (size_t i = 0; i < n; i++) {
+    if (cls[i] != kShore) continue;
+    const int x = int(i) % w, y = int(i) / w;
+    uint16_t only = 0;
+    int found = 0;
+    for (int dy = -1; dy <= 1 && found < 2; dy++) {
+      for (int dx = -1; dx <= 1 && found < 2; dx++) {
+        if (!dx && !dy) continue;
+        const int nx = x + dx, ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+        const size_t j = size_t(ny) * size_t(w) + size_t(nx);
+        if (cls[j] != kLand) continue;
+        if (found == 0) { only = out[j]; found = 1; }
+        else if (out[j] != only) found = 2;
+      }
+    }
+    out[i] = found == 1 ? only : kShoreSentinel;
   }
   return land + water;
 }

@@ -1050,6 +1050,14 @@ struct App : Host {
       to = AskSavePath(main, path);
       if (to.empty()) return false;
     }
+    // `REGM` is what the AI reads to decide whether a target needs a transport,
+    // and a map that arrived with it wrong keeps it wrong: the core only
+    // relabels when terrain changes, because a load and a save with nothing in
+    // between has to come back byte for byte. Writing a file is the other
+    // moment, and there the right answer matters more than an identical one —
+    // otherwise a map with two landmasses welded together stays that way
+    // however often it is opened.
+    pf_map_rebuild_regions(canvas.map());
     const pf_status status_code =
         pf_map_save_file(canvas.map(), ToUtf8(to).c_str());
     if (status_code != PF_OK) {

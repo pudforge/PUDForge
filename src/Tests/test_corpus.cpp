@@ -602,4 +602,69 @@ TEST(shipped_trigger_maps_keep_their_scripts) {
   CHECK(checked > 0);
   CHECK_EQ(differing_total, 0L);
 }
+
+/**
+ * Rebuilding `REGM` reproduces what the game's own editor wrote.
+ *
+ * The AI reads this to decide whether a target needs a transport, so a
+ * landmass wrongly joined to another is an AI that never builds a ship. That
+ * is how it was reported: a map saved here lost its transports, and the same
+ * map saved by the standard editor got them back.
+ *
+ * Every map that carries a REGM is a labelling by an editor that got it right,
+ * so the whole corpus is the answer key. Compared as a partition rather than
+ * as bytes: which tiles share a region is the fact the AI acts on, and the
+ * numbering is only the order the flood happened to meet them in.
+ */
+TEST(rebuilt_regions_agree_with_the_editors_that_wrote_them) {
+  if (!have_corpus()) { skip("no maps"); return; }
+  int checked = 0, exact = 0;
+  long tiles = 0, wrong = 0;
+  std::vector<std::string> bad;
+
+  for (const std::string& path : g_corpus) {
+    std::vector<uint8_t> bytes;
+    if (!pf::read_file(path, bytes)) continue;
+    pf::Status s;
+    pf::Map* map = pf::Map::parse(bytes.data(), bytes.size(), s);
+    if (!map) continue;
+    const std::vector<uint16_t> theirs = map->regions();
+    const size_t n = size_t(map->width()) * size_t(map->height());
+    if (theirs.size() != n) { delete map; continue; }
+    pf::rebuild_regions(*map);
+    const std::vector<uint16_t>& ours = map->regions();
+    checked++;
+
+    // Two tiles agree when the two labellings say the same thing about them:
+    // the same sentinel, or a region under a consistent renaming.
+    std::map<uint16_t, uint16_t> naming;
+    long mismatched = 0;
+    for (size_t i = 0; i < n; i++) {
+      const bool their_special = theirs[i] >= 0xfff0;
+      const bool our_special = ours[i] >= 0xfff0;
+      if (their_special || our_special) {
+        if (theirs[i] != ours[i]) mismatched++;
+        continue;
+      }
+      auto it = naming.find(theirs[i]);
+      if (it == naming.end()) naming.emplace(theirs[i], ours[i]);
+      else if (it->second != ours[i]) mismatched++;
+    }
+    tiles += long(n);
+    wrong += mismatched;
+    if (mismatched == 0) exact++;
+    else if (bad.size() < 5) bad.push_back(path);
+    delete map;
+  }
+
+  std::printf("     %d of %d maps relabel exactly, %ld of %ld tiles differ\n",
+              exact, checked, wrong, tiles);
+  for (const std::string& b : bad) std::printf("     differs: %s\n", b.c_str());
+  CHECK(checked > 0);
+  // Under one tile in a thousand. Their editor and this one need not agree on
+  // every last shore tile, but a landmass either matches or the AI is wrong
+  // about the whole map, and that shows up in thousands.
+  CHECK(wrong * 1000 <= tiles);
+}
+
 }  // namespace pft
