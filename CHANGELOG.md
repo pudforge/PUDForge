@@ -12,7 +12,8 @@ is gone, and that is a different question from what is new.
 - One idea in each sentence. No more than 25 words.
 - The active voice, the present tense, and the same word for the same thing.
 - No metaphors, no jargon, and no words that only the code explains.
-- Under **Fixed**, say what the editor does now, then what it did before.
+- Give the change and not the reason. What was wrong, why it was wrong and how
+  it was found belong in the commit message.
 - Leave out the conditions, the defaults and the exceptions. Most people want
   to know what is different, not when it applies. The user guide has the rest.
 
@@ -26,12 +27,9 @@ section therefore covers all the commits after the previous tag.
 
 **Fixed**
 
-- Computer players use transports again. PUDForge joined separate landmasses
-  into one region, so the AI believed it could walk to every target.
-- The editor writes the region data the game expects for tiles on the
-  waterline. It gave them a landmass, and the game's own editor does not.
-- PUDForge rebuilds the region data every time it saves. Open an affected map
-  and save it to correct it.
+- Computer players use transports again.
+- PUDForge writes correct region data for tiles on the waterline.
+- Saving a map rebuilds its region data.
 
 ## 0.1.35
 

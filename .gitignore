@@ -5,3 +5,6 @@ out/
 .DS_Store
 CLAUDE.md
 vid/
+# The map and artwork corpus. Usually a junction to a War2Combat install;
+# see the corpus note in CLAUDE.md.
+reference/

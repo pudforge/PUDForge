@@ -18,10 +18,10 @@
 
 #define PF_APP_VERSION_MAJOR 0
 #define PF_APP_VERSION_MINOR 1
-#define PF_APP_VERSION_PATCH 37
+#define PF_APP_VERSION_PATCH 38
 
 // Spelled out rather than stringised from the three numbers above: rc.exe's
 // preprocessor does not do the two-level stringisation that would build it, and
 // a VALUE expanding to something other than a string literal is a syntax error.
-#define PF_APP_VERSION_STR "0.1.37"
-#define PF_APP_VERSION_WSTR L"0.1.37"
+#define PF_APP_VERSION_STR "0.1.38"
+#define PF_APP_VERSION_WSTR L"0.1.38"
