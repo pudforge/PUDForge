@@ -4,6 +4,8 @@
 
 #include "harness.hpp"
 
+#include <set>   // region membership, compared as a partition
+
 TEST_GROUP("corpus")
 
 namespace pft {
@@ -604,22 +606,27 @@ TEST(shipped_trigger_maps_keep_their_scripts) {
 }
 
 /**
- * Rebuilding `REGM` reproduces what the game's own editor wrote.
+ * Rebuilding `REGM` never welds two landmasses the game's editor kept apart.
  *
  * The AI reads this to decide whether a target needs a transport, so a
  * landmass wrongly joined to another is an AI that never builds a ship. That
  * is how it was reported: a map saved here lost its transports, and the same
  * map saved by the standard editor got them back.
  *
- * Every map that carries a REGM is a labelling by an editor that got it right,
- * so the whole corpus is the answer key. Compared as a partition rather than
- * as bytes: which tiles share a region is the fact the AI acts on, and the
- * numbering is only the order the flood happened to meet them in.
+ * Held to the partition rather than to the bytes, and to one direction of it.
+ * Which number a region gets is the order the flood met it in. Which tiles
+ * share a region is the fact the AI acts on, and joining two that the editor
+ * separated is the one error that costs a map its ships — splitting one only
+ * makes the AI sail where it could have walked.
+ *
+ * Only over maps whose own `REGM` uses the 0xfffa shore sentinel. A map that
+ * never uses it was labelled by something other than the game's editor and is
+ * not evidence about what the game's editor does; across 357 maps on one
+ * machine, 241 use it and 116 do not.
  */
-TEST(rebuilt_regions_agree_with_the_editors_that_wrote_them) {
+TEST(rebuilt_regions_never_join_two_landmasses) {
   if (!have_corpus()) { skip("no maps"); return; }
-  int checked = 0, exact = 0;
-  long tiles = 0, wrong = 0;
+  int checked = 0, identical = 0, renumbered = 0, split = 0, merged = 0;
   std::vector<std::string> bad;
 
   for (const std::string& path : g_corpus) {
@@ -631,40 +638,50 @@ TEST(rebuilt_regions_agree_with_the_editors_that_wrote_them) {
     const std::vector<uint16_t> theirs = map->regions();
     const size_t n = size_t(map->width()) * size_t(map->height());
     if (theirs.size() != n) { delete map; continue; }
+    bool theirs_uses_sentinel = false;
+    for (size_t i = 0; i < n; i++) {
+      if (theirs[i] == 0xfffa) { theirs_uses_sentinel = true; break; }
+    }
+    if (!theirs_uses_sentinel) { delete map; continue; }
+
     pf::rebuild_regions(*map);
     const std::vector<uint16_t>& ours = map->regions();
     checked++;
 
-    // Two tiles agree when the two labellings say the same thing about them:
-    // the same sentinel, or a region under a consistent renaming.
-    std::map<uint16_t, uint16_t> naming;
-    long mismatched = 0;
+    std::map<uint16_t, std::set<uint16_t>> ours_to_theirs, theirs_to_ours;
+    long differing = 0;
     for (size_t i = 0; i < n; i++) {
-      const bool their_special = theirs[i] >= 0xfff0;
-      const bool our_special = ours[i] >= 0xfff0;
-      if (their_special || our_special) {
-        if (theirs[i] != ours[i]) mismatched++;
-        continue;
+      const bool their_land = theirs[i] >= 0x4000 && theirs[i] < 0xfff0;
+      const bool our_land = ours[i] >= 0x4000 && ours[i] < 0xfff0;
+      if (their_land && our_land) {
+        ours_to_theirs[ours[i]].insert(theirs[i]);
+        theirs_to_ours[theirs[i]].insert(ours[i]);
+      } else if (theirs[i] != ours[i]) {
+        differing++;
       }
-      auto it = naming.find(theirs[i]);
-      if (it == naming.end()) naming.emplace(theirs[i], ours[i]);
-      else if (it->second != ours[i]) mismatched++;
     }
-    tiles += long(n);
-    wrong += mismatched;
-    if (mismatched == 0) exact++;
-    else if (bad.size() < 5) bad.push_back(path);
+    bool welds = false, splits = false;
+    for (const auto& e : ours_to_theirs) welds |= e.second.size() > 1;
+    for (const auto& e : theirs_to_ours) splits |= e.second.size() > 1;
+    if (welds) { merged++; if (bad.size() < 5) bad.push_back(path); }
+    else if (splits) split++;
+    else if (differing) renumbered++;
+    else identical++;
     delete map;
   }
 
-  std::printf("     %d of %d maps relabel exactly, %ld of %ld tiles differ\n",
-              exact, checked, wrong, tiles);
-  for (const std::string& b : bad) std::printf("     differs: %s\n", b.c_str());
+  // "Renumbered" is everything short of a different partition of the land: a
+  // water region that came out with another number, or a shore tile handed to
+  // a landmass where the editor withheld it. Neither moves a landmass.
+  std::printf("     %d maps by the game's editor: %d identical, %d renumbered, "
+              "%d split, %d welded\n",
+              checked, identical, renumbered, split, merged);
+  for (const std::string& b : bad) std::printf("     welded: %s\n", b.c_str());
   CHECK(checked > 0);
-  // Under one tile in a thousand. Their editor and this one need not agree on
-  // every last shore tile, but a landmass either matches or the AI is wrong
-  // about the whole map, and that shows up in thousands.
-  CHECK(wrong * 1000 <= tiles);
+  // Not a share and not a threshold. One landmass joined to another is one map
+  // whose AI sits at home, so the number that is allowed is none.
+  CHECK_EQ(merged, 0);
+  CHECK_EQ(split, 0);
 }
 
 }  // namespace pft
