@@ -2001,3 +2001,58 @@ TEST(converting_can_be_narrowed_to_the_selection) {
   CHECK_EQ(ed.CountUnitsOfType(0x01, false), 4);
   pf_map_free(map);
 }
+
+/**
+ * Two ships cannot be put on top of each other.
+ *
+ * The whole path the canvas uses — PlaceOrigin to turn the pointer into an
+ * origin, then PlaceUnit — rather than the core call underneath it, because
+ * that is where a report of stacked ships comes from. A ship covers 2x2, so
+ * the three neighbours of a placed one are all refused.
+ */
+TEST(a_ship_cannot_be_placed_on_another_ship) {
+  pf_map* map = blank();
+  for (int y = 10; y < 40; y++) {
+    for (int x = 10; x < 40; x++) {
+      pf_map_paint_terrain(map, x, y, PF_TERRAIN_WATER_DARK, 1);
+    }
+  }
+  Editor ed(map);
+  ed.SetMode(pfwin::Mode::kUnit);
+  ed.SetTool(Tool::kPlace);
+  ed.placing_type = 0x1e;   // Elven Destroyer
+  ed.placing_owner = 0;
+
+  // A fresh editor keeps the rules, and SetMap has pushed them to the map.
+  CHECK_EQ(pf_map_allows_stacked_units(map), 0);
+
+  auto click = [&](int tx, int ty) {
+    int ox = 0, oy = 0;
+    ed.PlaceOrigin(tx, ty, ed.placing_type, ox, oy);
+    return ed.PlaceUnit(ox, oy);
+  };
+
+  CHECK(click(21, 21) >= 0);
+  CHECK_EQ(pf_map_unit_count(map), 1);
+  // Every tile the first one covers, and every offset that would share one.
+  for (int dy = 0; dy <= 1; dy++) {
+    for (int dx = 0; dx <= 1; dx++) {
+      if (!dx && !dy) continue;
+      CHECK_EQ(click(21 + dx, 21 + dy), -1);
+      CHECK(ed.last_refusal.find("already there") != std::string::npos);
+    }
+  }
+  CHECK_EQ(pf_map_unit_count(map), 1);
+
+  // Clear of it by one tile in each direction, which is where the next one fits.
+  CHECK(click(23, 21) >= 0);
+  CHECK(click(21, 23) >= 0);
+  CHECK_EQ(pf_map_unit_count(map), 3);
+
+  // And with the escape hatch on it is the person's business, as with every
+  // other placement rule.
+  ed.SetAllowStackedUnits(true);
+  CHECK(click(21, 22) >= 0);
+  CHECK_EQ(pf_map_unit_count(map), 4);
+  pf_map_free(map);
+}
