@@ -1421,6 +1421,7 @@ const char* pf_movement_bit_name(int i) { return pf::movement_bit_name(i); }
 int pf_movement_class_count(void) { return pf::movement_class_count(); }
 int pf_movement_class_value(int index) { return pf::movement_class_value(index); }
 const char* pf_movement_class_name(int index) { return pf::movement_class_name(index); }
+int pf_movement_class_offered(int i) { return pf::movement_class_offered(i) ? 1 : 0; }
 int pf_movement_class_of(int value) { return pf::movement_class_of(value); }
 
 void pf_tile_quadrants(uint16_t tile, uint8_t* out) {

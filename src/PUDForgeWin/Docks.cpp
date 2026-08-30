@@ -510,6 +510,9 @@ void TerrainPanel::RebuildMovementPalette() {
   entries.push_back(std::move(back));
 
   for (int i = 0; i < pf_movement_class_count(); i++) {
+    // Named but not offered: a value a real map holds still has to read as
+    // something under the pointer, without being a cell to paint more of.
+    if (!pf_movement_class_offered(i)) continue;
     PaletteGrid::Entry entry;
     entry.id = i;
     const char* name = pf_movement_class_name(i);

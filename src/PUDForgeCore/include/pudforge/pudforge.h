@@ -853,6 +853,14 @@ PF_API const char *pf_movement_bit_name(int index);
 PF_API int pf_movement_class_count(void);
 PF_API int pf_movement_class_value(int index);
 PF_API const char *pf_movement_class_name(int index);
+/**
+ * Whether a palette should offer this class.
+ *
+ * Every class is named, because a value a real map holds has to read as
+ * something; not every one is worth painting more of. The two walls differ by
+ * one bit that nobody sets on purpose, so one of them is named and not offered.
+ */
+PF_API int pf_movement_class_offered(int index);
 PF_API int pf_movement_class_of(int value);
 
 /**

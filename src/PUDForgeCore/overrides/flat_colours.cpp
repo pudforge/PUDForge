@@ -61,8 +61,8 @@ uint32_t movement_colour(int value) {
     case 0x0082: return 0x3f8fc0;   // shore, mostly water
     case 0x0040: return 0x2f5fd0;   // open water
     case 0x0081: return 0xd05a3a;   // forest and rock
-    case 0x008d: return 0xb0b4bc;   // human wall
-    case 0x0089: return 0x8a7f6a;   // orc wall
+    case 0x008d: return 0xb0b4bc;   // wall, human: named, not offered
+    case 0x0089: return 0x8a7f6a;   // wall
     case 0x0000: return 0xe8c34a;   // land and water: stops nothing
     // The combinations. A restriction on ground keeps ground's green and goes
     // darker with it, so the family is visible before the name is read; the

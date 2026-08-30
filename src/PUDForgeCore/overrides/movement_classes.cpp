@@ -50,6 +50,11 @@ namespace {
 struct MovementClass {
   uint16_t value;
   const char* name;
+  /// Whether a palette offers it. A value a real map holds has to be named
+  /// whether or not anybody should be painting more of it — 0x008d is on
+  /// 12,128 tiles and has to read as something, but both walls are walls and
+  /// one bit is the whole difference, so only one of them is on offer.
+  bool offered;
 };
 
 /// What each bit of the word means, from the game's own header. This is the
@@ -93,14 +98,18 @@ const MovementBit kMovementBits[] = {
 
 /// In the order a palette should show them: passable first, then blocked.
 const MovementClass kMovementClasses[] = {
-    {0x0001, "Ground"},
-    {0x0011, "Coast"},
-    {0x0002, "Shore, mostly land"},
-    {0x0082, "Shore, mostly water"},
-    {0x0040, "Open water"},
-    {0x0081, "Forest and rock"},
-    {0x008d, "Human wall"},
-    {0x0089, "Orc wall"},
+    {0x0001, "Ground", true},
+    {0x0011, "Coast", true},
+    {0x0002, "Shore, mostly land", true},
+    {0x0082, "Shore, mostly water", true},
+    {0x0040, "Open water", true},
+    {0x0081, "Forest and rock", true},
+    // One wall. SQ_C_WALL is the bit both carry; SQ_P_WALL is on the human one
+    // and on nothing else, and is not worth a second cell for a difference
+    // nobody paints on purpose. The human value is still named, because 12,128
+    // tiles of real maps hold it and a map that does has to read as something.
+    {0x0089, "Wall", true},
+    {0x008d, "Wall, human", false},
     // 0x0000 declares neither land nor water and stops nothing, so a walker and
     // a ship may both be there — Land and water. War2XE calls it a bridge.
     //
@@ -108,10 +117,8 @@ const MovementClass kMovementClasses[] = {
     // painted bare. What stops a ground unit is SQ_UNPASSABLE, which is the bit
     // forest, rock and both walls carry and the reason none of them can be
     // walked through; SQ_MAN_AIR is what War2XE's "no flying units" sets. The
-    // two together are the only barrier nothing crosses:
-    // a tile with neither SQ_LAND nor SQ_WATER is a bridge, and a restriction
-    // on a tile nothing can reach says nothing. War2XE writes its own "no
-    // flying units" the same way, as 0x0201 and not as 0x0200 alone.
+    // two together are the only barrier nothing crosses. War2XE writes its own
+    // "no flying units" the same way, as 0x0201 and not as 0x0200 alone.
     //
     // SQ_VICTORY, SQ_RUNES and TR_START are deliberately not offered. Each was
     // painted on ground and taken into the game, and nothing happened — they
@@ -128,12 +135,12 @@ const MovementClass kMovementClasses[] = {
     // Which leaves SQ_BUILDING and SQ_AI_BUILDING below still untested. They
     // are offered because a bit named for building plausibly stops building,
     // and they will come out if that turns out to be another guess.
-    {0x0000, "Land and water"},
-    {0x0281, "No walking or flying"},
-    {0x0201, "Ground, no flying"},
-    {0x0240, "Water, no flying"},
-    {0x0801, "Ground, no building"},
-    {0x0840, "Water, no building"},
+    {0x0000, "Land and water", true},
+    {0x0281, "No walking or flying", true},
+    {0x0201, "Ground, no flying", true},
+    {0x0240, "Water, no flying", true},
+    {0x0801, "Ground, no building", true},
+    {0x0840, "Water, no building", true},
 };
 
 }  // namespace
@@ -152,6 +159,14 @@ int movement_bit_value(int index) {
 const char* movement_bit_name(int index) {
   if (index < 0 || index >= movement_bit_count()) return nullptr;
   return kMovementBits[index].name;
+}
+
+bool movement_class_offered(int index) {
+  if (index < 0 || index >= int(sizeof(kMovementClasses) /
+                                sizeof(kMovementClasses[0]))) {
+    return false;
+  }
+  return kMovementClasses[index].offered;
 }
 
 int movement_class_count() {

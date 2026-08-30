@@ -507,6 +507,17 @@ TEST(movement_follows_the_tiles_it_is_painted_from) {
   // written. The eight come first, so an index into them still means what it
   // always did.
   CHECK_EQ(pf_movement_class_count(), 14);
+  // One of them is named without being offered: 12,128 tiles of real maps hold
+  // 0x008d, so it has to read as something, but both walls are walls and the
+  // bit between them is not worth a cell.
+  int offered = 0;
+  for (int i = 0; i < pf_movement_class_count(); i++) {
+    offered += pf_movement_class_offered(i) ? 1 : 0;
+  }
+  CHECK_EQ(offered, 13);
+  CHECK(pf_movement_class_of(0x008d) >= 0);
+  CHECK(!pf_movement_class_offered(pf_movement_class_of(0x008d)));
+  CHECK(pf_movement_class_offered(pf_movement_class_of(0x0089)));
   for (int i = 0; i < pf_movement_class_count(); i++) {
     const int value = pf_movement_class_value(i);
     // Bridge is 0x0000 — the value that stops nothing — so a class value may

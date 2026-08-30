@@ -129,6 +129,9 @@ const char* movement_bit_name(int index);
 int movement_class_count();
 int movement_class_value(int index);
 const char* movement_class_name(int index);
+/// Whether a palette should offer it. Every class is named, because a value a
+/// real map holds has to read as something; not every one is worth painting.
+bool movement_class_offered(int index);
 int movement_class_of(int value);
 
 /// What one bit of ALOW's upgrade blocks restricts, or null when unused.
