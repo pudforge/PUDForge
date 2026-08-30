@@ -510,7 +510,8 @@
 /* Asked when a map is opened holding units the game could not place. The
    title is IDS_CHECK_TITLE: it is the same check, said at another moment.
    1858 was a second copy of that title and is left unused. */
-/* The movement palette's last cell: not a class but the absence of one. */
+/* The movement palette's first cell: not a class but the absence of one. It
+   puts a tile back to what its terrain implies, one brush stroke at a time. */
 #define IDS_MOVE_FROM_TERRAIN      1863
 /* The status bar in movement mode: which tool is in hand, and its chords. */
 /* The shade row's other question, asked in movement mode. */

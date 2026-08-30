@@ -100,7 +100,7 @@ BEGIN
   IDS_MISPLACED_REMOVED_MANY "%d misplaced units removed"
   /* The movement palette's last cell, and what the status bar says when it is
      picked: it takes back whatever the tile drawn there implies. */
-  IDS_MOVE_FROM_TERRAIN "Match the terrain"
+  IDS_MOVE_FROM_TERRAIN "Reset"
   /* Movement mode. The layer is not drawn, so the hint says where to look. */
   IDS_TOOL_WALKABLE     "Painting movement"
   IDS_HINT_MOVEMENT     "Drag to paint  Colours are the movement overlay"

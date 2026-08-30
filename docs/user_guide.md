@@ -195,10 +195,10 @@ it, and **No walking or flying** stops both, which is the only barrier nothing
 crosses. The rest stop one thing at a time: ground no flier may cross, water no
 platform may be built on, and so on.
 
-The last cell of the palette, **Match the terrain**, is not a value but the
-absence of one. Painting with it puts each tile back to what its terrain
-implies, which is how a single override comes off; **Tools ▸ Tile Movement
-Data** does the same to the selection or the whole map at once.
+The first cell of the palette, **Reset**, is not a value but the absence of
+one. Painting with it puts each tile back to what its terrain implies, which is
+how a single override comes off; **Tools ▸ Tile Movement Data** does the same to
+the selection or the whole map at once.
 
 A value you paint here survives a terrain edit over the same tile, and a save
 and a reload. Nothing in the format records which tiles you meant, and nothing

@@ -494,12 +494,21 @@ int TerrainPanel::SelectedMovementCell() const {
 void TerrainPanel::RebuildMovementPalette() {
   // Flat colours, and the overlay's own: a cell and the tiles it paints are
   // then the same colour, which is the whole of what has to be learned.
+  // Indexed by cell id, which is unchanged by where a cell is shown.
   icons_.assign(size_t(pf_movement_class_count()) + 1, Icon{});
   for (int i = 0; i < pf_movement_class_count(); i++) {
     icons_[size_t(i)] = FlatIcon(pf_movement_colour(pf_movement_class_value(i)));
   }
 
+  // The way back comes first: not a class but the absence of one, and the cell
+  // reached for most often. An override comes off a tile at a time here, where
+  // Reset Movement takes the lot.
   std::vector<PaletteGrid::Entry> entries;
+  PaletteGrid::Entry back;
+  back.id = MovementResetCell();
+  back.label = Str(IDS_MOVE_FROM_TERRAIN);
+  entries.push_back(std::move(back));
+
   for (int i = 0; i < pf_movement_class_count(); i++) {
     PaletteGrid::Entry entry;
     entry.id = i;
@@ -507,12 +516,6 @@ void TerrainPanel::RebuildMovementPalette() {
     entry.label = name ? FromUtf8(name) : L"";
     entries.push_back(std::move(entry));
   }
-  // And the way back: not a ninth class but the absence of one, so an override
-  // comes off a tile at a time where Reset Movement takes the lot.
-  PaletteGrid::Entry back;
-  back.id = MovementResetCell();
-  back.label = Str(IDS_MOVE_FROM_TERRAIN);
-  entries.push_back(std::move(back));
 
   palette_.SetEntries(std::move(entries));
   palette_.SetSelected(SelectedMovementCell());
