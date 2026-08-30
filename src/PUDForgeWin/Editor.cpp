@@ -951,14 +951,16 @@ void Editor::PlaceOrigin(int x, int y, int type, int& ox, int& oy) const {
   pf_map_unit_footprint(map_, type, &fw, &fh);
   ox = x - ((fw - 1) >> 1);
   oy = y - ((fh - 1) >> 1);
-  // Ships and flying units go on a two-tile grid, which is where the game's
-  // editor puts every one of them. Snapped rather than refused: the tiles
-  // between are not a placement to explain, they are half a tile of pointer
-  // travel, and a ghost that jumps two at a time says the rule by moving.
+  // Ships and flying units go on a two-tile grid, and oil on the same one a
+  // tile off it, which is where the game's editor puts every one of them.
+  // Snapped rather than refused: the tiles between are not a placement to
+  // explain, they are half a tile of pointer travel, and a ghost that jumps two
+  // at a time says the rule by moving.
   const int step = pf_unit_placement_step(type);
+  const int phase = pf_unit_placement_phase(type);
   if (step > 1) {
-    ox -= ((ox % step) + step) % step;
-    oy -= ((oy % step) + step) % step;
+    ox -= (((ox - phase) % step) + step) % step;
+    oy -= (((oy - phase) % step) + step) % step;
   }
 }
 

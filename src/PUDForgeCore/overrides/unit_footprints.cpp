@@ -70,6 +70,32 @@ const struct { int id; const char* name; } kTwoByTwo[] = {
     {0x2b, "Dragon"},
 };
 
+/// Oil, which goes on the same two-tile grid as the ships but one tile off it.
+///
+/// Across the maps the game's own editor wrote, all 1,286 oil patches sit at an
+/// odd x *and* an odd y, and so do all 16 oil wells. Not one is anywhere else.
+/// The gold mine is the control and settles that this is not simply what a 3x3
+/// unit does: it is the same size, and its 2,605 placements fall 676 / 718 /
+/// 625 / 586 across the four parities, which is what chance looks like.
+///
+/// Why the odd one is not known here. A patch is 3x3, so an odd corner puts its
+/// middle on the even grid the ships use, which would make it the same rule
+/// seen from the centre rather than the corner — but the gold mine is 3x3 too
+/// and does not follow it, so that explanation is not enough and is not
+/// claimed.
+const uint8_t kOddGrid[] = {
+    0x5d,   // Oil Patch
+    0x56,   // Human Oil Well
+    0x57,   // Orc Oil Well
+};
+
+bool on_the_odd_grid(int unit_id) {
+  for (uint8_t id : kOddGrid) {
+    if (id == unit_id) return true;
+  }
+  return false;
+}
+
 }  // namespace
 
 bool unit_footprint_override(int unit_id, int& w, int& h) {
@@ -82,9 +108,13 @@ bool unit_footprint_override(int unit_id, int& w, int& h) {
 }
 
 int unit_placement_step(int unit_id) {
+  if (on_the_odd_grid(unit_id)) return 2;
   int w = 0, h = 0;
   return unit_footprint_override(unit_id, w, h) ? 2 : 1;
 }
+
+int unit_placement_phase(int unit_id) { return on_the_odd_grid(unit_id) ? 1 : 0; }
+
 
 int oversize_unit_count() {
   return int(sizeof(kTwoByTwo) / sizeof(kTwoByTwo[0]));

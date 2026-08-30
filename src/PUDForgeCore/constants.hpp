@@ -242,6 +242,11 @@ bool unit_footprint_override(int unit_id, int& w, int& h);
 /// overrides/unit_footprints.cpp for the count behind that.
 int unit_placement_step(int unit_id);
 
+/// Where on that grid the unit sits: 0 for the ships and fliers, which take
+/// even tiles, and 1 for oil, which takes odd ones. See
+/// overrides/unit_footprints.cpp for the counts behind both.
+int unit_placement_phase(int unit_id);
+
 /// The units that table names, for the tests that check it.
 int oversize_unit_count();
 int oversize_unit_id(int index);

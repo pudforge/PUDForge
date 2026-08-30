@@ -494,6 +494,11 @@ int pf_unit_placement_step(int unit_id) {
   return pf::unit_placement_step(unit_id);
 }
 
+int pf_unit_placement_phase(int unit_id) {
+  if (unit_id < 0 || unit_id >= pf::kUnitCount) return 0;
+  return pf::unit_placement_phase(unit_id);
+}
+
 int pf_unit_counterpart(int unit_id) { return pf::unit_counterpart(unit_id); }
 
 int pf_unit_counterpart_count(void) { return pf::unit_counterpart_count(); }
@@ -2213,11 +2218,15 @@ int pf_map_placement_check(const pf_map* map, int x, int y, int type) {
     return PF_PLACE_OUT_OF_BOUNDS;
   }
 
-  // Ships and flying units go on a 2x2 grid. Here rather than in the editor
-  // that snaps the pointer, because paste and a dragged selection arrive with
-  // an offset of their own and would otherwise put one on an odd tile.
+  // Ships and flying units go on a two-tile grid, and oil goes on the same one
+  // a tile off it. Here rather than in the editor that snaps the pointer,
+  // because paste and a dragged selection arrive with an offset of their own
+  // and would otherwise put one between the lines.
   const int step = pf::unit_placement_step(type);
-  if (step > 1 && ((x % step) || (y % step))) return PF_PLACE_OFF_GRID;
+  const int phase = pf::unit_placement_phase(type);
+  if (step > 1 && (((x - phase) % step) || ((y - phase) % step))) {
+    return PF_PLACE_OFF_GRID;
+  }
 
   const pf::UnitDomain domain = pf::default_unit_domain(type);
   const uint32_t flags = pf_unit_flags(type);

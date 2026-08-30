@@ -342,6 +342,17 @@ PF_API int pf_unit_needs_opt_in_count(void);
 PF_API int pf_unit_placement_step(int unit_id);
 
 /**
+ * Where on that grid the unit sits: 0 for the ships and flying units, which
+ * take even tiles, and 1 for oil patches and oil wells, which take odd ones.
+ *
+ * All 1,286 oil patches the game's own editor placed sit at an odd x and an odd
+ * y, and so do all 16 oil wells. The gold mine is the same size and does not
+ * follow it, which is what makes this the unit's rule rather than the
+ * footprint's. A placement is on the grid when (x - phase) % step is zero.
+ */
+PF_API int pf_unit_placement_phase(int unit_id);
+
+/**
  * The other race's equivalent of a unit, or -1 when it has none.
  *
  * A footman answers a grunt, a farm a pig farm, a keep a stronghold. Reads

@@ -592,8 +592,12 @@ TEST(units_cannot_be_placed_on_terrain_they_cannot_stand_on) {
   CHECK_EQ(pf_map_placement_check(map, 2, 2, 40), int(PF_PLACE_OK));
   CHECK_EQ(pf_map_placement_check(map, 2, 2, 92), int(PF_PLACE_OK));
   CHECK(pf_map_placement_check(map, 15, 15, 92) != PF_PLACE_OK);   // mine in a lake
+  // An oil well goes on the odd tiles of the two-tile grid, so both of these
+  // aim at odd ones: an even tile answers PF_PLACE_OFF_GRID first and says
+  // nothing about the terrain, which is what this test is about.
   CHECK_EQ(pf_map_placement_check(map, 15, 15, 86), int(PF_PLACE_OK));
-  CHECK_EQ(pf_map_placement_check(map, 2, 2, 86), int(PF_PLACE_NEEDS_WATER));
+  CHECK_EQ(pf_map_placement_check(map, 3, 3, 86), int(PF_PLACE_NEEDS_WATER));
+  CHECK_EQ(pf_map_placement_check(map, 2, 2, 86), int(PF_PLACE_OFF_GRID));
 
   // A building needs buildable ground under every tile, which is stricter
   // than "not water": no building in any of the 529 shipped maps sits on a
@@ -853,21 +857,29 @@ TEST(ships_and_fliers_sit_on_even_tiles) {
     for (int i = 0, n = pf_map_unit_count(map); i < n; i++) {
       pf_unit u;
       if (pf_map_unit(map, i, &u) != PF_OK) continue;
-      const bool even = (u.x % 2) == 0 && (u.y % 2) == 0;
-      if (pf_unit_placement_step(u.type) > 1) {
-        if (game_editor) { by_editor++; by_editor_even += even; }
-        else { elsewhere++; elsewhere_even += even; }
+      // On its own grid: the even tiles for a ship or a flier, the odd ones
+      // for oil. The same two-tile grid, half a step apart.
+      const int step = pf_unit_placement_step(u.type);
+      const int phase = pf_unit_placement_phase(u.type);
+      const bool on_grid =
+          ((int(u.x) - phase) % step) == 0 && ((int(u.y) - phase) % step) == 0;
+      if (step > 1) {
+        if (game_editor) { by_editor++; by_editor_even += on_grid; }
+        else { elsewhere++; elsewhere_even += on_grid; }
       } else {
         int w = 1, h = 1;
         pf_map_unit_footprint(map, u.type, &w, &h);
-        if (w == 1 && h == 1) { small++; small_even += even; }
+        // The control group, and it is asked the plain question: a 1x1 unit
+        // has no grid, so what matters is that it is not on one by accident.
+        const bool plain_even = (u.x % 2) == 0 && (u.y % 2) == 0;
+        if (w == 1 && h == 1) { small++; small_even += plain_even; }
       }
     }
     pf_map_free(map);
   }
 
-  std::printf("     %ld/%ld on even tiles in maps by the game's editor, "
-              "%ld/%ld elsewhere, %ld/%ld 1x1 units\n",
+  std::printf("     %ld/%ld on their grid in maps by the game's editor, "
+              "%ld/%ld elsewhere, %ld/%ld 1x1 units on even tiles\n",
               by_editor_even, by_editor, elsewhere_even, elsewhere,
               small_even, small);
   CHECK(by_editor + elsewhere > 0);
@@ -1093,4 +1105,45 @@ TEST(the_unit_name_block_stops_before_the_upgrades) {
   CHECK(std::string(pf_unit_name(0x69)) == "Corpse");
 }
 
+
+/**
+ * Oil goes on odd tiles, and only odd ones.
+ *
+ * The same two-tile grid the ships use, a tile off it. Measured rather than
+ * assumed: every oil patch and every oil well the game's own editor placed sits
+ * at an odd x and an odd y, and the gold mine — the same 3x3 size — does not,
+ * which is what makes it the unit's rule and not the footprint's.
+ */
+TEST(oil_sits_on_the_odd_tiles_of_the_same_grid) {
+  const int kOilPatch = 0x5d, kGoldMine = 0x5c, kDestroyer = 0x1e;
+
+  CHECK_EQ(pf_unit_placement_step(kOilPatch), 2);
+  CHECK_EQ(pf_unit_placement_phase(kOilPatch), 1);
+  CHECK_EQ(pf_unit_placement_step(0x56), 2);    // human oil well
+  CHECK_EQ(pf_unit_placement_phase(0x57), 1);   // orc oil well
+  // A ship is on the same grid but the other half of it.
+  CHECK_EQ(pf_unit_placement_step(kDestroyer), 2);
+  CHECK_EQ(pf_unit_placement_phase(kDestroyer), 0);
+  // The gold mine is the control: same size, no grid at all.
+  CHECK_EQ(pf_unit_placement_step(kGoldMine), 1);
+  CHECK_EQ(pf_unit_placement_phase(kGoldMine), 0);
+
+  pf_status st = PF_OK;
+  pf_map* map = pf_map_create(32, 32, PF_TILESET_FOREST, &st);
+  if (!map) { CHECK(false); return; }
+  for (int y = 4; y < 28; y++) {
+    for (int x = 4; x < 28; x++) {
+      pf_map_paint_terrain(map, x, y, PF_TERRAIN_WATER_DARK, 1);
+    }
+  }
+  // Odd is where it may go; even is between the lines.
+  CHECK_EQ(pf_map_placement_check(map, 11, 11, kOilPatch), PF_PLACE_OK);
+  CHECK_EQ(pf_map_placement_check(map, 12, 11, kOilPatch), PF_PLACE_OFF_GRID);
+  CHECK_EQ(pf_map_placement_check(map, 11, 12, kOilPatch), PF_PLACE_OFF_GRID);
+  CHECK_EQ(pf_map_placement_check(map, 12, 12, kOilPatch), PF_PLACE_OFF_GRID);
+  // And a ship on the same water is the other way round.
+  CHECK_EQ(pf_map_placement_check(map, 12, 12, kDestroyer), PF_PLACE_OK);
+  CHECK_EQ(pf_map_placement_check(map, 11, 11, kDestroyer), PF_PLACE_OFF_GRID);
+  pf_map_free(map);
+}
 }  // namespace pft

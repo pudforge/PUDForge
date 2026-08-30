@@ -23,7 +23,7 @@ section therefore covers all the commits after the previous tag.
 `scripts/prep-release.ps1` collects those commits as a start. See
 `docs/releasing.md`.
 
-## 0.1.56
+## 0.1.57
 
 **New**
 
@@ -66,6 +66,8 @@ section therefore covers all the commits after the previous tag.
 
 **Fixed**
 
+- Oil patches and oil wells go on every other tile, as the game places them.
+  You could put one between the lines.
 - Ships and flying units occupy 2 x 2 tiles, the area Warcraft II gives them.
   The editor gave them one tile, and let you put a ship in a space that is too
   small.
