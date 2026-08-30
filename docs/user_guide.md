@@ -175,8 +175,7 @@ it is.
 
 ## Movement mode
 
-**View ▸ Mode ▸ Movement** (M), or the **Movement** button at the foot of the
-terrain panel, paints the layer under the artwork: what may
+**View ▸ Mode ▸ Movement** (M) paints the layer under the artwork: what may
 walk, swim, sail or fly over each tile. The terrain palette becomes the eight
 movement values the game uses, in the colours the movement overlay draws them,
 and the overlay comes on while you are in the mode.
@@ -295,9 +294,10 @@ The grid draws a heavier line every eight tiles for use as a ruler.
 Clicking the minimap jumps to that point; dragging scrolls continuously and the
 map follows during the drag.
 
-**View ▸ Layer** replaces the artwork with the values the file stores:
-movement, regions or raw tile ids. The movement layer marks tiles whose stored
-value disagrees with the value their terrain implies.
+**View ▸ Layer** replaces the artwork with the values the file stores: regions
+or raw tile ids. The movement layer is not here — **View ▸ Mode ▸ Movement**
+shows it, because that is the mode that edits it, and it puts back whatever
+layer you had on the way out.
 
 **View ▸ Sight and Range of the Selected Unit** draws the sight and attack ranges of
 the selected units as circles around their footprints.

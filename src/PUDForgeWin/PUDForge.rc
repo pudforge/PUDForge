@@ -134,8 +134,11 @@ BEGIN
     BEGIN
       // "Artwork" named what you see when no overlay is on, which reads as a
       // fourth overlay rather than as the absence of the other three.
+      //
+      // Movement is not here any more. It is the one layer that can be edited,
+      // and the mode that edits it turns it on and off; two ways to show it
+      // meant the menu could say it was off while the mode had it on.
       MENUITEM "&None",                    IDM_VIEW_LAYER_ART
-      MENUITEM "&Movement",                IDM_VIEW_LAYER_MOVEMENT
       MENUITEM "&Regions",                 IDM_VIEW_LAYER_REGIONS
       MENUITEM "&Tile IDs",                IDM_VIEW_LAYER_TILES
     END

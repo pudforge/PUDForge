@@ -515,11 +515,8 @@
 #define IDS_MOVE_FROM_TERRAIN      1863
 /* The status bar in movement mode: which tool is in hand, and its chords. */
 /* The shade row's other question, asked in movement mode. */
-/* The panel's own mode switch, at its foot. */
-#define IDS_PANEL_MODE_TERRAIN     1871
-#define IDS_PANEL_MODE_MOVEMENT    1872
-#define IDS_TIP_PANEL_TERRAIN      1873
-#define IDS_TIP_PANEL_MOVEMENT     1874
+/* 1871-1874 named a Terrain / Movement switch at the foot of the terrain
+   panel. The View menu is the only way into a mode now. Left unused. */
 
 /* 1866-1870 were the Flying row, two buttons over one bit. The list below
    carries SQ_MAN_AIR with the other thirteen, and one word with two controls

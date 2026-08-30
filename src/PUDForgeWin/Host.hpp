@@ -11,8 +11,6 @@
 
 #include <string>
 
-#include "Editor.hpp"   // Mode, for the panel's own switch between them
-
 namespace pfwin {
 
 struct Host {
@@ -92,13 +90,6 @@ struct Host {
   /// to mean different things.
   virtual void OnBulkEdit(BulkEdit which) = 0;
 
-  /// Switch the panel between painting terrain and painting movement.
-  ///
-  /// Through the host rather than straight into the editor, because entering
-  /// movement mode turns its overlay on and leaving puts back whatever was
-  /// showing — and that is the application's to remember. The View menu items
-  /// call the same code, so the switch and the menu cannot drift apart.
-  virtual void OnPanelMode(Mode mode) = 0;
 
   /// Open the tabbed map window on a page, from a dock.
   ///

@@ -50,6 +50,10 @@
 #define IDM_VIEW_UNITS_AIR       233
 #define IDM_VIEW_UNITS_BUILDINGS 234
 #define IDM_VIEW_LAYER_ART       240   /* order matches pf_overlay */
+/* 241 showed the movement layer. View ▸ Mode ▸ Movement turns it on now, and
+   turns it off again on the way out, so a menu item beside it could only
+   disagree. The id keeps its place because the ones below it are pf_overlay
+   values offset from IDM_VIEW_LAYER_ART, and nothing sends it. */
 #define IDM_VIEW_LAYER_MOVEMENT  241
 #define IDM_VIEW_LAYER_REGIONS   242
 #define IDM_VIEW_LAYER_TILES     243
@@ -429,11 +433,9 @@
 #define IDM_COLUMNS_SCALE     786
 
 /* The two bulk terrain edits, on the terrain panel as well as in Tools. */
-/// The two modes this panel paints in, at its foot: Terrain and Movement. On
-/// the panel rather than only in the View menu, because the panel is what
-/// changes between them — a person looking at the palette wondering where the
-/// terrains went is looking at the control that would have told them.
-#define IDC_PANEL_MODE_FIRST  802   /* +0 terrain, +1 movement */
+/* 802 and 803 were a Terrain / Movement switch at the foot of this panel.
+   Picking a mode is a deliberate act and belongs in the View menu, which is
+   the only way in now. Left unused. */
 
 #define IDC_TERRAIN_REPLACE   800
 #define IDC_TERRAIN_DECORATE  801

@@ -106,12 +106,6 @@ BEGIN
   IDS_HINT_MOVEMENT     "Drag to paint  Colours are the movement overlay"
   /* The shade row, asked again in movement mode. Two answers, not three: the
      bit is on or it is not. */
-  /* The panel's mode switch. The same two words the View menu uses, because
-     they are the same two modes. */
-  IDS_PANEL_MODE_TERRAIN "Terrain"
-  IDS_PANEL_MODE_MOVEMENT "Movement"
-  IDS_TIP_PANEL_TERRAIN  "Paint the ground itself: what the map is made of and what it looks like."
-  IDS_TIP_PANEL_MOVEMENT "Paint the layer under the artwork: what may walk, swim, sail or fly over each tile, whatever is drawn there."
 
   /* The bit list under the movement palette. A value is one word and these
      are its bits, so a class in the palette lights some of them and any of
@@ -440,7 +434,7 @@ BEGIN
      number here is written by painting, so the only thing to do in this window
      is find the tiles where that went wrong and undo them. */
   IDS_MOVE_ABOUT        "Every tile carries a movement value in the map's SQM section — what may walk, swim, sail or fly over it. PUDForge writes it as you paint, from the tile painted, so it normally needs no attention. A tile whose value differs from the one its terrain implies is an override: something a mapper meant, or another editor left it there. Paint them yourself in View > Mode > Movement, where the palette carries the eight values instead of the terrains. An override survives a terrain edit, a save and a reload; this is how you take one off again."
-  IDS_MOVE_LEGEND       "The eight values the game uses. View > Layer > Movement draws them over the map:"
+  IDS_MOVE_LEGEND       "The values the game uses. View > Mode > Movement draws them over the map, and paints them:"
   IDS_MOVE_OVERRIDDEN_ONE  "%d tile in %ls does not match the terrain under it."
   IDS_MOVE_OVERRIDDEN_MANY "%d tiles in %ls do not match the terrain under them."
   IDS_MOVE_MATCHES      "Every tile matches the terrain under it."

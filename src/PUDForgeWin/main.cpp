@@ -658,7 +658,13 @@ struct App : Host {
     Log::The().Add(full, warn);
   }
 
-  void OnPanelMode(Mode mode) override {
+  /// Enter a mode, and put the right layer on show with it.
+  ///
+  /// Not a Host hook any more: the only way in is the View menu, and that is
+  /// this window's own. It stays one function because entering movement mode
+  /// turns its overlay on and leaving puts back whatever was showing, and two
+  /// places doing that would eventually disagree.
+  void EnterMode(Mode mode) {
     editor.SetMode(mode);
     // The layer is invisible under the artwork, so entering the mode turns it
     // on and leaving puts back whatever was on show. Painting what you cannot
@@ -1469,9 +1475,9 @@ struct App : Host {
       case IDM_VIEW_MODE_TERRAIN:
       case IDM_VIEW_MODE_UNITS:
       case IDM_VIEW_MODE_MOVEMENT:
-        OnPanelMode(id == IDM_VIEW_MODE_TERRAIN    ? Mode::kTerrain
-                    : id == IDM_VIEW_MODE_MOVEMENT ? Mode::kMovement
-                                                   : Mode::kUnit);
+        EnterMode(id == IDM_VIEW_MODE_TERRAIN    ? Mode::kTerrain
+                  : id == IDM_VIEW_MODE_MOVEMENT ? Mode::kMovement
+                                                 : Mode::kUnit);
         OnEditorChanged();
         return true;
 
@@ -1856,7 +1862,10 @@ struct App : Host {
     for (int i = 0; i < 5; i++) {
       check(IDM_VIEW_UNITS_ALL + i, editor.unit_filter == i);
     }
+    // Movement's item is gone from the menu; ticking one that is not there is
+    // harmless but says the loop still believes in it.
     for (int i = 0; i < 4; i++) {
+      if (i == PF_OVERLAY_MOVEMENT) continue;
       check(IDM_VIEW_LAYER_ART + i, editor.overlay == i);
     }
     check(IDM_VIEW_GRID, editor.show_grid);
