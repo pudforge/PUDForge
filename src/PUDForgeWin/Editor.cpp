@@ -317,7 +317,15 @@ int Editor::StepBrushSize(int dir) {
   for (int i = 0; i < rungs; i++) {
     if (pf_brush_size(i) <= brush_size) at = i;
   }
-  const int next = std::max(0, std::min(at + (dir > 0 ? 1 : -1), rungs - 1));
+  // The bottom rung is a corner rather than a tile, and the movement layer
+  // holds one value per tile — so in that mode the ladder starts a rung higher
+  // instead of offering a size that would round back up to one.
+  const int floor = (mode_ == Mode::kMovement &&
+                     pf_brush_size(0) == PF_BRUSH_SIZE_CORNER)
+                        ? 1
+                        : 0;
+  const int next =
+      std::max(floor, std::min(at + (dir > 0 ? 1 : -1), rungs - 1));
   const int size = pf_brush_size(next);
   if (size == brush_size) return -1;
   brush_size = size;

@@ -23,7 +23,7 @@ section therefore covers all the commits after the previous tag.
 `scripts/prep-release.ps1` collects those commits as a start. See
 `docs/releasing.md`.
 
-## 0.1.50
+## 0.1.51
 
 **New**
 
@@ -35,8 +35,8 @@ section therefore covers all the commits after the previous tag.
 - The movement overlay draws the palette's colours, so a tile on the map and
   the cell that painted it are the same colour.
 - The palette's last cell puts a tile back to what its terrain implies.
-- The movement brush shows its outline under the pointer, as the terrain brush
-  does.
+- The movement brush shows its outline under the pointer, and takes the same
+  size keys and Alt+wheel, as the terrain brush does.
 
 **Changed**
 

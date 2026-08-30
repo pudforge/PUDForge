@@ -1530,8 +1530,9 @@ const wchar_t* MapWindow::CursorForTool() const {
   // Ctrl is the eyedropper wherever it is held, so it wins over the tool.
   if (GetKeyState(VK_CONTROL) & 0x8000) return IDC_UPARROW;
   if (editor_->pasting()) return IDC_CROSS;
-  if (editor_->mode() == Mode::kTerrain) {
-    // Painting and dragging a rectangle are both aiming at a tile.
+  if (editor_->mode() == Mode::kTerrain || editor_->mode() == Mode::kMovement) {
+    // Painting, dragging a rectangle and laying a movement value are all
+    // aiming at a tile.
     return IDC_CROSS;
   }
   if (editor_->tool() == Tool::kPlace) return IDC_CROSS;
@@ -1541,10 +1542,12 @@ const wchar_t* MapWindow::CursorForTool() const {
 void MapWindow::OnWheel(int delta, int x, int y, WPARAM keys) {
   if (!map_) return;
   // Alt is the one modifier the wheel had left, and sizing the brush is what a
-  // painter reaches for most after zoom. Terrain only: a unit has no size to
-  // change, and silently doing nothing is worse than not claiming the gesture.
+  // painter reaches for most after zoom. Wherever there is a brush, which is
+  // both the modes that paint: a unit has no size to change, and silently doing
+  // nothing is worse than not claiming the gesture.
   if ((GetKeyState(VK_MENU) & 0x8000) && editor_ &&
-      editor_->mode() == Mode::kTerrain) {
+      (editor_->mode() == Mode::kTerrain ||
+       editor_->mode() == Mode::kMovement)) {
     const int size = editor_->StepBrushSize(delta > 0 ? 1 : -1);
     if (size >= 0 && host_) {
       host_->OnEditorChanged();

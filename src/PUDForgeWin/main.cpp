@@ -1553,7 +1553,8 @@ struct App : Host {
 
       case IDM_EDIT_BRUSH_SMALLER:
       case IDM_EDIT_BRUSH_BIGGER: {
-        if (editor.mode() != Mode::kTerrain) return true;
+        // Both the modes that paint. The movement brush is the same brush.
+        if (editor.mode() == Mode::kUnit) return true;
         const int size = editor.StepBrushSize(id == IDM_EDIT_BRUSH_BIGGER ? 1 : -1);
         if (size < 0) return true;
         OnEditorChanged();

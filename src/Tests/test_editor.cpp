@@ -2250,3 +2250,41 @@ TEST(painting_terrain_leaves_authored_movement_alone) {
            pf_tile_movement(pf_map_tile_at(map, 20, 20)));
   pf_map_free(map);
 }
+
+/**
+ * The brush ladder works in movement mode, minus the rung it has no use for.
+ *
+ * Alt+wheel and the two size keys were terrain-only, which left the movement
+ * brush at whatever size it happened to be. It is the same brush, so it takes
+ * the same shortcuts — except the bottom rung, which marks a corner rather
+ * than a tile where this layer holds one value per tile.
+ */
+TEST(the_brush_ladder_skips_the_corner_rung_in_movement_mode) {
+  pf_map* map = blank();
+  Editor ed(map);
+
+  // Terrain mode reaches the corner rung, which is what it is for.
+  ed.SetMode(pfwin::Mode::kTerrain);
+  ed.brush_size = pf_brush_size(1);
+  CHECK_EQ(ed.StepBrushSize(-1), PF_BRUSH_SIZE_CORNER);
+  CHECK(ed.BrushIsCorner());
+
+  // Movement mode stops a rung above it, and never paints half a tile.
+  ed.SetMode(pfwin::Mode::kMovement);
+  ed.brush_size = pf_brush_size(1);
+  CHECK_EQ(ed.StepBrushSize(-1), -1);        // already as small as it goes
+  CHECK_EQ(ed.brush_size, pf_brush_size(1));
+  CHECK(!ed.BrushIsCorner());
+
+  // And it climbs the same ladder as terrain does.
+  const int up = ed.StepBrushSize(1);
+  CHECK(up > pf_brush_size(1));
+  CHECK_EQ(ed.brush_size, up);
+  CHECK_EQ(ed.MovementBrushSize(), up);
+
+  // A size left on the corner rung by terrain mode still paints a whole tile
+  // rather than nothing, whichever way it was reached.
+  ed.brush_size = PF_BRUSH_SIZE_CORNER;
+  CHECK_EQ(ed.MovementBrushSize(), 1);
+  pf_map_free(map);
+}
