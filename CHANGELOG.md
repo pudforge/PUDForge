@@ -30,10 +30,13 @@ section therefore covers all the commits after the previous tag.
 - A movement editing mode, at View, Mode, Movement. It paints what may cross
   each tile, whatever the tile looks like: ground units over water, no flying
   over open ground, or one tile that a ship and a ground unit share.
-- Unit placement obeys what you paint. A ground unit may stand on water you
-  made walkable, and painting a tile shut removes what was standing on it.
 - The brush is the terrain brush, with the same sizes and keys. Ctrl and the
   left button take the value under the pointer.
+
+**Fixed**
+
+- Oil patches and oil wells go on every other tile, as the game places them.
+
 ## 0.1.59
 
 **New**
