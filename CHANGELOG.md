@@ -23,15 +23,16 @@ section therefore covers all the commits after the previous tag.
 `scripts/prep-release.ps1` collects those commits as a start. See
 `docs/releasing.md`.
 
-## 0.1.52
+## 0.1.53
 
 **New**
 
 - A movement mode. The terrain palette becomes the movement values, and you
   paint them over any tile whatever is drawn there.
 - A Terrain and Movement switch at the foot of the terrain panel.
-- Seventeen movement values in the palette. Eight are the ones Blizzard's maps
-  use; the rest stop flying units, walking units, building, or everything.
+- Sixteen movement values in the palette, each named for what it does. Eight
+  are the ones Blizzard's maps use; the rest stop flying units, walking units,
+  building, or everything.
 - The movement overlay draws the palette's colours over the terrain, so a tile
   and the cell that painted it read as the same colour and the coastline under
   them is still visible.

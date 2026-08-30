@@ -59,13 +59,13 @@ struct MovementClass {
 /// nothing else — `movement_values_are_made_of_named_bits` checks it — and the
 /// eleven that occur come apart into sense:
 ///
-///   0x0000  SQ_NONE                                   a bridge: nothing at all
+///   0x0000  SQ_NONE                                   land and water at once
 ///   0x0011  SQ_LAND | SQ_UNBUILDABLE                  land nobody may build on
 ///   0x0081  SQ_LAND | SQ_UNPASSABLE                   forest and rock
 ///   0x008d  SQ_LAND | SQ_C_WALL | SQ_P_WALL | ...     one wall
 ///   0x0089  SQ_LAND | SQ_C_WALL | SQ_UNPASSABLE       the other
 ///   0x0201  SQ_LAND | SQ_MAN_AIR                      War2XE's "no flying"
-///   0x0f00  the four restriction bits together        space
+///   0x0f00  the four restriction bits together        closed to everything
 ///
 /// Which also settles the two walls: they are not a human bit and an orc bit
 /// but one wall bit and a second that only one of them carries.
@@ -101,8 +101,14 @@ const MovementClass kMovementClasses[] = {
     {0x0081, "Forest and rock"},
     {0x008d, "Human wall"},
     {0x0089, "Orc wall"},
-    // War2XE's two, in its own words. Then the combinations the four
-    // restriction bits allow, each added to a terrain rather than painted bare:
+    // War2XE's two, named for what they do rather than for what it calls them.
+    // "Bridge" is 0x0000, which declares neither land nor water and stops
+    // nothing, so a walker and a ship may both be there — Land and water.
+    // "Space" is the other end: the four restriction bits together and neither
+    // terrain bit, so nothing crosses it and nothing is built on it.
+    //
+    // Then the combinations the four restriction bits allow, each added to a
+    // terrain rather than painted bare:
     // a tile with neither SQ_LAND nor SQ_WATER is a bridge, and a restriction
     // on a tile nothing can reach says nothing. War2XE writes its own "no
     // flying units" the same way, as 0x0201 and not as 0x0200 alone.
@@ -112,11 +118,11 @@ const MovementClass kMovementClasses[] = {
     // are scenario machinery the map alone cannot switch on, so a palette cell
     // for them would be a cell that does nothing. The bits keep their names in
     // the table below, because a map that holds one still has to be read.
-    {0x0000, "Bridge"},
-    {0x0f00, "Space"},
+    {0x0000, "Land and water"},
+    {0x0f00, "Closed to everything"},
     {0x0201, "Ground, no flying"},
     {0x0101, "Ground, no walking"},
-    {0x0301, "Ground, nothing crosses"},
+    {0x0301, "Ground, no walking or flying"},
     {0x0801, "Ground, no building"},
     {0x0240, "Water, no flying"},
     {0x0840, "Water, no building"},
