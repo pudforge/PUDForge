@@ -23,6 +23,13 @@ section therefore covers all the commits after the previous tag.
 `scripts/prep-release.ps1` collects those commits as a start. See
 `docs/releasing.md`.
 
+## 0.1.42
+
+**Fixed**
+
+- The brush rows keep you in movement mode. They put the terrain brush back in
+  your hand.
+
 ## 0.1.41
 
 **New**

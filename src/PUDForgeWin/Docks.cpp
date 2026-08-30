@@ -731,8 +731,15 @@ void TerrainPanel::ArmTheBrush() {
   // Every row of this panel describes what a stroke lays. Setting one while the
   // select tool is in hand used to change a brush the next click would not use —
   // you pressed Circle, dragged, and got a rectangle.
-  if (!editor_ || editor_->tool() == Tool::kPaint) return;
-  editor_->SetTool(Tool::kPaint);
+  //
+  // Which brush, though, is the mode's business. The shape, the size and the
+  // mirrors are shared, so reaching for one in movement mode used to arm the
+  // terrain brush and take the person out of the mode they were working in.
+  if (!editor_) return;
+  const Tool want = editor_->mode() == Mode::kMovement ? Tool::kWalkable
+                                                       : Tool::kPaint;
+  if (editor_->tool() == want) return;
+  editor_->SetTool(want);
   if (host_) host_->OnEditorChanged();
 }
 
