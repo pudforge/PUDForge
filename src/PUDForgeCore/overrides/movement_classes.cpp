@@ -20,6 +20,24 @@
 // returns -1 for those and the editor shows raw hex, which is the escape hatch
 // PUDDraft's two unexplainable checkboxes ("No Flyers", "No Others") were not.
 //
+// Three more come from War2XE, which offers nine and writes values Blizzard's
+// maps never do. A map made for the purpose settles what each one is: every
+// option laid on one row over the same tile, 0x0050, so nothing but the value
+// differs.
+//
+//   0x0F00  space              its four high bits and nothing else
+//   0x0000  bridge             no bits at all
+//   0x0201  no flying units    ground with 0x0200 added
+//
+// Which also reads the bitfield the other way up: a bit says what is *stopped*,
+// not what is let through. 0x0000 stops nothing, so a bridge carries walkers
+// and ships alike; 0x0F00 stops everything, which is what space is; and 0x0200
+// on its own is the one that stops flying — the bit War2XE adds to ground for
+// its ninth option, and the bit inside space that grounds it too. That reading
+// makes the eight above fall out as combinations rather than as eight
+// unexplained numbers, but it is inference from ten tiles and is written here
+// as such.
+//
 // The value a tile ought to have is kGroupMovement in terrain_tables.hpp; this
 // file is for the 236 tiles in 6,975,488 that deviate from it.
 
@@ -44,9 +62,20 @@ const MovementClass kMovementClasses[] = {
     {0x0081, "Forest and rock"},
     {0x008d, "Human wall"},
     {0x0089, "Orc wall"},
+    // War2XE's two, in its own words. Last because they are the ones no shipped
+    // map uses, so the eight above stay where anyone knew them.
+    //
+    // Its ninth option is not here: "no flying units" is 0x0200 added to a
+    // value rather than a value of its own — War2XE writes 0x0201, which is
+    // this bit on ground — so the editor carries it as a switch beside the
+    // palette and not as a cell in it. See pf_movement_no_flying_bit.
+    {0x0000, "Bridge"},
+    {0x0f00, "Space"},
 };
 
 }  // namespace
+
+uint16_t movement_no_flying_bit() { return 0x0200; }
 
 int movement_class_count() {
   return int(sizeof(kMovementClasses) / sizeof(kMovementClasses[0]));

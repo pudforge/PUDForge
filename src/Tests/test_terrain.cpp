@@ -502,14 +502,29 @@ TEST(movement_follows_the_tiles_it_is_painted_from) {
   // SQM is very nearly a function of the tile. Across the shipped maps, 1268
   // tiles disagree with the table it is derived from — 236 out of 6,975,488. So the table has to agree
   // with the corpus almost everywhere, and painting has to keep it that way.
-  CHECK_EQ(pf_movement_class_count(), 8);
+  // Ten: the eight the shipped maps use, then Bridge and Space, which no
+  // shipped map holds and which War2XE writes. The eight come first, so an
+  // index into them still means what it always did.
+  CHECK_EQ(pf_movement_class_count(), 10);
   for (int i = 0; i < pf_movement_class_count(); i++) {
     const int value = pf_movement_class_value(i);
-    CHECK(value > 0);
+    // Bridge is 0x0000 — the value that stops nothing — so a class value may
+    // legitimately be zero and only a negative one is missing.
+    CHECK(value >= 0);
     CHECK(pf_movement_class_name(i) != nullptr);
     CHECK_EQ(pf_movement_class_of(value), i);
   }
   CHECK_EQ(pf_movement_class_of(0x1234), -1);   // outside the set, and says so
+
+  // The two War2XE adds, and the bit it puts on top rather than beside.
+  CHECK_EQ(pf_movement_class_of(0x0000), 8);    // bridge: stops nothing
+  CHECK_EQ(pf_movement_class_of(0x0f00), 9);    // space: stops everything
+  CHECK_EQ(int(pf_movement_no_flying_bit()), 0x0200);
+  // Which is the difference between War2XE's ground and its "no flying units",
+  // measured off a map that lays every one of its options on the same tile.
+  CHECK_EQ(0x0001 | int(pf_movement_no_flying_bit()), 0x0201);
+  // And it is inside space, which is why space grounds them too.
+  CHECK_EQ(0x0f00 & int(pf_movement_no_flying_bit()), 0x0200);
 
   pf_map* map = pf_map_create(32, 32, 0, nullptr);
   CHECK(map != nullptr);
@@ -585,7 +600,7 @@ TEST(movement_follows_the_tiles_it_is_painted_from) {
     }
     pf_map_free(shipped);
   }
-  std::printf("     %lld tiles, %lld outside the eight classes, %lld deviating (%.4f%%)\n",
+  std::printf("     %lld tiles, %lld outside the named classes, %lld deviating (%.4f%%)\n",
               total, unknown, deviating, 100.0 * double(deviating) / double(total));
   CHECK_EQ(unknown, 0);
   // Measured at 236 of 6,975,488. Allow a little slack for a differing corpus,
@@ -593,7 +608,7 @@ TEST(movement_follows_the_tiles_it_is_painted_from) {
   CHECK(deviating * 10000 < total);
 
   // What the community maps do, reported and not asserted. They use values
-  // outside the eight and deviate from the table far more often, which is why
+  // outside the named classes and deviate from the table far more often, which is why
   // pf_movement_class_of returns -1 rather than guessing and the editor shows an
   // unrecognised value as raw hex. Worth printing: it is the evidence that the
   // eight are Blizzard's habit and not the format's rule.
@@ -613,7 +628,7 @@ TEST(movement_follows_the_tiles_it_is_painted_from) {
     pf_map_free(custom);
   }
   if (other) {
-    std::printf("     community: %lld tiles, %lld outside the eight (%.2f%%),"
+    std::printf("     community: %lld tiles, %lld outside the named (%.2f%%),"
                 " %lld deviating (%.2f%%)\n",
                 other, other_unknown, 100.0 * double(other_unknown) / double(other),
                 other_deviating, 100.0 * double(other_deviating) / double(other));

@@ -440,10 +440,11 @@ std::vector<int> Editor::BrushPoints(int x, int y, int shape, double density) {
 
 int Editor::MovementBrushValue() const {
   if (movement_class == kMovementFromTerrain) return -1;
-  if (movement_class >= 0 && movement_class < pf_movement_class_count()) {
-    return pf_movement_class_value(movement_class);
-  }
-  return movement_value;
+  const int base = (movement_class >= 0 &&
+                    movement_class < pf_movement_class_count())
+                       ? pf_movement_class_value(movement_class)
+                       : movement_value;
+  return movement_no_flying ? base | int(pf_movement_no_flying_bit()) : base;
 }
 
 int Editor::PaintMovementAt(int x, int y) {
@@ -466,8 +467,10 @@ int Editor::PaintMovementAt(int x, int y) {
       if (!InBounds(tx, ty)) continue;
       // -1 is the palette's "put it back": each tile takes what the tile drawn
       // there implies, which is what makes an override removable by hand.
-      const int value =
-          want >= 0 ? want : pf_tile_movement(pf_map_tile_at(map_, tx, ty));
+      // The palette's "put it back" still answers to the flag, so it can be
+      // added to a tile without deciding what else that tile is.
+      int value = want >= 0 ? want : pf_tile_movement(pf_map_tile_at(map_, tx, ty));
+      if (want < 0 && movement_no_flying) value |= int(pf_movement_no_flying_bit());
       if (value < 0 || pf_map_movement_at(map_, tx, ty) == value) continue;
       if (pf_map_set_movement(map_, tx, ty, value) == PF_OK) changed++;
     }

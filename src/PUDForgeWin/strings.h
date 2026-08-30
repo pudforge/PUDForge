@@ -513,6 +513,13 @@
 /* The movement palette's last cell: not a class but the absence of one. */
 #define IDS_MOVE_FROM_TERRAIN      1863
 /* The status bar in movement mode: which tool is in hand, and its chords. */
+/* The shade row's other question, asked in movement mode. */
+#define IDS_ROW_FLYING             1866
+#define IDS_FLYING_ALLOWED         1867
+#define IDS_FLYING_BLOCKED         1868
+#define IDS_TIP_FLYING_ALLOWED     1869
+#define IDS_TIP_FLYING_BLOCKED     1870
+
 #define IDS_TOOL_WALKABLE          1864
 #define IDS_HINT_MOVEMENT          1865
 

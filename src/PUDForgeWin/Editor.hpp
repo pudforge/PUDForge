@@ -594,8 +594,14 @@ class Editor {
   /// shipped maps use are not the only ones a map may hold. See
   /// overrides/movement_classes.cpp for why there are exactly eight.
   int movement_value = 0x0001;
+  /// Add the no-flying bit to whatever the brush lays. A flag rather than a
+  /// class: War2XE writes it on top of a value, and "space" is that bit among
+  /// four, so it combines instead of replacing.
+  bool movement_no_flying = false;
+
   /// The value the movement brush would lay, or -1 for the entry that takes
-  /// whatever the terrain under each tile implies.
+  /// whatever the terrain under each tile implies — to which the flag still
+  /// applies, so it can be added to a tile without disturbing its class.
   int MovementBrushValue() const;
 
   /// Paint the movement class over a tile and the rest of the brush, mirrored

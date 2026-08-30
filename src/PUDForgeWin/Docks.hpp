@@ -137,6 +137,11 @@ class TerrainPanel {
   /// stroke lay — with three exclusive answers. The palette carries one cell
   /// per terrain rather than one per drawing, which is why the answer is here.
   HWND shade_[3] = {};
+  /// The shade row's slot again, in movement mode: whether what the brush lays
+  /// also stops flying units. Two buttons where the shade row has three, shown
+  /// in its place — a drawing of a terrain means nothing to a layer that is not
+  /// drawn, and the flag is on or it is not.
+  HWND flying_[2] = {};
   /// Fill and Clear, shown only while a terrain rectangle exists — a button
   /// that acts on something the user cannot see is worse than a missing one.
   /// Replace and Decorate are always here, because their scope is the map when

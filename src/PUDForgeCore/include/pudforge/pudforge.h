@@ -828,6 +828,16 @@ PF_API int pf_unit_default_owner(int unit_id);
  */
 PF_API unsigned pf_movement_colour(int value);
 
+/**
+ * The bit that stops flying units.
+ *
+ * Not a class but a flag on one: War2XE's "no flying units" writes 0x0201,
+ * which is this bit added to ground, and its "space" is the four high bits
+ * together — this one among them. So it combines with whatever a tile already
+ * says rather than replacing it.
+ */
+PF_API unsigned pf_movement_no_flying_bit(void);
+
 PF_API int pf_movement_class_count(void);
 PF_API int pf_movement_class_value(int index);
 PF_API const char *pf_movement_class_name(int index);

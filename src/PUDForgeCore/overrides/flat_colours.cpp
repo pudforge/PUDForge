@@ -63,6 +63,8 @@ uint32_t movement_colour(int value) {
     case 0x0081: return 0xd05a3a;   // forest and rock
     case 0x008d: return 0xb0b4bc;   // human wall
     case 0x0089: return 0x8a7f6a;   // orc wall
+    case 0x0000: return 0xe8c34a;   // bridge: stops nothing
+    case 0x0f00: return 0x2b1b3d;   // space: stops everything
     default: return kUnknown;
   }
 }

@@ -2178,13 +2178,42 @@ TEST(the_movement_brush_paints_over_what_is_drawn) {
   CHECK_EQ(pf_map_movement_at(map, 5, 5), implied);
   CHECK_EQ(ed.MovementOverrides(), 0);
 
+  // The no-flying flag rides on top of a class rather than being one, which is
+  // what War2XE's ninth option turns out to be: it writes 0x0201, this bit
+  // added to ground. So every class can be painted with it or without.
+  ed.movement_class = water;
+  ed.movement_no_flying = true;
+  CHECK_EQ(ed.MovementBrushValue(), 0x0040 | 0x0200);
+  ed.BeginStroke();
+  CHECK_EQ(ed.PaintMovementAt(7, 7), 1);
+  ed.EndStroke();
+  CHECK_EQ(pf_map_movement_at(map, 7, 7), 0x0240);
+
+  // And it applies to "put it back" too, so the bit can be added to a tile
+  // without deciding what else that tile is.
+  ed.movement_class = Editor::kMovementFromTerrain;
+  ed.BeginStroke();
+  CHECK_EQ(ed.PaintMovementAt(9, 9), 1);
+  ed.EndStroke();
+  CHECK_EQ(pf_map_movement_at(map, 9, 9),
+           pf_tile_movement(pf_map_tile_at(map, 9, 9)) | 0x0200);
+  ed.movement_no_flying = false;
+  ed.BeginStroke();
+  CHECK_EQ(ed.PaintMovementAt(9, 9), 1);
+  ed.EndStroke();
+  CHECK_EQ(pf_map_movement_at(map, 9, 9),
+           pf_tile_movement(pf_map_tile_at(map, 9, 9)));
+
   // A bigger brush lays the class over its whole footprint.
   ed.movement_class = water;
+  ed.movement_no_flying = false;
   ed.brush_size = 3;
   ed.BeginStroke();
   CHECK_EQ(ed.PaintMovementAt(10, 10), 9);
   ed.EndStroke();
-  CHECK_EQ(ed.MovementOverrides(), 9);
+  // Nine from this stroke, plus the water-and-no-flying tile above; the tile
+  // that was put back is not an override any more and is not counted.
+  CHECK_EQ(ed.MovementOverrides(), 10);
   pf_map_free(map);
 }
 

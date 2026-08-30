@@ -23,6 +23,19 @@ section therefore covers all the commits after the previous tag.
 `scripts/prep-release.ps1` collects those commits as a start. See
 `docs/releasing.md`.
 
+## 0.1.43
+
+**New**
+
+- Two more movement values: Bridge, which stops nothing, and Space, which stops
+  everything.
+- A Flying row beside the brush. It adds the bit that stops flying units to
+  whatever you paint.
+
+**Changed**
+
+- The movement palette writes the name of each value on its cell.
+
 ## 0.1.42
 
 **Fixed**

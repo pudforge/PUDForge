@@ -104,6 +104,13 @@ BEGIN
   /* Movement mode. The layer is not drawn, so the hint says where to look. */
   IDS_TOOL_WALKABLE     "Painting movement"
   IDS_HINT_MOVEMENT     "Drag to paint  Colours are the movement overlay"
+  /* The shade row, asked again in movement mode. Two answers, not three: the
+     bit is on or it is not. */
+  IDS_ROW_FLYING        "Flying"
+  IDS_FLYING_ALLOWED    "Allowed"
+  IDS_FLYING_BLOCKED    "Blocked"
+  IDS_TIP_FLYING_ALLOWED "Paint the value as it is, leaving flying units free to cross."
+  IDS_TIP_FLYING_BLOCKED "Add the bit that stops flying units to whatever the brush lays, the way War2XE's ""no flying units"" does. It rides on top of the class rather than replacing it, so Ground and Open water can each be painted with or without it."
 
   /* ------------------------------------------------------------- editing */
   IDS_STARTS_PLACED_ONE  "%d start location placed"

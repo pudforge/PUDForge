@@ -185,6 +185,13 @@ The brush size, shape and mirrors are the ones the terrain brush uses. The
 bucket is not offered: it would follow the terrain, and this layer is the one
 that disagrees with the terrain on purpose.
 
+The palette carries ten values. Eight are the ones Blizzard's own maps use;
+**Bridge** stops nothing, so walkers and ships both cross it, and **Space**
+stops everything. The **Flying** row beside the brush adds the bit that stops
+flying units to whatever the brush lays, so any of the ten can be painted with
+or without it — this is War2XE's "no flying units", which is a flag on a value
+rather than a value of its own.
+
 The last cell of the palette, **Match the terrain**, is not a value but the
 absence of one. Painting with it puts each tile back to what its terrain
 implies, which is how a single override comes off; **Tools ▸ Tile Movement

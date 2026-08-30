@@ -190,6 +190,11 @@
    unused rather than reassigned. */
 /* Light and dark, the two drawings a terrain pair has. Exclusive, pushlike. */
 #define IDC_SHADE_FIRST       461   /* +0 light, +1 dark, +2 mix */
+/* The same row, in movement mode, asking a different question: whether the
+   value being painted also stops flying units. Two buttons rather than the
+   shade row's three, in its place, because a shade means nothing to a layer
+   that is not drawn. */
+#define IDC_FLYING_FIRST      464   /* +0 allowed, +1 blocked */
 /* The eyedropper, armed for one click. Ctrl and the left button do the same. */
 #define IDC_TERRAIN_PICK      463
 /* Straight to the player sheet from the unit dock's player dropdown. */

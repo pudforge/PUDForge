@@ -117,6 +117,9 @@ int unit_counterpart(int unit_id);
 int unit_counterpart_count();
 
 /// The eight `SQM ` values the game uses. See overrides/movement_classes.cpp.
+/// The bit that stops flying units, which rides on top of a class rather than
+/// being one. See overrides/movement_classes.cpp.
+uint16_t movement_no_flying_bit();
 int movement_class_count();
 int movement_class_value(int index);
 const char* movement_class_name(int index);

@@ -368,6 +368,20 @@ void TerrainPanel::Build() {
                                (i == 0 ? WS_GROUP : 0));
   }
 
+  // The same row's slot, for the other question it asks in movement mode.
+  // Separate controls rather than the shade buttons retitled: those carry
+  // drawings from the icon sheet, and a sun over "Allowed" reads as nothing.
+  const UINT flying[] = {IDS_FLYING_ALLOWED, IDS_FLYING_BLOCKED};
+  for (int i = 0; i < 2; i++) {
+    flying_[i] = MakeButton(hwnd_, instance_, Str(flying[i]).c_str(),
+                            IDC_FLYING_FIRST + i,
+                            BS_AUTORADIOBUTTON | BS_PUSHLIKE |
+                                (i == 0 ? WS_GROUP : 0));
+    ShowWindow(flying_[i], SW_HIDE);
+  }
+  Explain(flying_[0], IDS_TIP_FLYING_ALLOWED);
+  Explain(flying_[1], IDS_TIP_FLYING_BLOCKED);
+
   labels_[3] = MakeLabel(hwnd_, instance_, Str(IDS_ROW_MIRROR).c_str());
   // Independent toggles after the first: the axes combine, "none" clears.
   const wchar_t* mirror[] = {L"·", L"↔", L"↕", L"⤢", L"⤡"};
@@ -579,7 +593,42 @@ bool TerrainPanel::PickCustomTile() {
   return true;
 }
 
+/// A movement cell: the class colour, with its name written over it.
+///
+/// Colour alone was not enough once there were eleven of them — the two shore
+/// mixes and the two walls are four blues and two greys, and nobody learns
+/// which is which by looking. The name goes on the cell rather than in a
+/// tooltip, so choosing does not mean hovering each one in turn.
+void DrawMovementCell(HDC dc, const RECT& rect, const std::wstring& name,
+                      uint32_t colour) {
+  const COLORREF back = RGB((colour >> 16) & 0xff, (colour >> 8) & 0xff, colour & 0xff);
+  HBRUSH fill = CreateSolidBrush(back);
+  FillRect(dc, &rect, fill);
+  DeleteObject(fill);
+
+  // Black on the light half, white on the dark: the eleven run from a near
+  // black to a pale green, and one ink cannot be read on both.
+  const int luma = (((colour >> 16) & 0xff) * 299 + ((colour >> 8) & 0xff) * 587 +
+                    (colour & 0xff) * 114) / 1000;
+  SetTextColor(dc, luma > 140 ? RGB(0, 0, 0) : RGB(255, 255, 255));
+  SetBkMode(dc, TRANSPARENT);
+  RECT text = rect;
+  InflateRect(&text, -2, -2);
+  DrawTextW(dc, name.c_str(), -1, &text,
+            DT_CENTER | DT_WORDBREAK | DT_EDITCONTROL | DT_NOPREFIX);
+}
+
 void TerrainPanel::DrawBrushIcon(HDC dc, const RECT& rect, int brush) {
+  if (editor_ && editor_->mode() == Mode::kMovement) {
+    if (brush == MovementResetCell()) {
+      DrawMovementCell(dc, rect, Str(IDS_MOVE_FROM_TERRAIN), 0xf0f0f0);
+    } else {
+      const char* name = pf_movement_class_name(brush);
+      DrawMovementCell(dc, rect, name ? FromUtf8(name) : L"?",
+                       pf_movement_colour(pf_movement_class_value(brush)));
+    }
+    return;
+  }
   // The cell shows the drawing the switch has chosen, so a palette on Dark is a
   // picture of what the next stroke lays.
   if (editor_ && editor_->mode() != Mode::kMovement && editor_->DarkWanted() &&
@@ -664,7 +713,13 @@ void TerrainPanel::Layout() {
   y += row;
 
   place_row(labels_[0], detail_, 3);
+  // One slot, two rows laid into it: only one of them is ever on screen, and
+  // Refresh decides which. Placed on the same y so the panel does not shuffle
+  // when the mode changes.
+  const int shade_y = y;
   place_row(labels_[4], shade_, 3);
+  y = shade_y;
+  place_row(labels_[4], flying_, 2);
   place_row(labels_[3], mirror_, 5);
 
   // Full width and no label column, the way Fill and Clear are: these two carry
@@ -690,10 +745,11 @@ void TerrainPanel::OnCommand(int id) {
     Refresh();
     // The palette's cells draw the chosen shade, so they are now all wrong.
     if (palette_.hwnd()) InvalidateRect(palette_.hwnd(), nullptr, TRUE);
-    if (host_) {
-      host_->OnEditorChanged();
-      host_->OnStatus(FromUtf8(editor_->BrushName()), false);
-    }
+  } else if (id >= IDC_FLYING_FIRST && id <= IDC_FLYING_FIRST + 1) {
+    editor_->movement_no_flying = id == IDC_FLYING_FIRST + 1;
+    ArmTheBrush();
+    Refresh();
+    if (host_) host_->OnEditorChanged();
     return;
   }
   if (id == IDC_TERRAIN_REPLACE || id == IDC_TERRAIN_DECORATE) {
@@ -801,14 +857,25 @@ void TerrainPanel::Refresh() {
     const char* name = editor_->movement_class >= 0
                            ? pf_movement_class_name(editor_->movement_class)
                            : nullptr;
-    SetWindowTextW(brush_name_,
-                   name ? FromUtf8(name).c_str()
-                        : Str(IDS_MOVE_FROM_TERRAIN).c_str());
+    std::wstring shown = name ? FromUtf8(name) : Str(IDS_MOVE_FROM_TERRAIN);
+    if (editor_->movement_no_flying) {
+      shown += L" + " + Str(IDS_FLYING_BLOCKED);
+    }
+    SetWindowTextW(brush_name_, shown.c_str());
   } else {
     SetWindowTextW(brush_name_, FromUtf8(editor_->BrushName()).c_str());
   }
+  // The shade row's slot asks a different question in movement mode, so the
+  // row is swapped rather than greyed: three buttons about a drawing become two
+  // about a bit, and the label says which is being asked.
+  for (HWND control : shade_) ShowWindow(control, movement ? SW_HIDE : SW_SHOW);
+  for (HWND control : flying_) ShowWindow(control, movement ? SW_SHOW : SW_HIDE);
+  SetWindowTextW(labels_[4],
+                 Str(movement ? IDS_ROW_FLYING : IDS_ROW_SHADE).c_str());
+  Button_SetCheck(flying_[0], !editor_->movement_no_flying);
+  Button_SetCheck(flying_[1], editor_->movement_no_flying);
+
   for (HWND control : detail_) EnableWindow(control, !movement);
-  for (HWND control : shade_) EnableWindow(control, !movement);
   for (HWND control : bulk_) EnableWindow(control, !movement);
   // The bucket floods what the terrain says, and this layer is the one that
   // disagrees with the terrain on purpose, so it has nothing to follow.
