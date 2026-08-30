@@ -13,7 +13,16 @@
 // is not 1x1-shaped at all:
 //
 //   31–42 px   every infantry, cavalry and hero on foot          (1 tile)
-//   63–71 px   all ten ships, all six flying units               (2 tiles)
+//   63–71 px   all ten ships, six of the eight flying units      (2 tiles)
+//
+// Six of the eight, because boxSize is evidence and not the rule. The Daemon
+// and the Eye of Kilrogg are summoned rather than built, and both carry a
+// 31x31 box like a footman — yet all 77 Daemons across the corpus sit at an
+// even x and an even y, none of them odd, which is the 2x2 signature and not a
+// footman's. Chance would leave about a quarter of them there. The Eye of
+// Kilrogg appears in no map at all, so it is in the table on the Daemon's
+// evidence and on being its opposite number: same box, same summoning, same
+// flight. Deathwing is in it on the same footing and has always been.
 //
 // Second, and harder to argue with: across the five maps in `test/fixtures`,
 // all 45 ships and flying units sit at an even x *and* an even y. Land units do
@@ -68,6 +77,10 @@ const struct { int id; const char* name; } kTwoByTwo[] = {
     {0x29, "Goblin Zeppelin"},
     {0x2a, "Gryphon Rider"},
     {0x2b, "Dragon"},
+    // The two summoned fliers. Their boxSize is 31x31, so the pixel evidence
+    // above says nothing about them; the maps do. See the note below.
+    {0x2d, "Eye of Kilrogg"},
+    {0x38, "Daemon"},
 };
 
 /// Oil, which goes on the same two-tile grid as the ships but one tile off it.

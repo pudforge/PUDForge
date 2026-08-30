@@ -784,7 +784,11 @@ TEST(ships_and_fliers_cover_two_by_two) {
     return w == side && h == side;
   };
 
-  CHECK_EQ(pf::oversize_unit_count(), 16);
+  // Ten ships and eight fliers. The count is pinned so a unit cannot quietly
+  // join or leave the table: the Daemon and the Eye of Kilrogg were missing
+  // from it for as long as the rule was read off boxSize, which calls them
+  // 31x31 while the maps put all 77 Daemons on the even grid.
+  CHECK_EQ(pf::oversize_unit_count(), 18);
   for (int i = 0; i < pf::oversize_unit_count(); i++) {
     const int id = pf::oversize_unit_id(i);
     CHECK(boxed(id, 2));
@@ -888,7 +892,6 @@ TEST(ships_and_fliers_sit_on_even_tiles) {
   // And the control group is nowhere near it, or the parity means nothing.
   if (small > 100) CHECK(small_even * 2 < small);
 }
-
 
 /**
  * The units a map holds in places the game cannot put them, and taking them
@@ -994,7 +997,6 @@ TEST(a_ship_needs_water_for_its_whole_footprint) {
   pf_map_free(map);
 }
 
-
 /**
  * Opening a real map must not cry wolf.
  *
@@ -1037,7 +1039,6 @@ TEST(opening_a_map_does_not_offer_to_delete_much) {
   // format, so a rule that flags many of their units is the rule being wrong.
   CHECK(shipped_flagged * 50 <= shipped_units);
 }
-
 
 /**
  * Which units the map check lets stand on each other.
@@ -1083,7 +1084,6 @@ TEST(only_a_few_units_may_share_tiles) {
   pf_map_free(map);
 }
 
-
 /**
  * The unit block in the game's string table ends before the upgrades.
  *
@@ -1104,7 +1104,6 @@ TEST(the_unit_name_block_stops_before_the_upgrades) {
   }
   CHECK(std::string(pf_unit_name(0x69)) == "Corpse");
 }
-
 
 /**
  * Oil goes on odd tiles, and only odd ones.
@@ -1146,4 +1145,5 @@ TEST(oil_sits_on_the_odd_tiles_of_the_same_grid) {
   CHECK_EQ(pf_map_placement_check(map, 11, 11, kDestroyer), PF_PLACE_OFF_GRID);
   pf_map_free(map);
 }
+
 }  // namespace pft

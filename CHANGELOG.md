@@ -23,6 +23,12 @@ section therefore covers all the commits after the previous tag.
 `scripts/prep-release.ps1` collects those commits as a start. See
 `docs/releasing.md`.
 
+## 0.1.61
+
+**Fixed**
+
+- The Daemon and the Eye of Kilrogg follow the rules for air units. They
+  occupy 2 x 2 tiles and go on every other tile.
 ## 0.1.60
 
 **New**
