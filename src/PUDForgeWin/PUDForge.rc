@@ -117,6 +117,9 @@ BEGIN
     BEGIN
       MENUITEM "&Terrain\tT",              IDM_VIEW_MODE_TERRAIN
       MENUITEM "&Units\tU",                IDM_VIEW_MODE_UNITS
+      // The layer under the artwork: where things may walk, whatever is drawn
+      // there. M for movement, beside the two it is a third of.
+      MENUITEM "&Movement\tM",             IDM_VIEW_MODE_MOVEMENT
     END
     MENUITEM SEPARATOR
     POPUP "&Units"
@@ -292,6 +295,7 @@ BEGIN
   VK_SUBTRACT,  IDM_VIEW_ZOOM_OUT, VIRTKEY
   "T",      IDM_VIEW_MODE_TERRAIN, VIRTKEY
   "U",      IDM_VIEW_MODE_UNITS,   VIRTKEY
+  "M",      IDM_VIEW_MODE_MOVEMENT, VIRTKEY
   // The two pickers that open at the pointer. Space is held for the ring, so
   // it repeats while down; the ring's own loop is what reads that.
   "Q",      IDM_VIEW_QUICK_PICK,   VIRTKEY

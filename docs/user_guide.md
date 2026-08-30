@@ -173,6 +173,27 @@ a map the editor says how many units are in a position the game cannot use, and
 offers to remove them; see **Checking a map**. If you decline, the map stays as
 it is.
 
+## Movement mode
+
+**View ▸ Mode ▸ Movement** (M) paints the layer under the artwork: what may
+walk, swim, sail or fly over each tile. The terrain palette becomes the eight
+movement values the game uses, in the colours the movement overlay draws them,
+and the overlay comes on while you are in the mode.
+
+Click or drag to lay the selected value over any tile, whatever is drawn there.
+The brush size, shape and mirrors are the ones the terrain brush uses. The
+bucket is not offered: it would follow the terrain, and this layer is the one
+that disagrees with the terrain on purpose.
+
+The last cell of the palette, **Match the terrain**, is not a value but the
+absence of one. Painting with it puts each tile back to what its terrain
+implies, which is how a single override comes off; **Tools ▸ Tile Movement
+Data** does the same to the selection or the whole map at once.
+
+A value you paint here survives a terrain edit over the same tile, and a save
+and a reload. Nothing in the format records which tiles you meant, and nothing
+needs to: a value that disagrees with the tile under it is the answer.
+
 ## Selections
 
 Terrain and units have separate selections and are edited independently.

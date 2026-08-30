@@ -63,6 +63,10 @@
 #define IDM_VIEW_ZOOM_400        251
 #define IDM_VIEW_MODE_TERRAIN    252
 #define IDM_VIEW_MODE_UNITS      253
+/// The third mode: painting where things may walk, over whatever is drawn.
+/// 257 rather than a number beside the other two, which the View block has
+/// run out of; the order of these ids means nothing.
+#define IDM_VIEW_MODE_MOVEMENT   257
 #define IDM_VIEW_WATER           254
 /// The two pickers that open where the pointer is rather than in a panel.
 #define IDM_VIEW_QUICK_PICK      255

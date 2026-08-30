@@ -106,6 +106,9 @@ class TerrainPanel {
   void ArmTheBrush();
   void DrawBrushIcon(HDC dc, const RECT& rect, int brush);
   void RebuildPalette();
+  /// The movement half of it: the eight classes plus the cell that puts a tile
+  /// back to what its terrain implies.
+  void RebuildMovementPalette();
   /// Open the tile picker for the custom cell. False when nothing was chosen.
   bool PickCustomTile();
   /// Give a control a tooltip. One tooltip window for the whole panel.
@@ -116,6 +119,9 @@ class TerrainPanel {
   HWND hwnd_ = nullptr;
   HINSTANCE instance_ = nullptr;
   Editor* editor_ = nullptr;
+  /// Which list the palette currently holds. A mode change swaps it for the
+  /// other one, and nothing else does.
+  Mode palette_mode_ = Mode::kTerrain;
   Host* host_ = nullptr;
   PaletteGrid palette_;
   /// No tool buttons. Painting is what clicking a palette cell means,

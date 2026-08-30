@@ -98,6 +98,12 @@ BEGIN
   IDS_MISPLACED_MANY    "%d units in this map are somewhere the game cannot place them.\n\nRemove them?"
   IDS_MISPLACED_REMOVED_ONE  "%d misplaced unit removed"
   IDS_MISPLACED_REMOVED_MANY "%d misplaced units removed"
+  /* The movement palette's last cell, and what the status bar says when it is
+     picked: it takes back whatever the tile drawn there implies. */
+  IDS_MOVE_FROM_TERRAIN "Match the terrain"
+  /* Movement mode. The layer is not drawn, so the hint says where to look. */
+  IDS_TOOL_WALKABLE     "Painting movement"
+  IDS_HINT_MOVEMENT     "Drag to paint  Colours are the movement overlay"
 
   /* ------------------------------------------------------------- editing */
   IDS_STARTS_PLACED_ONE  "%d start location placed"
@@ -415,7 +421,7 @@ BEGIN
   /* The tool is read-mostly, and what it is *for* was the missing half: every
      number here is written by painting, so the only thing to do in this window
      is find the tiles where that went wrong and undo them. */
-  IDS_MOVE_ABOUT        "Every tile carries a movement value in the map's SQM section — what may walk, swim, sail or fly over it. PUDForge writes it as you paint, from the tile painted, so it normally needs no attention. A tile whose value differs from the one its terrain implies is an override: a hand edit or another editor left it there, and it is the usual cause of ground that looks walkable but is not."
+  IDS_MOVE_ABOUT        "Every tile carries a movement value in the map's SQM section — what may walk, swim, sail or fly over it. PUDForge writes it as you paint, from the tile painted, so it normally needs no attention. A tile whose value differs from the one its terrain implies is an override: something a mapper meant, or another editor left it there. Paint them yourself in View > Mode > Movement, where the palette carries the eight values instead of the terrains. An override survives a terrain edit, a save and a reload; this is how you take one off again."
   IDS_MOVE_LEGEND       "The eight values the game uses. View > Layer > Movement draws them over the map:"
   IDS_MOVE_OVERRIDDEN_ONE  "%d tile in %ls does not match the terrain under it."
   IDS_MOVE_OVERRIDDEN_MANY "%d tiles in %ls do not match the terrain under them."

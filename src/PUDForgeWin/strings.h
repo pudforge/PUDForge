@@ -510,6 +510,12 @@
 /* Asked when a map is opened holding units the game could not place. The
    title is IDS_CHECK_TITLE: it is the same check, said at another moment.
    1858 was a second copy of that title and is left unused. */
+/* The movement palette's last cell: not a class but the absence of one. */
+#define IDS_MOVE_FROM_TERRAIN      1863
+/* The status bar in movement mode: which tool is in hand, and its chords. */
+#define IDS_TOOL_WALKABLE          1864
+#define IDS_HINT_MOVEMENT          1865
+
 #define IDS_MISPLACED_ONE          1859
 #define IDS_MISPLACED_MANY         1860
 #define IDS_MISPLACED_REMOVED_ONE  1861

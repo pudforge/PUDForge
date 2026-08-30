@@ -61,20 +61,28 @@ void Editor::SetMap(pf_map* map) {
   }
 }
 
+Mode Editor::ModeOfTool(Tool tool) {
+  switch (tool) {
+    case Tool::kPaint: case Tool::kRect: return Mode::kTerrain;
+    case Tool::kWalkable: return Mode::kMovement;
+    default: return Mode::kUnit;
+  }
+}
+
 void Editor::SetMode(Mode mode) {
   mode_ = mode;
-  const bool fits = mode == Mode::kTerrain
-      ? (tool_ == Tool::kPaint || tool_ == Tool::kRect)
-      : (tool_ == Tool::kSelect || tool_ == Tool::kPlace || tool_ == Tool::kErase);
-  if (!fits) tool_ = mode == Mode::kTerrain ? Tool::kPaint : Tool::kSelect;
+  if (ModeOfTool(tool_) != mode) {
+    tool_ = mode == Mode::kTerrain    ? Tool::kPaint
+            : mode == Mode::kMovement ? Tool::kWalkable
+                                      : Tool::kSelect;
+  }
   if (tool_ != Tool::kRect) ClearTerrainSelection();
   // Leaving unit mode drops a selection that can no longer be acted on.
-  if (mode == Mode::kTerrain) ClearSelection();
+  if (mode != Mode::kUnit) ClearSelection();
 }
 
 void Editor::SetTool(Tool tool) {
-  mode_ = (tool == Tool::kPaint || tool == Tool::kRect) ? Mode::kTerrain
-                                                        : Mode::kUnit;
+  mode_ = ModeOfTool(tool);
   tool_ = tool;
   // The terrain rectangle belongs to the terrain-select tool. Leaving it drawn
   // implies it still applies, and Fill would then act on something the user
@@ -428,6 +436,44 @@ std::vector<int> Editor::BrushPoints(int x, int y, int shape, double density) {
                                 int(points.size()));
   points.resize(size_t(n) * 2);
   return points;
+}
+
+int Editor::MovementBrushValue() const {
+  if (movement_class == kMovementFromTerrain) return -1;
+  if (movement_class >= 0 && movement_class < pf_movement_class_count()) {
+    return pf_movement_class_value(movement_class);
+  }
+  return movement_value;
+}
+
+int Editor::PaintMovementAt(int x, int y) {
+  if (!map_ || !InBounds(x, y)) return 0;
+  const int want = MovementBrushValue();
+
+  // The same brush the terrain tools use, so size, shape and the mirrors mean
+  // one thing across the editor. The bucket has nothing to flood here: what it
+  // would follow is the terrain, and this layer is the one that disagrees with
+  // the terrain on purpose.
+  const int shape = brush_shape == kShapeFill ? PF_BRUSH_SQUARE : brush_shape;
+  std::vector<int> points = BrushPoints(x, y, shape, pf_scatter_density());
+  if (points.empty()) SquareAround(x, y, brush_size, points);
+
+  int changed = 0;
+  for (size_t i = 0; i + 1 < points.size(); i += 2) {
+    const std::vector<int> spots = SymmetryPoints(points[i], points[i + 1]);
+    for (size_t j = 0; j + 1 < spots.size(); j += 2) {
+      const int tx = spots[j], ty = spots[j + 1];
+      if (!InBounds(tx, ty)) continue;
+      // -1 is the palette's "put it back": each tile takes what the tile drawn
+      // there implies, which is what makes an override removable by hand.
+      const int value =
+          want >= 0 ? want : pf_tile_movement(pf_map_tile_at(map_, tx, ty));
+      if (value < 0 || pf_map_movement_at(map_, tx, ty) == value) continue;
+      if (pf_map_set_movement(map_, tx, ty, value) == PF_OK) changed++;
+    }
+  }
+  if (changed) Bump();
+  return changed;
 }
 
 bool Editor::PaintBrushAt(int x, int y, double density) {

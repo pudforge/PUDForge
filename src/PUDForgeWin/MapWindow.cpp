@@ -1149,6 +1149,16 @@ void MapWindow::OnMouseDown(int button, int x, int y, WPARAM keys) {
   hover_py_ = y;
 
   switch (editor_->tool()) {
+    case Tool::kWalkable: {
+      // The same shape as a terrain stroke: one undo step for the drag, and the
+      // pointer paints as it moves.
+      drag_ = Drag::kPaint;
+      editor_->BeginStroke();
+      const int changed = editor_->PaintMovementAt(tx, ty);
+      if (host_ && changed) host_->OnMapStroke();
+      Invalidate();
+      break;
+    }
     case Tool::kPaint:
       // Shift over the bucket means every tile of that terrain rather than the
       // region touching this one. Taken before BeginStroke: it is a bulk edit
@@ -1273,6 +1283,12 @@ void MapWindow::StrokeAt(int tx, int ty) {
   last_ty_ = ty;
 
   switch (editor_->tool()) {
+    case Tool::kWalkable:
+      if (drag_ == Drag::kPaint) {
+        if (editor_->PaintMovementAt(tx, ty) && host_) host_->OnMapStroke();
+        Invalidate();
+      }
+      break;
     case Tool::kPaint:
       if (drag_ == Drag::kSpray) {
         // The timer lays the puffs; moving just re-aims it.

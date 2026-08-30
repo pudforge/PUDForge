@@ -2122,3 +2122,114 @@ TEST(nothing_can_move_a_ship_onto_an_odd_tile) {
   CHECK_EQ(int(u.y) % 2, 0);
   pf_map_free(map);
 }
+
+/**
+ * Painting where things may walk, over whatever is drawn there.
+ *
+ * The movement layer is very nearly a function of the tile, and painting
+ * terrain keeps it that way. This is the tool for the handful of tiles that
+ * are meant to disagree — a bridge made walkable, a shallow closed off — so it
+ * writes the layer and leaves the artwork alone.
+ */
+TEST(the_movement_brush_paints_over_what_is_drawn) {
+  pf_map* map = blank();
+  Editor ed(map);
+  ed.SetMode(pfwin::Mode::kMovement);
+  CHECK(ed.tool() == Tool::kWalkable);
+  CHECK(ed.mode() == pfwin::Mode::kMovement);
+  ed.brush_size = 1;
+  ed.brush_shape = PF_BRUSH_SQUARE;
+
+  const int tile = pf_map_tile_at(map, 5, 5);
+  const int implied = pf_tile_movement(tile);
+  CHECK_EQ(pf_map_movement_at(map, 5, 5), implied);
+
+  // Lay open water over ground. The tile is untouched; only the layer moves.
+  int water = -1;
+  for (int i = 0; i < pf_movement_class_count(); i++) {
+    if (pf_movement_class_value(i) == 0x0040) water = i;
+  }
+  CHECK(water >= 0);
+  ed.movement_class = water;
+  CHECK_EQ(ed.MovementBrushValue(), 0x0040);
+
+  ed.BeginStroke();
+  CHECK_EQ(ed.PaintMovementAt(5, 5), 1);
+  // A drag back over a tile it already painted is not another edit.
+  CHECK_EQ(ed.PaintMovementAt(5, 5), 0);
+  ed.EndStroke();
+  CHECK_EQ(pf_map_movement_at(map, 5, 5), 0x0040);
+  CHECK_EQ(pf_map_tile_at(map, 5, 5), tile);   // the artwork is as it was
+  CHECK_EQ(ed.MovementOverrides(), 1);
+
+  // One undo step puts the stroke back.
+  CHECK(ed.Undo());
+  CHECK_EQ(pf_map_movement_at(map, 5, 5), implied);
+  CHECK(ed.Redo());
+  CHECK_EQ(pf_map_movement_at(map, 5, 5), 0x0040);
+
+  // The palette's "put it back" entry takes whatever the tile implies, which
+  // is how one override comes off without resetting the whole map.
+  ed.movement_class = Editor::kMovementFromTerrain;
+  CHECK_EQ(ed.MovementBrushValue(), -1);
+  ed.BeginStroke();
+  CHECK_EQ(ed.PaintMovementAt(5, 5), 1);
+  ed.EndStroke();
+  CHECK_EQ(pf_map_movement_at(map, 5, 5), implied);
+  CHECK_EQ(ed.MovementOverrides(), 0);
+
+  // A bigger brush lays the class over its whole footprint.
+  ed.movement_class = water;
+  ed.brush_size = 3;
+  ed.BeginStroke();
+  CHECK_EQ(ed.PaintMovementAt(10, 10), 9);
+  ed.EndStroke();
+  CHECK_EQ(ed.MovementOverrides(), 9);
+  pf_map_free(map);
+}
+
+/**
+ * A terrain edit does not take hand-painted movement away.
+ *
+ * Nothing in the format records which tiles somebody meant, and nothing needs
+ * to: a value that disagrees with the tile under it is the answer. That also
+ * makes it survive a save and a reload, which is the half that was asked for.
+ */
+TEST(painting_terrain_leaves_authored_movement_alone) {
+  pf_map* map = blank();
+  Editor ed(map);
+  ed.SetMode(pfwin::Mode::kMovement);
+  ed.brush_size = 1;
+  ed.movement_class = Editor::kMovementFromTerrain;
+
+  // Two tiles: one authored, one left as the terrain made it.
+  ed.movement_value = 0x0040;
+  ed.movement_class = 99;   // out of range: the raw value above is used
+  CHECK_EQ(ed.MovementBrushValue(), 0x0040);
+  ed.BeginStroke();
+  CHECK_EQ(ed.PaintMovementAt(8, 8), 1);
+  ed.EndStroke();
+  const int plain_before = pf_map_movement_at(map, 20, 20);
+
+  // Paint forest across both of them.
+  ed.SetMode(pfwin::Mode::kTerrain);
+  ed.brush_size = 5;
+  int forest = -1;
+  for (int i = 0; i < pf_brush_count(); i++) {
+    if (pf_brush_terrain(i) == PF_TERRAIN_FOREST) forest = i;
+  }
+  CHECK(forest >= 0);
+  ed.brush_index = forest;
+  ed.BeginStroke();
+  CHECK(ed.PaintAt(8, 8));
+  CHECK(ed.PaintAt(20, 20));
+  ed.EndStroke();
+
+  // The authored tile keeps what a person put there; its neighbour follows the
+  // terrain, which is what makes the layer right without anyone editing it.
+  CHECK_EQ(pf_map_movement_at(map, 8, 8), 0x0040);
+  CHECK(pf_map_movement_at(map, 20, 20) != plain_before);
+  CHECK_EQ(pf_map_movement_at(map, 20, 20),
+           pf_tile_movement(pf_map_tile_at(map, 20, 20)));
+  pf_map_free(map);
+}

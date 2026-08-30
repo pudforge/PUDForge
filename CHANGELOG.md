@@ -23,6 +23,19 @@ section therefore covers all the commits after the previous tag.
 `scripts/prep-release.ps1` collects those commits as a start. See
 `docs/releasing.md`.
 
+## 0.1.41
+
+**New**
+
+- A movement mode. The terrain palette becomes the eight movement values, and
+  you paint them over any tile whatever is drawn there.
+- The palette's last cell puts a tile back to what its terrain implies.
+
+**Changed**
+
+- Movement you paint by hand survives a terrain edit over the same tile. The
+  editor rewrote it from the terrain.
+
 ## 0.1.40
 
 **Fixed**

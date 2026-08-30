@@ -86,6 +86,7 @@
 <li><a href="#modes">Modes</a></li>
 <li><a href="#terrain-mode">Terrain mode</a></li>
 <li><a href="#unit-mode">Unit mode</a></li>
+<li><a href="#movement-mode">Movement mode</a></li>
 <li><a href="#selections">Selections</a></li>
 <li><a href="#copy-and-paste">Copy and paste</a></li>
 <li><a href="#map-properties">Map properties</a></li>
@@ -295,6 +296,11 @@ Path=D:\Games\Warcraft II</pre>
 <p>A unit covers the tiles the game gives it, and the editor keeps that area clear. Most units cover one tile, buildings cover two to four, and ships and flying units cover four in a two by two square.</p>
 <p>The editor refuses placements the game would refuse: a ship on land, a ship in water too small for it, a town hall too close to a gold mine, a unit on the map edge. The status bar names the unit and the reason. Each refusal can be disabled in <strong>Tools ▸ Options…</strong>.</p>
 <p>Existing maps that break these rules load unchanged. On the first sight of such a map the editor says how many units are in a position the game cannot use, and offers to remove them; see <strong>Checking a map</strong>. If you decline, the map stays as it is.</p>
+<h2 id="movement-mode">Movement mode</h2>
+<p><strong>View ▸ Mode ▸ Movement</strong> (M) paints the layer under the artwork: what may walk, swim, sail or fly over each tile. The terrain palette becomes the eight movement values the game uses, in the colours the movement overlay draws them, and the overlay comes on while you are in the mode.</p>
+<p>Click or drag to lay the selected value over any tile, whatever is drawn there. The brush size, shape and mirrors are the ones the terrain brush uses. The bucket is not offered: it would follow the terrain, and this layer is the one that disagrees with the terrain on purpose.</p>
+<p>The last cell of the palette, <strong>Match the terrain</strong>, is not a value but the absence of one. Painting with it puts each tile back to what its terrain implies, which is how a single override comes off; <strong>Tools ▸ Tile Movement Data</strong> does the same to the selection or the whole map at once.</p>
+<p>A value you paint here survives a terrain edit over the same tile, and a save and a reload. Nothing in the format records which tiles you meant, and nothing needs to: a value that disagrees with the tile under it is the answer.</p>
 <h2 id="selections">Selections</h2>
 <p>Terrain and units have separate selections and are edited independently.</p>
 <p><strong>Tiles</strong> (Ctrl+T). Drag a rectangle. <strong>Shift+drag</strong> adds a rectangle, <strong>Alt+drag</strong> subtracts one. The status bar reports the tile count and the bounding box separately.</p>

@@ -16,6 +16,10 @@
 namespace pfwin {
 namespace {
 
+/// The movement palette's last cell, which puts a tile back to what its terrain
+/// implies. One past the classes, the way Custom is one past the terrains.
+int MovementResetCell() { return pf_movement_class_count(); }
+
 constexpr wchar_t kTerrainClass[] = L"PUDForgeTerrainPanel";
 constexpr wchar_t kUnitsClass[] = L"PUDForgeUnitsPanel";
 
@@ -277,6 +281,21 @@ void TerrainPanel::Build() {
     DrawBrushIcon(dc, rect, brush);
   };
   palette_.on_pick = [this](int brush) {
+    if (editor_->mode() == Mode::kMovement) {
+      editor_->movement_class =
+          brush == MovementResetCell() ? Editor::kMovementFromTerrain : brush;
+      editor_->SetTool(Tool::kWalkable);
+      palette_.SetSelected(brush);
+      if (host_) {
+        host_->OnEditorChanged();
+        const char* name = editor_->movement_class >= 0
+                               ? pf_movement_class_name(editor_->movement_class)
+                               : nullptr;
+        host_->OnStatus(name ? FromUtf8(name) : Str(IDS_MOVE_FROM_TERRAIN),
+                        false);
+      }
+      return;
+    }
     const int previous = editor_->brush_index;
     editor_->SetBrush(brush);
     // Always painting, not "painting unless a rectangle was being dragged":
@@ -447,7 +466,40 @@ void TerrainPanel::SetArtwork(const pf_tileset_art* art, int tileset) {
   RebuildPalette();
 }
 
+void TerrainPanel::RebuildMovementPalette() {
+  // Flat colours, and the overlay's own: a cell and the tiles it paints are
+  // then the same colour, which is the whole of what has to be learned.
+  icons_.assign(size_t(pf_movement_class_count()) + 1, Icon{});
+  for (int i = 0; i < pf_movement_class_count(); i++) {
+    icons_[size_t(i)] = FlatIcon(pf_movement_colour(pf_movement_class_value(i)));
+  }
+
+  std::vector<PaletteGrid::Entry> entries;
+  for (int i = 0; i < pf_movement_class_count(); i++) {
+    PaletteGrid::Entry entry;
+    entry.id = i;
+    const char* name = pf_movement_class_name(i);
+    entry.label = name ? FromUtf8(name) : L"";
+    entries.push_back(std::move(entry));
+  }
+  // And the way back: not a ninth class but the absence of one, so an override
+  // comes off a tile at a time where Reset Movement takes the lot.
+  PaletteGrid::Entry back;
+  back.id = MovementResetCell();
+  back.label = Str(IDS_MOVE_FROM_TERRAIN);
+  entries.push_back(std::move(back));
+
+  palette_.SetEntries(std::move(entries));
+  palette_.SetSelected(editor_ && editor_->movement_class >= 0
+                           ? editor_->movement_class
+                           : MovementResetCell());
+}
+
 void TerrainPanel::RebuildPalette() {
+  if (editor_ && editor_->mode() == Mode::kMovement) {
+    RebuildMovementPalette();
+    return;
+  }
   // Brush icons: the solid tile the brush paints, or the flat colour when the
   // artwork is absent - the same fallback the renderer uses.
   icons_.assign(size_t(pf_brush_count()) + 1, Icon{});
@@ -530,7 +582,8 @@ bool TerrainPanel::PickCustomTile() {
 void TerrainPanel::DrawBrushIcon(HDC dc, const RECT& rect, int brush) {
   // The cell shows the drawing the switch has chosen, so a palette on Dark is a
   // picture of what the next stroke lays.
-  if (editor_ && editor_->DarkWanted() && brush < pf_brush_count()) {
+  if (editor_ && editor_->mode() != Mode::kMovement && editor_->DarkWanted() &&
+      brush < pf_brush_count()) {
     const int terrain = pf_brush_terrain(brush);
     const int twin = pf_terrain_other_shade(terrain);
     if (twin != terrain) {
@@ -549,7 +602,11 @@ void TerrainPanel::DrawBrushIcon(HDC dc, const RECT& rect, int brush) {
   // The custom cell, and anything with nothing to draw: a label.
   SetBkMode(dc, TRANSPARENT);
   RECT text = rect;
-  DrawTextW(dc, brush >= pf_brush_count() ? L"…" : L"?", -1, &text,
+  DrawTextW(dc,
+            (editor_ && editor_->mode() == Mode::kMovement) ? L"↺"
+            : brush >= pf_brush_count()                     ? L"…"
+                                                            : L"?",
+            -1, &text,
             DT_SINGLELINE | DT_CENTER | DT_VCENTER);
 }
 
@@ -681,7 +738,19 @@ void TerrainPanel::ArmTheBrush() {
 
 void TerrainPanel::Refresh() {
   if (!editor_) return;
-  palette_.SetSelected(editor_->brush_index);
+  // The palette is a different list in movement mode, so a mode change is a
+  // rebuild rather than a repaint.
+  if (palette_mode_ != editor_->mode()) {
+    palette_mode_ = editor_->mode();
+    RebuildPalette();
+  }
+  if (editor_->mode() == Mode::kMovement) {
+    palette_.SetSelected(editor_->movement_class >= 0
+                             ? editor_->movement_class
+                             : MovementResetCell());
+  } else {
+    palette_.SetSelected(editor_->brush_index);
+  }
 
   // DarkWanted rather than paint_dark: holding shift borrows the other shade,
   // and the switch has to show what the next stroke would lay or the borrowing
@@ -717,7 +786,31 @@ void TerrainPanel::Refresh() {
                                   ? L"½"
                                   : std::to_wstring(editor_->brush_size).c_str());
 
-  SetWindowTextW(brush_name_, FromUtf8(editor_->BrushName()).c_str());
+  // In movement mode the palette is a different list, so the name under it is
+  // a different name — and the rows that choose a *drawing* of a terrain have
+  // nothing to say about a layer that is not drawn at all.
+  const bool movement = editor_->mode() == Mode::kMovement;
+  if (movement) {
+    const char* name = editor_->movement_class >= 0
+                           ? pf_movement_class_name(editor_->movement_class)
+                           : nullptr;
+    SetWindowTextW(brush_name_,
+                   name ? FromUtf8(name).c_str()
+                        : Str(IDS_MOVE_FROM_TERRAIN).c_str());
+  } else {
+    SetWindowTextW(brush_name_, FromUtf8(editor_->BrushName()).c_str());
+  }
+  for (HWND control : detail_) EnableWindow(control, !movement);
+  for (HWND control : shade_) EnableWindow(control, !movement);
+  for (HWND control : bulk_) EnableWindow(control, !movement);
+  // The bucket floods what the terrain says, and this layer is the one that
+  // disagrees with the terrain on purpose, so it has nothing to follow.
+  EnableWindow(shape_[3], !movement);
+  if (movement && editor_->brush_shape == Editor::kShapeFill) {
+    editor_->brush_shape = PF_BRUSH_SQUARE;
+    Button_SetCheck(shape_[3], FALSE);
+    Button_SetCheck(shape_[0], TRUE);
+  }
 
   Button_SetCheck(mirror_[0], editor_->mirrors == PF_MIRROR_NONE);
   Button_SetCheck(mirror_[1], (editor_->mirrors & PF_MIRROR_LEFT_RIGHT) != 0);

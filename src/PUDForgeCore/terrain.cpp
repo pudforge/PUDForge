@@ -581,10 +581,18 @@ int apply_corners(Map& map, const CornerGrid& grid, const Rect& rect,
       if (was && !was->repick(grid, x, y)) continue;
 
       const size_t i = size_t(y) * size_t(w) + size_t(x);
+      // Movement a person painted by hand survives a terrain edit. There is no
+      // field in the format that says which tiles those are, and there does not
+      // need to be: a stored value that disagrees with the tile under it is one
+      // somebody meant, which is the same test Reset Movement counts. Derived
+      // rather than remembered, so it also survives a save and a reload.
+      const bool authored =
+          map.movement()[i] != tile_movement(map.tiles()[i]);
+
       uint8_t kind = grid.wall_at(x, y);
       if (kind) {
         map.tiles()[i] = wall_tile(grid, x, y, kind);
-        map.movement()[i] = kind == 1 ? 0x008d : 0x0089;
+        if (!authored) map.movement()[i] = kind == 1 ? 0x008d : 0x0089;
         continue;
       }
 
@@ -607,7 +615,7 @@ int apply_corners(Map& map, const CornerGrid& grid, const Rect& rect,
       }
 
       map.tiles()[i] = uint16_t(tile);
-      map.movement()[i] = tile_movement(uint16_t(tile));
+      if (!authored) map.movement()[i] = tile_movement(uint16_t(tile));
     }
   }
   return fallbacks;

@@ -18,9 +18,10 @@
 
 namespace pfwin {
 
-/// The two halves of map making, which barely overlap: you are shaping
-/// terrain or you are placing units. The mode decides what the palette shows.
-enum class Mode { kTerrain, kUnit };
+/// The halves of map making, which barely overlap: you are shaping terrain,
+/// placing units, or saying where things may walk. The mode decides what the
+/// palette shows.
+enum class Mode { kTerrain, kUnit, kMovement };
 
 /// What a click on the map does. Tools are grouped under the modes.
 enum class Tool {
@@ -29,6 +30,7 @@ enum class Tool {
   kSelect,   ///< unit mode: click or band-select units
   kPlace,    ///< unit mode: place the current unit
   kErase,    ///< unit mode: click to delete
+  kWalkable, ///< movement mode: paint a movement class over whatever is drawn
 };
 
 /// A tile rectangle. `w == 0` means "none" wherever one is optional.
@@ -52,6 +54,9 @@ class Editor {
   // ------------------------------------------------------------------ mode
   Mode mode() const { return mode_; }
   Tool tool() const { return tool_; }
+  /// Which mode a tool belongs to. One place, so a tool added to one of them
+  /// cannot be sorted differently by the two functions that ask.
+  static Mode ModeOfTool(Tool tool);
   /// Switch mode, adopting its default tool unless the current one fits.
   void SetMode(Mode mode);
   /// Set the tool, switching mode when it belongs to the other one.
@@ -575,6 +580,31 @@ class Editor {
   /// Put the scope's movement back to what its terrain implies, as one undo
   /// step. @return tiles changed
   int ResetMovement();
+
+  /// The palette entry that puts a tile back to what its terrain implies,
+  /// rather than laying a class over it. It is how an override is taken off
+  /// again, one brush stroke at a time, where Reset Movement does the lot.
+  static constexpr int kMovementFromTerrain = -1;
+
+  /// Which movement class the movement brush lays, as an index into
+  /// pf_movement_class_value, or kMovementFromTerrain. Out of range means the
+  /// raw value below instead.
+  int movement_class = 0;
+  /// The value painted when `movement_class` names no class, so the eight the
+  /// shipped maps use are not the only ones a map may hold. See
+  /// overrides/movement_classes.cpp for why there are exactly eight.
+  int movement_value = 0x0001;
+  /// The value the movement brush would lay, or -1 for the entry that takes
+  /// whatever the terrain under each tile implies.
+  int MovementBrushValue() const;
+
+  /// Paint the movement class over a tile and the rest of the brush, mirrored
+  /// under the symmetry. What is drawn there is not touched: this layer says
+  /// where things may walk, and the two disagreeing is the point of the tool.
+  ///
+  /// Must sit between BeginStroke and EndStroke, like painting terrain.
+  /// @return tiles whose value changed
+  int PaintMovementAt(int x, int y);
 
   // ------------------------------------------------------------ clipboard
   //

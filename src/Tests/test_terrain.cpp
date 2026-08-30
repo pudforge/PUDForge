@@ -540,10 +540,27 @@ TEST(movement_follows_the_tiles_it_is_painted_from) {
   CHECK_EQ(pf_map_reset_movement(map, 0, 0, 0, 0), 1);
   CHECK_EQ(pf_map_movement_at(map, 4, 4), pf_tile_movement(pf_map_tile_at(map, 4, 4)));
 
-  // Repainting a tile takes the override with it, which is the honest
-  // behaviour: the tile is not the one that was overridden any more.
+  // Repainting a tile keeps the override, which is the point of overriding:
+  // the layer is where a mapper says a bridge is walkable or a shallow is
+  // closed, and a touch-up to the artwork must not quietly undo that. It comes
+  // off through Reset Movement, or the movement palette's own "put it back".
+  //
+  // Nothing records which tiles were meant. Nothing needs to: a value that
+  // disagrees with the tile under it is the answer, which is also why it
+  // survives a save and a reload.
   CHECK_EQ(pf_map_set_movement(map, 4, 4, 0x0040), PF_OK);
   pf_map_paint_terrain(map, 4, 4, PF_TERRAIN_GROUND_LIGHT, 1);
+  CHECK_EQ(pf_map_movement_at(map, 4, 4), 0x0040);
+  pf_map_paint_terrain_raw(map, 4, 4, PF_TERRAIN_FOREST, 1);
+  CHECK_EQ(pf_map_movement_at(map, 4, 4), 0x0040);   // and the raw painter too
+
+  // A tile nobody overrode still follows its terrain, which is what keeps the
+  // layer right without anyone editing it.
+  pf_map_paint_terrain(map, 6, 6, PF_TERRAIN_FOREST, 1);
+  CHECK_EQ(pf_map_movement_at(map, 6, 6), pf_tile_movement(pf_map_tile_at(map, 6, 6)));
+
+  // Put back, and the tile follows its terrain again.
+  CHECK_EQ(pf_map_reset_movement(map, 0, 0, 0, 0), 1);
   CHECK_EQ(pf_map_movement_at(map, 4, 4), pf_tile_movement(pf_map_tile_at(map, 4, 4)));
 
   CHECK_EQ(pf_map_set_movement(map, -1, 0, 1), PF_ERR_OUT_OF_RANGE);

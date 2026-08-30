@@ -820,6 +820,14 @@ PF_API int pf_map_reset_movement(pf_map *map, int x, int y, int w, int h);
  */
 PF_API int pf_unit_default_owner(int unit_id);
 
+/**
+ * The colour the movement overlay paints a value, as 0xRRGGBB.
+ *
+ * Shared so a palette of the classes and the overlay over the map are the same
+ * eight colours; two sets would be two things to learn.
+ */
+PF_API unsigned pf_movement_colour(int value);
+
 PF_API int pf_movement_class_count(void);
 PF_API int pf_movement_class_value(int index);
 PF_API const char *pf_movement_class_name(int index);

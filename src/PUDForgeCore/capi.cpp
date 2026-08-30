@@ -1413,6 +1413,7 @@ int pf_ai_script_listing(const pf_ai_scripts* scripts, int index, char* out, int
   return copy_out(scripts->scripts->listing(index), out, cap);
 }
 
+unsigned pf_movement_colour(int value) { return pf::movement_colour(value); }
 int pf_movement_class_count(void) { return pf::movement_class_count(); }
 int pf_movement_class_value(int index) { return pf::movement_class_value(index); }
 const char* pf_movement_class_name(int index) { return pf::movement_class_name(index); }
@@ -3171,8 +3172,12 @@ pf_status pf_map_paint_terrain_raw(pf_map* map, int x, int y, int terrain, int s
       const int tile = pf::solid_tile(uint8_t(terrain), variation);
       if (tile < 0) continue;
       const size_t i = size_t(ty) * size_t(m.width()) + size_t(tx);
+      // Movement somebody painted by hand outlives a terrain edit here too, the
+      // same test apply_corners makes: raw or auto-tiled is how the artwork was
+      // laid, and says nothing about whether the layer was meant.
+      const bool authored = m.movement()[i] != pf::tile_movement(m.tiles()[i]);
       m.tiles()[i] = uint16_t(tile);
-      m.movement()[i] = pf::kGroupMovement[tile >> 4];
+      if (!authored) m.movement()[i] = pf::kGroupMovement[tile >> 4];
       // Keep the corner state in step so a later auto-tile stroke is coherent.
       grid.set(tx, ty, uint8_t(terrain));
       grid.set(tx + 1, ty, uint8_t(terrain));

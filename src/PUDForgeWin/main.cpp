@@ -513,6 +513,10 @@ struct App : Host {
   /// cannot be found again once it has been filled.
   HMENU units_menu_ = nullptr;
 
+  /// The layer that was on show before movement mode turned its own on, so
+  /// leaving puts back what the person had rather than nothing.
+  int overlay_before_movement_ = PF_OVERLAY_NONE;
+
   /// Where the context menu was opened, for the items that act on a tile.
   POINT context_tile_{};
 
@@ -587,6 +591,11 @@ struct App : Host {
       }
       tool = IDS_TOOL_PAINTING;
       hint = IDS_HINT_TERRAIN_PAINT;
+      return;
+    }
+    if (editor.mode() == Mode::kMovement) {
+      tool = IDS_TOOL_WALKABLE;
+      hint = IDS_HINT_MOVEMENT;
       return;
     }
     const bool place = editor.tool() == Tool::kPlace;
@@ -1444,7 +1453,20 @@ struct App : Host {
 
       case IDM_VIEW_MODE_TERRAIN:
       case IDM_VIEW_MODE_UNITS:
-        editor.SetMode(id == IDM_VIEW_MODE_TERRAIN ? Mode::kTerrain : Mode::kUnit);
+      case IDM_VIEW_MODE_MOVEMENT:
+        editor.SetMode(id == IDM_VIEW_MODE_TERRAIN    ? Mode::kTerrain
+                       : id == IDM_VIEW_MODE_MOVEMENT ? Mode::kMovement
+                                                      : Mode::kUnit);
+        // The layer is invisible under the artwork, so entering the mode turns
+        // it on and leaving puts back whatever was on show. Painting what you
+        // cannot see is not a tool, it is a guess.
+        if (editor.mode() == Mode::kMovement) {
+          overlay_before_movement_ = editor.overlay;
+          editor.overlay = PF_OVERLAY_MOVEMENT;
+        } else if (editor.overlay == PF_OVERLAY_MOVEMENT) {
+          editor.overlay = overlay_before_movement_;
+        }
+        canvas.MarkMapChanged();
         OnEditorChanged();
         return true;
 
@@ -1820,6 +1842,7 @@ struct App : Host {
 
     check(IDM_VIEW_MODE_TERRAIN, editor.mode() == Mode::kTerrain);
     check(IDM_VIEW_MODE_UNITS, editor.mode() == Mode::kUnit);
+    check(IDM_VIEW_MODE_MOVEMENT, editor.mode() == Mode::kMovement);
     // The two select tools are toggles and the strip shows them pushed in, so
     // their menu items have to say the same thing.
     check(IDM_TOOL_TERRAIN_SELECT, editor.tool() == Tool::kRect);
