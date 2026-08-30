@@ -2145,13 +2145,11 @@ TEST(the_movement_brush_paints_over_what_is_drawn) {
   CHECK_EQ(pf_map_movement_at(map, 5, 5), implied);
 
   // Lay open water over ground. The tile is untouched; only the layer moves.
-  int water = -1;
-  for (int i = 0; i < pf_movement_class_count(); i++) {
-    if (pf_movement_class_value(i) == 0x0040) water = i;
-  }
-  CHECK(water >= 0);
-  ed.movement_class = water;
+  ed.movement_value = 0x0040;
   CHECK_EQ(ed.MovementBrushValue(), 0x0040);
+  // The palette lights the class whose value this is.
+  CHECK(ed.MovementClassIndex() >= 0);
+  CHECK_EQ(pf_movement_class_value(ed.MovementClassIndex()), 0x0040);
 
   ed.BeginStroke();
   CHECK_EQ(ed.PaintMovementAt(5, 5), 1);
@@ -2170,50 +2168,43 @@ TEST(the_movement_brush_paints_over_what_is_drawn) {
 
   // The palette's "put it back" entry takes whatever the tile implies, which
   // is how one override comes off without resetting the whole map.
-  ed.movement_class = Editor::kMovementFromTerrain;
+  ed.movement_from_terrain = true;
   CHECK_EQ(ed.MovementBrushValue(), -1);
   ed.BeginStroke();
   CHECK_EQ(ed.PaintMovementAt(5, 5), 1);
   ed.EndStroke();
   CHECK_EQ(pf_map_movement_at(map, 5, 5), implied);
   CHECK_EQ(ed.MovementOverrides(), 0);
+  ed.movement_from_terrain = false;
 
-  // The no-flying flag rides on top of a class rather than being one, which is
-  // what War2XE's ninth option turns out to be: it writes 0x0201, this bit
-  // added to ground. So every class can be painted with it or without.
-  ed.movement_class = water;
-  ed.movement_no_flying = true;
-  CHECK_EQ(ed.MovementBrushValue(), 0x0040 | 0x0200);
+  // Water no flier may cross: a combination the palette offers and no map in
+  // existence holds.
+  ed.movement_value = 0x0040 | int(pf_movement_no_flying_bit());
+  CHECK_EQ(ed.MovementBrushValue(), 0x0240);
+  CHECK(ed.MovementClassIndex() >= 0);
   ed.BeginStroke();
   CHECK_EQ(ed.PaintMovementAt(7, 7), 1);
   ed.EndStroke();
   CHECK_EQ(pf_map_movement_at(map, 7, 7), 0x0240);
 
-  // And it applies to "put it back" too, so the bit can be added to a tile
-  // without deciding what else that tile is.
-  ed.movement_class = Editor::kMovementFromTerrain;
+  // And a value the palette does not offer is still a value: the brush paints
+  // the word it is given, and the palette lights no cell for it.
+  ed.movement_value = 0x0082 | int(pf_movement_no_flying_bit());
+  CHECK_EQ(ed.MovementClassIndex(), -1);
   ed.BeginStroke();
-  CHECK_EQ(ed.PaintMovementAt(9, 9), 1);
+  CHECK_EQ(ed.PaintMovementAt(13, 13), 1);
   ed.EndStroke();
-  CHECK_EQ(pf_map_movement_at(map, 9, 9),
-           pf_tile_movement(pf_map_tile_at(map, 9, 9)) | 0x0200);
-  ed.movement_no_flying = false;
-  ed.BeginStroke();
-  CHECK_EQ(ed.PaintMovementAt(9, 9), 1);
-  ed.EndStroke();
-  CHECK_EQ(pf_map_movement_at(map, 9, 9),
-           pf_tile_movement(pf_map_tile_at(map, 9, 9)));
+  CHECK_EQ(pf_map_movement_at(map, 13, 13), 0x0282);
 
-  // A bigger brush lays the class over its whole footprint.
-  ed.movement_class = water;
-  ed.movement_no_flying = false;
+  // A bigger brush lays the value over its whole footprint.
+  ed.movement_value = 0x0040;
   ed.brush_size = 3;
   ed.BeginStroke();
   CHECK_EQ(ed.PaintMovementAt(10, 10), 9);
   ed.EndStroke();
-  // Nine from this stroke, plus the water-and-no-flying tile above; the tile
-  // that was put back is not an override any more and is not counted.
-  CHECK_EQ(ed.MovementOverrides(), 10);
+  // Nine from this stroke, plus the two odd values painted above; the tile that
+  // was put back is not an override any more and is not counted.
+  CHECK_EQ(ed.MovementOverrides(), 11);
   pf_map_free(map);
 }
 
@@ -2229,11 +2220,8 @@ TEST(painting_terrain_leaves_authored_movement_alone) {
   Editor ed(map);
   ed.SetMode(pfwin::Mode::kMovement);
   ed.brush_size = 1;
-  ed.movement_class = Editor::kMovementFromTerrain;
-
   // Two tiles: one authored, one left as the terrain made it.
   ed.movement_value = 0x0040;
-  ed.movement_class = 99;   // out of range: the raw value above is used
   CHECK_EQ(ed.MovementBrushValue(), 0x0040);
   ed.BeginStroke();
   CHECK_EQ(ed.PaintMovementAt(8, 8), 1);

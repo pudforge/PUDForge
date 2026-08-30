@@ -99,15 +99,25 @@ const MovementClass kMovementClasses[] = {
     {0x0081, "Forest and rock"},
     {0x008d, "Human wall"},
     {0x0089, "Orc wall"},
-    // War2XE's two, in its own words. Last because they are the ones no shipped
-    // map uses, so the eight above stay where anyone knew them.
+    // War2XE's two, in its own words. Then the combinations the bits allow and
+    // no map has ever held: a restriction bit added to ground, the way War2XE
+    // writes its own "no flying units" as 0x0201 rather than as 0x0200 alone.
     //
-    // Its ninth option is not here: "no flying units" is 0x0200 added to a
-    // value rather than a value of its own — War2XE writes 0x0201, which is
-    // this bit on ground — so the editor carries it as a switch beside the
-    // palette and not as a cell in it. See pf_movement_no_flying_bit.
+    // Ground rather than bare, because a tile with neither SQ_LAND nor SQ_WATER
+    // is a bridge — nothing is stopped — and a restriction on a tile nothing
+    // can reach says nothing. These are offered so they can be tried; which of
+    // them the game acts on is not known here, and the last three are named
+    // after their bit rather than after an effect for that reason.
     {0x0000, "Bridge"},
     {0x0f00, "Space"},
+    {0x0201, "Ground, no flying"},
+    {0x0240, "Water, no flying"},
+    {0x0101, "Ground, no walking"},
+    {0x0401, "Ground, no AI building"},
+    {0x0801, "Ground, no building"},
+    {0x0021, "Ground, victory"},
+    {0x1001, "Ground, runes"},
+    {0x2001, "Ground, trigger start"},
 };
 
 }  // namespace

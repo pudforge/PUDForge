@@ -109,10 +109,16 @@ class TerrainPanel {
   /// The movement half of it: the eight classes plus the cell that puts a tile
   /// back to what its terrain implies.
   void RebuildMovementPalette();
+  /// Which movement cell to show as chosen, or -1 when the bits have been taken
+  /// somewhere no class has a name for.
+  int SelectedMovementCell() const;
   /// Open the tile picker for the custom cell. False when nothing was chosen.
   bool PickCustomTile();
   /// Give a control a tooltip. One tooltip window for the whole panel.
   void Explain(HWND control, UINT text);
+  /// The same, for a tip that has to be built rather than looked up: the bit
+  /// toggles name the bit they stand for and show its value.
+  void ExplainWith(HWND control, const std::wstring& text);
   /// The palette's right-click menu: how the cells are sized, and which side.
   void PickColumns(POINT screen);
 
@@ -137,11 +143,7 @@ class TerrainPanel {
   /// stroke lay — with three exclusive answers. The palette carries one cell
   /// per terrain rather than one per drawing, which is why the answer is here.
   HWND shade_[3] = {};
-  /// The shade row's slot again, in movement mode: whether what the brush lays
-  /// also stops flying units. Two buttons where the shade row has three, shown
-  /// in its place — a drawing of a terrain means nothing to a layer that is not
-  /// drawn, and the flag is on or it is not.
-  HWND flying_[2] = {};
+
   /// Fill and Clear, shown only while a terrain rectangle exists — a button
   /// that acts on something the user cannot see is worse than a missing one.
   /// Replace and Decorate are always here, because their scope is the map when

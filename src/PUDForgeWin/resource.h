@@ -190,11 +190,12 @@
    unused rather than reassigned. */
 /* Light and dark, the two drawings a terrain pair has. Exclusive, pushlike. */
 #define IDC_SHADE_FIRST       461   /* +0 light, +1 dark, +2 mix */
-/* The same row, in movement mode, asking a different question: whether the
-   value being painted also stops flying units. Two buttons rather than the
-   shade row's three, in its place, because a shade means nothing to a layer
-   that is not drawn. */
-#define IDC_FLYING_FIRST      464   /* +0 allowed, +1 blocked */
+/* 464 and 465 were the Flying row, two buttons for one bit. The bit list below
+   carries SQ_MAN_AIR along with the other thirteen, and one word with two
+   controls over it is how they come to disagree. Left unused. */
+/* 470-483 were a toggle per named bit. The palette carries the combinations
+   worth having as cells of their own instead, which is one thing to click
+   rather than two. Left unused. */
 /* The eyedropper, armed for one click. Ctrl and the left button do the same. */
 #define IDC_TERRAIN_PICK      463
 /* Straight to the player sheet from the unit dock's player dropdown. */

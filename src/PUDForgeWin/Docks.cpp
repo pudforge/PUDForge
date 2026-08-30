@@ -286,18 +286,14 @@ void TerrainPanel::Build() {
   };
   palette_.on_pick = [this](int brush) {
     if (editor_->mode() == Mode::kMovement) {
-      editor_->movement_class =
-          brush == MovementResetCell() ? Editor::kMovementFromTerrain : brush;
+      editor_->movement_from_terrain = brush == MovementResetCell();
+      if (!editor_->movement_from_terrain) {
+        editor_->movement_value = pf_movement_class_value(brush);
+      }
       editor_->SetTool(Tool::kWalkable);
       palette_.SetSelected(brush);
-      if (host_) {
-        host_->OnEditorChanged();
-        const char* name = editor_->movement_class >= 0
-                               ? pf_movement_class_name(editor_->movement_class)
-                               : nullptr;
-        host_->OnStatus(name ? FromUtf8(name) : Str(IDS_MOVE_FROM_TERRAIN),
-                        false);
-      }
+      Refresh();
+      if (host_) host_->OnEditorChanged();
       return;
     }
     const int previous = editor_->brush_index;
@@ -372,19 +368,6 @@ void TerrainPanel::Build() {
                                (i == 0 ? WS_GROUP : 0));
   }
 
-  // The same row's slot, for the other question it asks in movement mode.
-  // Separate controls rather than the shade buttons retitled: those carry
-  // drawings from the icon sheet, and a sun over "Allowed" reads as nothing.
-  const UINT flying[] = {IDS_FLYING_ALLOWED, IDS_FLYING_BLOCKED};
-  for (int i = 0; i < 2; i++) {
-    flying_[i] = MakeButton(hwnd_, instance_, Str(flying[i]).c_str(),
-                            IDC_FLYING_FIRST + i,
-                            BS_AUTORADIOBUTTON | BS_PUSHLIKE |
-                                (i == 0 ? WS_GROUP : 0));
-    ShowWindow(flying_[i], SW_HIDE);
-  }
-  Explain(flying_[0], IDS_TIP_FLYING_ALLOWED);
-  Explain(flying_[1], IDS_TIP_FLYING_BLOCKED);
 
   labels_[3] = MakeLabel(hwnd_, instance_, Str(IDS_ROW_MIRROR).c_str());
   // Independent toggles after the first: the axes combine, "none" clears.
@@ -454,6 +437,10 @@ void TerrainPanel::SetUiIcons(const UiIcons* icons) {
 }
 
 void TerrainPanel::Explain(HWND control, UINT text) {
+  ExplainWith(control, Str(text));
+}
+
+void TerrainPanel::ExplainWith(HWND control, const std::wstring& text) {
   if (!control) return;
   if (!tip_) {
     tip_ = CreateWindowExW(WS_EX_TOPMOST, TOOLTIPS_CLASSW, nullptr,
@@ -464,7 +451,7 @@ void TerrainPanel::Explain(HWND control, UINT text) {
     // are sentences.
     SendMessageW(tip_, TTM_SETMAXTIPWIDTH, 0, 320);
   }
-  tip_texts_.push_back(Str(text));
+  tip_texts_.push_back(text);
   TOOLINFOW info = {};
   info.cbSize = sizeof(info);
   info.uFlags = TTF_IDISHWND | TTF_SUBCLASS;
@@ -495,6 +482,15 @@ void TerrainPanel::SetArtwork(const pf_tileset_art* art, int tileset) {
   RebuildPalette();
 }
 
+int TerrainPanel::SelectedMovementCell() const {
+  if (!editor_) return 0;
+  if (editor_->movement_from_terrain) return MovementResetCell();
+  const int cls = editor_->MovementClassIndex();
+  // A value the bits have taken somewhere no class names lights no cell: the
+  // palette would otherwise say the brush lays something it does not.
+  return cls >= 0 ? cls : -1;
+}
+
 void TerrainPanel::RebuildMovementPalette() {
   // Flat colours, and the overlay's own: a cell and the tiles it paints are
   // then the same colour, which is the whole of what has to be learned.
@@ -519,9 +515,7 @@ void TerrainPanel::RebuildMovementPalette() {
   entries.push_back(std::move(back));
 
   palette_.SetEntries(std::move(entries));
-  palette_.SetSelected(editor_ && editor_->movement_class >= 0
-                           ? editor_->movement_class
-                           : MovementResetCell());
+  palette_.SetSelected(SelectedMovementCell());
 }
 
 void TerrainPanel::RebuildPalette() {
@@ -751,13 +745,7 @@ void TerrainPanel::Layout() {
   y += row;
 
   if (!movement) place_row(labels_[0], detail_, 3);
-  // One slot, two rows laid into it: only one of them is ever on screen, and
-  // Refresh decides which. Placed on the same y so the panel does not shuffle
-  // when the mode changes.
-  const int shade_y = y;
-  place_row(labels_[4], shade_, 3);
-  y = shade_y;
-  place_row(labels_[4], flying_, 2);
+  if (!movement) place_row(labels_[4], shade_, 3);
   place_row(labels_[3], mirror_, 5);
 
   // Full width and no label column, the way Fill and Clear are: these two carry
@@ -774,6 +762,7 @@ void TerrainPanel::Layout() {
   for (int i = 0; i < 2; i++) {
     place(mode_[i], pad + bulk_w * i, y, bulk_w, row - 2);
   }
+
   y += row;
 
   if (defer) EndDeferWindowPos(defer);
@@ -799,13 +788,8 @@ void TerrainPanel::OnCommand(int id) {
                                                     : Mode::kMovement);
     }
     return;
-  } else if (id >= IDC_FLYING_FIRST && id <= IDC_FLYING_FIRST + 1) {
-    editor_->movement_no_flying = id == IDC_FLYING_FIRST + 1;
-    ArmTheBrush();
-    Refresh();
-    if (host_) host_->OnEditorChanged();
-    return;
   }
+
   if (id == IDC_TERRAIN_REPLACE || id == IDC_TERRAIN_DECORATE) {
     // The sheet and everything that follows it belong to the application: the
     // panel cannot recompose the canvas or the minimap, and the menu item does
@@ -865,9 +849,7 @@ void TerrainPanel::Refresh() {
     Layout();
   }
   if (editor_->mode() == Mode::kMovement) {
-    palette_.SetSelected(editor_->movement_class >= 0
-                             ? editor_->movement_class
-                             : MovementResetCell());
+    palette_.SetSelected(SelectedMovementCell());
   } else {
     palette_.SetSelected(editor_->brush_index);
   }
@@ -911,28 +893,29 @@ void TerrainPanel::Refresh() {
   // nothing to say about a layer that is not drawn at all.
   const bool movement = editor_->mode() == Mode::kMovement;
   if (movement) {
-    const char* name = editor_->movement_class >= 0
-                           ? pf_movement_class_name(editor_->movement_class)
-                           : nullptr;
-    std::wstring shown = name ? FromUtf8(name) : Str(IDS_MOVE_FROM_TERRAIN);
-    if (editor_->movement_no_flying) {
-      shown += L" + " + Str(IDS_FLYING_BLOCKED);
+    // The name and the word it stands for. Once bits can be turned on by hand
+    // the value is the thing being painted, and it is often one no class has a
+    // name for — "0x0101" is then the only honest answer.
+    std::wstring shown;
+    if (editor_->movement_from_terrain) {
+      shown = Str(IDS_MOVE_FROM_TERRAIN);
+    } else {
+      const int cls = editor_->MovementClassIndex();
+      const char* name = cls >= 0 ? pf_movement_class_name(cls) : nullptr;
+      shown = Format(IDS_MOVE_VALUE,
+                     name ? FromUtf8(name).c_str() : Str(IDS_MOVE_UNNAMED).c_str(),
+                     unsigned(editor_->movement_value));
     }
     SetWindowTextW(brush_name_, shown.c_str());
   } else {
     SetWindowTextW(brush_name_, FromUtf8(editor_->BrushName()).c_str());
   }
-  // The shade row's slot asks a different question in movement mode, so the
-  // row is swapped rather than greyed: three buttons about a drawing become two
-  // about a bit, and the label says which is being asked.
+  // A shade is a drawing of a terrain, which a layer that is not drawn has
+  // none of; the bits are the movement value taken apart.
   for (HWND control : shade_) ShowWindow(control, movement ? SW_HIDE : SW_SHOW);
-  for (HWND control : flying_) ShowWindow(control, movement ? SW_SHOW : SW_HIDE);
-  SetWindowTextW(labels_[4],
-                 Str(movement ? IDS_ROW_FLYING : IDS_ROW_SHADE).c_str());
+  ShowWindow(labels_[4], movement ? SW_HIDE : SW_SHOW);
   Button_SetCheck(mode_[0], !movement);
   Button_SetCheck(mode_[1], movement);
-  Button_SetCheck(flying_[0], !editor_->movement_no_flying);
-  Button_SetCheck(flying_[1], editor_->movement_no_flying);
 
   // The bucket is hidden in movement mode rather than greyed, so a brush left
   // on Fill has to be moved off it or the next click would do nothing.

@@ -113,11 +113,15 @@ BEGIN
   IDS_TIP_PANEL_TERRAIN  "Paint the ground itself: what the map is made of and what it looks like."
   IDS_TIP_PANEL_MOVEMENT "Paint the layer under the artwork: what may walk, swim, sail or fly over each tile, whatever is drawn there."
 
-  IDS_ROW_FLYING        "Flying"
-  IDS_FLYING_ALLOWED    "Allowed"
-  IDS_FLYING_BLOCKED    "Blocked"
-  IDS_TIP_FLYING_ALLOWED "Paint the value as it is, leaving flying units free to cross."
-  IDS_TIP_FLYING_BLOCKED "Add the bit that stops flying units to whatever the brush lays, the way War2XE's ""no flying units"" does. It rides on top of the class rather than replacing it, so Ground and Open water can each be painted with or without it."
+  /* The bit list under the movement palette. A value is one word and these
+     are its bits, so a class in the palette lights some of them and any of
+     them can be turned on to reach a value no class has a name for. */
+  IDS_ROW_BITS          "Bits"
+  IDS_TIP_MOVE_BIT      "%ls (0x%04X). Part of the movement value the brush lays: pick a class above, then turn bits on or off to reach one nothing has a name for."
+  /* The name under the palette: the class, or the word itself when no class
+     has that value. */
+  IDS_MOVE_VALUE        "%ls  0x%04X"
+  IDS_MOVE_UNNAMED      "Custom"
 
   /* ------------------------------------------------------------- editing */
   IDS_STARTS_PLACED_ONE  "%d start location placed"

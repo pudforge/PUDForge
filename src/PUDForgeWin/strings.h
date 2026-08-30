@@ -520,11 +520,16 @@
 #define IDS_TIP_PANEL_TERRAIN      1873
 #define IDS_TIP_PANEL_MOVEMENT     1874
 
-#define IDS_ROW_FLYING             1866
-#define IDS_FLYING_ALLOWED         1867
-#define IDS_FLYING_BLOCKED         1868
-#define IDS_TIP_FLYING_ALLOWED     1869
-#define IDS_TIP_FLYING_BLOCKED     1870
+/* 1866-1870 were the Flying row, two buttons over one bit. The list below
+   carries SQ_MAN_AIR with the other thirteen, and one word with two controls
+   over it is how they come to disagree. Left unused. */
+/* The bit list under the movement palette, and the value it adds up to. */
+#define IDS_ROW_BITS               1875
+#define IDS_TIP_MOVE_BIT           1876
+#define IDS_MOVE_VALUE             1877
+/* What the name under the palette says when the bits add up to a value no
+   class has a name for. */
+#define IDS_MOVE_UNNAMED           1878
 
 #define IDS_TOOL_WALKABLE          1864
 #define IDS_HINT_MOVEMENT          1865

@@ -581,32 +581,30 @@ class Editor {
   /// step. @return tiles changed
   int ResetMovement();
 
-  /// The palette entry that puts a tile back to what its terrain implies,
-  /// rather than laying a class over it. It is how an override is taken off
-  /// again, one brush stroke at a time, where Reset Movement does the lot.
-  static constexpr int kMovementFromTerrain = -1;
-
-  /// Which movement class the movement brush lays, as an index into
-  /// pf_movement_class_value, or kMovementFromTerrain. Out of range means the
-  /// raw value below instead.
-  int movement_class = 0;
-  /// The value painted when `movement_class` names no class, so the eight the
-  /// shipped maps use are not the only ones a map may hold. See
-  /// overrides/movement_classes.cpp for why there are exactly eight.
+  /// The value the movement brush lays.
+  ///
+  /// One number rather than a class and a set of modifiers beside it. A class
+  /// in the palette is a value; a bit toggled on is that value with a bit
+  /// changed; and a value no class has a name for is still a value. Two pieces
+  /// of state for one word is how a "no flying" switch and a palette cell come
+  /// to disagree about what the next stroke writes.
   int movement_value = 0x0001;
-  /// Add the no-flying bit to whatever the brush lays. A flag rather than a
-  /// class: War2XE writes it on top of a value, and "space" is that bit among
-  /// four, so it combines instead of replacing.
-  bool movement_no_flying = false;
+
+  /// Take whatever the terrain under each tile implies instead, which is how a
+  /// single override comes off where Reset Movement does the lot. Not a value,
+  /// so it is not `movement_value`.
+  bool movement_from_terrain = false;
+
+  /// Which palette cell to show as chosen: the class whose value this is, or
+  /// -1 when the bits have been taken somewhere no class has a name for.
+  int MovementClassIndex() const;
 
   /// The movement brush's reach in tiles. The corner rung is a mark on an
   /// intersection, and this layer holds one value per tile, so it rounds up to
   /// a tile rather than painting nothing.
   int MovementBrushSize() const;
 
-  /// The value the movement brush would lay, or -1 for the entry that takes
-  /// whatever the terrain under each tile implies — to which the flag still
-  /// applies, so it can be added to a tile without disturbing its class.
+  /// The value the movement brush would lay, or -1 for "match the terrain".
   int MovementBrushValue() const;
 
   /// Paint the movement class over a tile and the rest of the brush, mirrored
