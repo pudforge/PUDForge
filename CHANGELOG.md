@@ -23,29 +23,19 @@ section therefore covers all the commits after the previous tag.
 `scripts/prep-release.ps1` collects those commits as a start. See
 `docs/releasing.md`.
 
-## 0.1.58
+## 0.1.59
 
 **New**
 
-- A movement mode. The terrain palette becomes the movement values, and you
-  paint them over any tile whatever is drawn there.
-- Thirteen movement values in the palette, each named for what it does. Seven
-  are the ones Blizzard's maps use; the rest stop flying units, ground units,
-  both, or building.
-- The movement overlay draws the palette's colours over the terrain, so a tile
-  and the cell that painted it read as the same colour and the coastline under
-  them is still visible.
-- The palette's first cell, Reset, puts a tile back to what its terrain
-  implies.
-- The movement brush shows its outline under the pointer, and takes the same
-  size keys, Alt+wheel and Ctrl+click to sample, as the terrain brush does.
+- A movement editing mode, at View, Mode, Movement. It paints what may cross
+  each tile, whatever the tile looks like: ground units over water, no flying
+  over open ground, or one tile that a ship and a ground unit share.
+- The brush is the terrain brush, with the same sizes and keys. Ctrl and the
+  left button take the value under the pointer.
 
-**Changed**
+**Fixed**
 
-- Movement you paint by hand survives a terrain edit over the same tile. The
-  editor rewrote it from the terrain.
-- The map draws about a hundred times faster with an overlay on. Painting and
-  zooming were choppy.
+- Oil patches and oil wells go on every other tile, as the game places them.
 
 ## 0.1.40
 
@@ -65,8 +55,7 @@ section therefore covers all the commits after the previous tag.
 
 **Fixed**
 
-- Oil patches and oil wells go on every other tile, as the game places them.
-  You could put one between the lines.
+
 - Ships and flying units occupy 2 x 2 tiles, the area Warcraft II gives them.
   The editor gave them one tile, and let you put a ship in a space that is too
   small.
