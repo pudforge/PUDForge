@@ -502,11 +502,11 @@ TEST(movement_follows_the_tiles_it_is_painted_from) {
   // SQM is very nearly a function of the tile. Across the shipped maps, 1268
   // tiles disagree with the table it is derived from — 236 out of 6,975,488. So the table has to agree
   // with the corpus almost everywhere, and painting has to keep it that way.
-  // Seventeen: the eight the shipped maps use, then Bridge and Space from
-  // War2XE, then seven combinations the bits allow and nothing has ever
+  // Fourteen: the eight the shipped maps use, then the value that stops
+  // nothing, then five combinations the bits allow and nothing has ever
   // written. The eight come first, so an index into them still means what it
   // always did.
-  CHECK_EQ(pf_movement_class_count(), 17);
+  CHECK_EQ(pf_movement_class_count(), 14);
   for (int i = 0; i < pf_movement_class_count(); i++) {
     const int value = pf_movement_class_value(i);
     // Bridge is 0x0000 — the value that stops nothing — so a class value may
@@ -517,15 +517,23 @@ TEST(movement_follows_the_tiles_it_is_painted_from) {
   }
   CHECK_EQ(pf_movement_class_of(0x1234), -1);   // outside the set, and says so
 
-  // The two War2XE adds, and the bit it puts on top rather than beside.
-  CHECK_EQ(pf_movement_class_of(0x0000), 8);    // bridge: stops nothing
-  CHECK_EQ(pf_movement_class_of(0x0f00), 9);    // space: stops everything
+  CHECK_EQ(pf_movement_class_of(0x0000), 8);    // stops nothing
   CHECK_EQ(int(pf_movement_no_flying_bit()), 0x0200);
-  // Which is the difference between War2XE's ground and its "no flying units",
-  // measured off a map that lays every one of its options on the same tile.
+  // The difference between War2XE's ground and its "no flying units", measured
+  // off a map that lays every one of its options on the same tile.
   CHECK_EQ(0x0001 | int(pf_movement_no_flying_bit()), 0x0201);
-  // And it is inside space, which is why space grounds them too.
-  CHECK_EQ(0x0f00 & int(pf_movement_no_flying_bit()), 0x0200);
+
+  // War2XE's "space" is not offered and is not a class: 0x0f00 carries no
+  // SQ_UNPASSABLE, and a footman walks over it in the game. What stops one is
+  // that bit, which forest, rock and both walls all carry.
+  CHECK_EQ(pf_movement_class_of(0x0f00), -1);
+  CHECK_EQ(0x0081 & 0x0080, 0x0080);            // forest and rock
+  CHECK_EQ(0x0089 & 0x0080, 0x0080);            // orc wall
+  CHECK_EQ(0x008d & 0x0080, 0x0080);            // human wall
+  CHECK_EQ(0x0f00 & 0x0080, 0);                 // and space carries none of it
+  // So the only value that stops both is the two together.
+  CHECK_EQ(0x0081 | int(pf_movement_no_flying_bit()), 0x0281);
+  CHECK(pf_movement_class_of(0x0281) >= 0);
 
   pf_map* map = pf_map_create(32, 32, 0, nullptr);
   CHECK(map != nullptr);

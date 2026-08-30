@@ -101,14 +101,14 @@ const MovementClass kMovementClasses[] = {
     {0x0081, "Forest and rock"},
     {0x008d, "Human wall"},
     {0x0089, "Orc wall"},
-    // War2XE's two, named for what they do rather than for what it calls them.
-    // "Bridge" is 0x0000, which declares neither land nor water and stops
-    // nothing, so a walker and a ship may both be there — Land and water.
-    // "Space" is the other end: the four restriction bits together and neither
-    // terrain bit, so nothing crosses it and nothing is built on it.
+    // 0x0000 declares neither land nor water and stops nothing, so a walker and
+    // a ship may both be there — Land and water. War2XE calls it a bridge.
     //
-    // Then the combinations the four restriction bits allow, each added to a
-    // terrain rather than painted bare:
+    // Then the combinations, each a restriction added to a terrain rather than
+    // painted bare. What stops a ground unit is SQ_UNPASSABLE, which is the bit
+    // forest, rock and both walls carry and the reason none of them can be
+    // walked through; SQ_MAN_AIR is what War2XE's "no flying units" sets. The
+    // two together are the only barrier nothing crosses:
     // a tile with neither SQ_LAND nor SQ_WATER is a bridge, and a restriction
     // on a tile nothing can reach says nothing. War2XE writes its own "no
     // flying units" the same way, as 0x0201 and not as 0x0200 alone.
@@ -118,15 +118,22 @@ const MovementClass kMovementClasses[] = {
     // are scenario machinery the map alone cannot switch on, so a palette cell
     // for them would be a cell that does nothing. The bits keep their names in
     // the table below, because a map that holds one still has to be read.
+    //
+    // War2XE's "space", 0x0f00, went the same way. It is the four high bits
+    // with no SQ_UNPASSABLE among them, and a footman walks straight over it —
+    // tested. So did SQ_MAN on its own, which was offered here as "no walking"
+    // on the strength of 0x0f00 being called space, and was wrong for the same
+    // reason. Whatever that nibble is for, it is not stopping a man on foot.
+    //
+    // Which leaves SQ_BUILDING and SQ_AI_BUILDING below still untested. They
+    // are offered because a bit named for building plausibly stops building,
+    // and they will come out if that turns out to be another guess.
     {0x0000, "Land and water"},
-    {0x0f00, "Closed to everything"},
+    {0x0281, "No walking or flying"},
     {0x0201, "Ground, no flying"},
-    {0x0101, "Ground, no walking"},
-    {0x0301, "Ground, no walking or flying"},
-    {0x0801, "Ground, no building"},
     {0x0240, "Water, no flying"},
+    {0x0801, "Ground, no building"},
     {0x0840, "Water, no building"},
-    {0x0281, "Forest and rock, no flying"},
 };
 
 }  // namespace

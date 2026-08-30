@@ -1138,6 +1138,10 @@ void MapWindow::OnMouseDown(int button, int x, int y, WPARAM keys) {
         // silence looks the same as one that missed.
         if (picked) host_->OnStatus(FromUtf8(editor_->BrushName()), false);
       }
+    } else if (editor_->mode() == Mode::kMovement) {
+      // The same act on the layer: read what a tile already says, then paint
+      // more of it. The panel names the value, so the status bar need not.
+      if (editor_->PickMovement(tx, ty) && host_) host_->OnEditorChanged();
     } else {
       const int index = editor_->PickUnitType(tx, ty);
       if (host_) {

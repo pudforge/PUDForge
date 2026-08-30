@@ -450,6 +450,17 @@ int Editor::MovementBrushSize() const {
   return BrushIsCorner() ? 1 : brush_size;
 }
 
+bool Editor::PickMovement(int x, int y) {
+  if (!map_ || !InBounds(x, y)) return false;
+  const int value = pf_map_movement_at(map_, x, y);
+  if (value < 0) return false;
+  movement_value = value;
+  // A value was adopted, so the brush lays that value rather than whatever
+  // each tile's terrain implies.
+  movement_from_terrain = false;
+  return true;
+}
+
 int Editor::MovementClassIndex() const {
   for (int i = 0; i < pf_movement_class_count(); i++) {
     if (pf_movement_class_value(i) == movement_value) return i;

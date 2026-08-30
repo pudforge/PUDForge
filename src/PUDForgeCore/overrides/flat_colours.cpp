@@ -64,17 +64,14 @@ uint32_t movement_colour(int value) {
     case 0x008d: return 0xb0b4bc;   // human wall
     case 0x0089: return 0x8a7f6a;   // orc wall
     case 0x0000: return 0xe8c34a;   // land and water: stops nothing
-    case 0x0f00: return 0x2b1b3d;   // closed: stops everything
     // The combinations. A restriction on ground keeps ground's green and goes
     // darker with it, so the family is visible before the name is read; the
     // three named after a bit rather than an effect take colours of their own.
     case 0x0201: return 0x3f8f52;   // ground, no flying
-    case 0x0101: return 0x2f6b3e;   // ground, no walking
-    case 0x0301: return 0x1e4a2b;   // ground, no walking or flying
     case 0x0801: return 0x71904a;   // ground, no building
     case 0x0240: return 0x27489c;   // water, no flying
     case 0x0840: return 0x3a63b8;   // water, no building
-    case 0x0281: return 0x8f3f28;   // forest and rock, no flying
+    case 0x0281: return 0x5c1f14;   // no walking or flying: the only real barrier
     default: return kUnknown;
   }
 }

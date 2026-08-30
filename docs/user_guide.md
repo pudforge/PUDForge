@@ -182,16 +182,18 @@ movement values the game uses, in the colours the movement overlay draws them,
 and the overlay comes on while you are in the mode.
 
 Click or drag to lay the selected value over any tile, whatever is drawn there.
-The brush size, shape and mirrors are the ones the terrain brush uses. The
+The brush size, shape and mirrors are the ones the terrain brush uses, and so
+are its keys: **[** and **]** or **Alt** and the wheel size it, and **Ctrl** and
+the left button adopt the value already on a tile — which is how you find out
+what a map somebody else wrote says, and then paint more of it. The
 bucket is not offered: it would follow the terrain, and this layer is the one
 that disagrees with the terrain on purpose.
 
-The palette carries sixteen values. Eight are the ones Blizzard's own maps use.
-**Land and water** declares neither and stops nothing, so a walker and a ship
-may both be on it; **Closed to everything** is the other end, where nothing
-crosses and nothing is built. The rest are those two ideas applied to one
-terrain at a time — ground no flier may cross, water no platform may be built
-on, and so on.
+The palette carries fourteen values. Eight are the ones Blizzard's own maps
+use. **Land and water** stops nothing, so a walker and a ship may both be on
+it, and **No walking or flying** stops both, which is the only barrier nothing
+crosses. The rest stop one thing at a time: ground no flier may cross, water no
+platform may be built on, and so on.
 
 The last cell of the palette, **Match the terrain**, is not a value but the
 absence of one. Painting with it puts each tile back to what its terrain

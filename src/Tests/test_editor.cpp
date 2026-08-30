@@ -2288,3 +2288,43 @@ TEST(the_brush_ladder_skips_the_corner_rung_in_movement_mode) {
   CHECK_EQ(ed.MovementBrushSize(), 1);
   pf_map_free(map);
 }
+
+/**
+ * The eyedropper works on the movement layer too.
+ *
+ * Ctrl and the left button adopt the terrain under the pointer in terrain
+ * mode. On this layer it is the more useful of the two: a value can be one
+ * nothing in the palette names, and reading it off a map somebody else wrote
+ * is the only way to find out what it says and then paint more of it.
+ */
+TEST(the_eyedropper_adopts_a_movement_value) {
+  pf_map* map = blank();
+  Editor ed(map);
+  ed.SetMode(pfwin::Mode::kMovement);
+
+  // A value no cell in the palette offers, put there the way another editor
+  // would have.
+  CHECK_EQ(pf_map_set_movement(map, 6, 6, 0x0282), PF_OK);
+  ed.movement_value = 0x0001;
+  ed.movement_from_terrain = true;
+
+  CHECK(ed.PickMovement(6, 6));
+  CHECK_EQ(ed.movement_value, 0x0282);
+  CHECK_EQ(ed.MovementClassIndex(), -1);      // nothing names it
+  // Adopting a value is choosing to paint that value, not the terrain's.
+  CHECK(!ed.movement_from_terrain);
+  CHECK_EQ(ed.MovementBrushValue(), 0x0282);
+
+  // And it lays what it took.
+  ed.brush_size = 1;
+  ed.BeginStroke();
+  CHECK_EQ(ed.PaintMovementAt(9, 9), 1);
+  ed.EndStroke();
+  CHECK_EQ(pf_map_movement_at(map, 9, 9), 0x0282);
+
+  // A tile that was never touched still answers, with what its terrain implies.
+  CHECK(ed.PickMovement(20, 20));
+  CHECK_EQ(ed.movement_value, pf_tile_movement(pf_map_tile_at(map, 20, 20)));
+  CHECK(!ed.PickMovement(-1, 0));
+  pf_map_free(map);
+}

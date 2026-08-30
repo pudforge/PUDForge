@@ -595,6 +595,12 @@ class Editor {
   /// so it is not `movement_value`.
   bool movement_from_terrain = false;
 
+  /// Adopt the movement value already on a tile, which is the eyedropper the
+  /// terrain brush has. Reading a value off the map is how you find out what a
+  /// map you did not write says, and then paint more of it.
+  /// @return false outside the map
+  bool PickMovement(int x, int y);
+
   /// Which palette cell to show as chosen: the class whose value this is, or
   /// -1 when the bits have been taken somewhere no class has a name for.
   int MovementClassIndex() const;
