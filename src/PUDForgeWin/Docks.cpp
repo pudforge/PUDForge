@@ -48,8 +48,12 @@ HWND MakeButton(HWND parent, HINSTANCE instance, const wchar_t* text, int id,
 }
 
 HWND MakeLabel(HWND parent, HINSTANCE instance, const wchar_t* text) {
-  HWND hwnd = CreateWindowExW(0, L"STATIC", text, WS_CHILD | WS_VISIBLE, 0, 0,
-                              0, 0, parent, nullptr, instance, nullptr);
+  // SS_CENTERIMAGE centres the text down the label's own height, so a row's
+  // label lines up with the middle of its buttons instead of being nudged down
+  // by a hand-picked number of pixels that only holds at one font size.
+  HWND hwnd = CreateWindowExW(0, L"STATIC", text,
+                              WS_CHILD | WS_VISIBLE | SS_CENTERIMAGE, 0, 0, 0,
+                              0, parent, nullptr, instance, nullptr);
   SetFont(hwnd);
   return hwnd;
 }
@@ -614,8 +618,15 @@ void DrawMovementCell(HDC dc, const RECT& rect, const std::wstring& name,
   SetBkMode(dc, TRANSPARENT);
   RECT text = rect;
   InflateRect(&text, -2, -2);
-  DrawTextW(dc, name.c_str(), -1, &text,
-            DT_CENTER | DT_WORDBREAK | DT_EDITCONTROL | DT_NOPREFIX);
+  // DT_VCENTER only works on one line, and these wrap to three. Measure what
+  // the wrapped text needs, then move the box down by half of what is left
+  // over: a name that wraps and one that does not then sit at the same height.
+  const UINT format = DT_CENTER | DT_WORDBREAK | DT_EDITCONTROL | DT_NOPREFIX;
+  RECT measured = text;
+  DrawTextW(dc, name.c_str(), -1, &measured, format | DT_CALCRECT);
+  const int slack = (text.bottom - text.top) - (measured.bottom - measured.top);
+  if (slack > 0) text.top += slack / 2;
+  DrawTextW(dc, name.c_str(), -1, &text, format);
 }
 
 void TerrainPanel::DrawBrushIcon(HDC dc, const RECT& rect, int brush) {
@@ -686,7 +697,12 @@ void TerrainPanel::Layout() {
   const int name_h = Scaled(hwnd_, 16);
   // Six rows below the palette, not five. The palette gives up the height, so a
   // narrow dock loses cells rather than pushing Mirror and Shade off the bottom.
-  const int most = rc.bottom - pad * 2 - row * 6 - name_h - top;
+  //
+  // Movement mode shows four of them: no Detail, and no bulk edits. The rows it
+  // does without are height the palette gets, which is where the two extra
+  // values and the way back went.
+  const bool movement = editor_ && editor_->mode() == Mode::kMovement;
+  const int most = rc.bottom - pad * 2 - row * (movement ? 4 : 6) - name_h - top;
   const int palette_h = std::max(0, std::min(most, palette_.HeightFor(width)));
   place(palette_.hwnd(), pad, top, width, palette_h);
   place(brush_name_, pad, top + palette_h + Scaled(hwnd_, 3), width, name_h);
@@ -694,7 +710,7 @@ void TerrainPanel::Layout() {
   int y = top + palette_h + name_h + pad * 2;
 
   auto place_row = [&](HWND label, HWND* cells, int count) {
-    place(label, pad, y + Scaled(hwnd_, 5), label_w, row);
+    place(label, pad, y, label_w, row - 2);
     const int cell_w = (width - label_w) / count;
     for (int i = 0; i < count; i++) {
       place(cells[i], pad + label_w + cell_w * i, y, cell_w, row - 2);
@@ -702,17 +718,28 @@ void TerrainPanel::Layout() {
     y += row;
   };
 
+  // A row that means nothing in this mode is not shown greyed: a control you
+  // cannot press is a question you have to work out the answer to. Detail is
+  // about which drawing of a terrain a stroke lays, the bucket floods what the
+  // terrain says, and the two bulk edits are terrain edits — none of them has
+  // anything to say about a layer that is not drawn.
+  const int shapes = movement ? 3 : 4;
+  ShowWindow(shape_[3], movement ? SW_HIDE : SW_SHOW);
+  ShowWindow(labels_[0], movement ? SW_HIDE : SW_SHOW);
+  for (HWND control : detail_) ShowWindow(control, movement ? SW_HIDE : SW_SHOW);
+  for (HWND control : bulk_) ShowWindow(control, movement ? SW_HIDE : SW_SHOW);
+
   // The brush first — its shape and its size, which is what the pointer is about
   // to do — then which drawing of the terrain it lays.
-  place_row(labels_[1], shape_, 4);
+  place_row(labels_[1], shape_, shapes);
 
-  place(labels_[2], pad, y + Scaled(hwnd_, 5), label_w, row);
+  place(labels_[2], pad, y, label_w, row - 2);
   const int value_w = Scaled(hwnd_, 24);
   place(size_slider_, pad + label_w, y, width - label_w - value_w, row - 2);
-  place(size_value_, pad + width - value_w, y + Scaled(hwnd_, 5), value_w, row);
+  place(size_value_, pad + width - value_w, y, value_w, row - 2);
   y += row;
 
-  place_row(labels_[0], detail_, 3);
+  if (!movement) place_row(labels_[0], detail_, 3);
   // One slot, two rows laid into it: only one of them is ever on screen, and
   // Refresh decides which. Placed on the same y so the panel does not shuffle
   // when the mode changes.
@@ -806,6 +833,9 @@ void TerrainPanel::Refresh() {
   if (palette_mode_ != editor_->mode()) {
     palette_mode_ = editor_->mode();
     RebuildPalette();
+    // Rows come and go with the mode, and the palette takes the height they
+    // give up, so the whole panel is laid out again rather than repainted.
+    Layout();
   }
   if (editor_->mode() == Mode::kMovement) {
     palette_.SetSelected(editor_->movement_class >= 0
@@ -875,11 +905,8 @@ void TerrainPanel::Refresh() {
   Button_SetCheck(flying_[0], !editor_->movement_no_flying);
   Button_SetCheck(flying_[1], editor_->movement_no_flying);
 
-  for (HWND control : detail_) EnableWindow(control, !movement);
-  for (HWND control : bulk_) EnableWindow(control, !movement);
-  // The bucket floods what the terrain says, and this layer is the one that
-  // disagrees with the terrain on purpose, so it has nothing to follow.
-  EnableWindow(shape_[3], !movement);
+  // The bucket is hidden in movement mode rather than greyed, so a brush left
+  // on Fill has to be moved off it or the next click would do nothing.
   if (movement && editor_->brush_shape == Editor::kShapeFill) {
     editor_->brush_shape = PF_BRUSH_SQUARE;
     Button_SetCheck(shape_[3], FALSE);

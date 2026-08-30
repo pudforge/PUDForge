@@ -23,32 +23,16 @@ section therefore covers all the commits after the previous tag.
 `scripts/prep-release.ps1` collects those commits as a start. See
 `docs/releasing.md`.
 
-## 0.1.43
+## 0.1.44
 
 **New**
 
+- A movement mode. The terrain palette becomes the movement values, and you
+  paint them over any tile whatever is drawn there.
 - Two more movement values: Bridge, which stops nothing, and Space, which stops
   everything.
 - A Flying row beside the brush. It adds the bit that stops flying units to
   whatever you paint.
-
-**Changed**
-
-- The movement palette writes the name of each value on its cell.
-
-## 0.1.42
-
-**Fixed**
-
-- The brush rows keep you in movement mode. They put the terrain brush back in
-  your hand.
-
-## 0.1.41
-
-**New**
-
-- A movement mode. The terrain palette becomes the eight movement values, and
-  you paint them over any tile whatever is drawn there.
 - The palette's last cell puts a tile back to what its terrain implies.
 
 **Changed**
