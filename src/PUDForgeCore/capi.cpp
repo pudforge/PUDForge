@@ -1415,6 +1415,9 @@ int pf_ai_script_listing(const pf_ai_scripts* scripts, int index, char* out, int
 
 unsigned pf_movement_colour(int value) { return pf::movement_colour(value); }
 unsigned pf_movement_no_flying_bit(void) { return pf::movement_no_flying_bit(); }
+int pf_movement_bit_count(void) { return pf::movement_bit_count(); }
+unsigned pf_movement_bit_value(int i) { return unsigned(pf::movement_bit_value(i)); }
+const char* pf_movement_bit_name(int i) { return pf::movement_bit_name(i); }
 int pf_movement_class_count(void) { return pf::movement_class_count(); }
 int pf_movement_class_value(int index) { return pf::movement_class_value(index); }
 const char* pf_movement_class_name(int index) { return pf::movement_class_name(index); }

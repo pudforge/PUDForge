@@ -120,6 +120,12 @@ int unit_counterpart_count();
 /// The bit that stops flying units, which rides on top of a class rather than
 /// being one. See overrides/movement_classes.cpp.
 uint16_t movement_no_flying_bit();
+
+/// The bits a movement value is made of, with the game's own names for them.
+/// Highest first, so a decomposition reads the way the word is written.
+int movement_bit_count();
+int movement_bit_value(int index);
+const char* movement_bit_name(int index);
 int movement_class_count();
 int movement_class_value(int index);
 const char* movement_class_name(int index);

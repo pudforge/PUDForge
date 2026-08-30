@@ -52,6 +52,43 @@ struct MovementClass {
   const char* name;
 };
 
+/// What each bit of the word means, from the game's own header. This is the
+/// one thing here that is not inference: the names are Blizzard's.
+///
+/// Every value in 4,638,720 tiles across 365 maps is a combination of these and
+/// nothing else — `movement_values_are_made_of_named_bits` checks it — and the
+/// eleven that occur come apart into sense:
+///
+///   0x0000  SQ_NONE                                   a bridge: nothing at all
+///   0x0011  SQ_LAND | SQ_UNBUILDABLE                  land nobody may build on
+///   0x0081  SQ_LAND | SQ_UNPASSABLE                   forest and rock
+///   0x008d  SQ_LAND | SQ_C_WALL | SQ_P_WALL | ...     one wall
+///   0x0089  SQ_LAND | SQ_C_WALL | SQ_UNPASSABLE       the other
+///   0x0201  SQ_LAND | SQ_MAN_AIR                      War2XE's "no flying"
+///   0x0f00  the four restriction bits together        space
+///
+/// Which also settles the two walls: they are not a human bit and an orc bit
+/// but one wall bit and a second that only one of them carries.
+///
+/// Five bits are never set in any of those tiles — SQ_VICTORY, SQ_RUNES,
+/// TR_START and the top two, which have no name here at all.
+struct MovementBit {
+  uint16_t value;
+  const char* name;
+};
+
+constexpr uint16_t kNoFlying = 0x0200;
+
+const MovementBit kMovementBits[] = {
+    {0x2000, "TR_START"},        {0x1000, "SQ_RUNES"},
+    {0x0800, "SQ_BUILDING"},     {0x0400, "SQ_AI_BUILDING"},
+    {0x0200, "SQ_MAN_AIR"},      {0x0100, "SQ_MAN"},
+    {0x0080, "SQ_UNPASSABLE"},   {0x0040, "SQ_WATER"},
+    {0x0020, "SQ_VICTORY"},      {0x0010, "SQ_UNBUILDABLE"},
+    {0x0008, "SQ_C_WALL"},       {0x0004, "SQ_P_WALL"},
+    {0x0002, "SQ_SHORE"},        {0x0001, "SQ_LAND"},
+};
+
 /// In the order a palette should show them: passable first, then blocked.
 const MovementClass kMovementClasses[] = {
     {0x0001, "Ground"},
@@ -75,7 +112,21 @@ const MovementClass kMovementClasses[] = {
 
 }  // namespace
 
-uint16_t movement_no_flying_bit() { return 0x0200; }
+uint16_t movement_no_flying_bit() { return kNoFlying; }
+
+int movement_bit_count() {
+  return int(sizeof(kMovementBits) / sizeof(kMovementBits[0]));
+}
+
+int movement_bit_value(int index) {
+  if (index < 0 || index >= movement_bit_count()) return 0;
+  return kMovementBits[index].value;
+}
+
+const char* movement_bit_name(int index) {
+  if (index < 0 || index >= movement_bit_count()) return nullptr;
+  return kMovementBits[index].name;
+}
 
 int movement_class_count() {
   return int(sizeof(kMovementClasses) / sizeof(kMovementClasses[0]));

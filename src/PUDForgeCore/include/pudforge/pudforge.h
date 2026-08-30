@@ -838,6 +838,18 @@ PF_API unsigned pf_movement_colour(int value);
  */
 PF_API unsigned pf_movement_no_flying_bit(void);
 
+/**
+ * The bits a movement value is made of, under the game's own names.
+ *
+ * `SQ_LAND`, `SQ_WATER`, `SQ_UNPASSABLE` and the rest. Every value in 365 maps
+ * is a combination of these and nothing else, so a value the class list has no
+ * name for can still be read out bit by bit rather than shown as raw hex.
+ * Highest first, so a decomposition reads the way the word is written.
+ */
+PF_API int pf_movement_bit_count(void);
+PF_API unsigned pf_movement_bit_value(int index);
+PF_API const char *pf_movement_bit_name(int index);
+
 PF_API int pf_movement_class_count(void);
 PF_API int pf_movement_class_value(int index);
 PF_API const char *pf_movement_class_name(int index);

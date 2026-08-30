@@ -1440,6 +1440,57 @@ TEST(filling_a_terrain_with_itself_re_rolls_its_detail) {
   pf_tileset_art_free(art);
 }
 
+
+/**
+ * Every movement value is made of the named bits and nothing else.
+ *
+ * The names are the game's own, from its header, so this is the one part of
+ * the movement story that is not inference. What the test adds is that they
+ * are complete: no map anywhere sets a bit the table cannot name, so a value
+ * the class list has never seen can still be read out rather than shown as
+ * four hex digits.
+ */
+TEST(movement_values_are_made_of_named_bits) {
+  int named = 0;
+  for (int i = 0; i < pf_movement_bit_count(); i++) {
+    const unsigned bit = pf_movement_bit_value(i);
+    CHECK(pf_movement_bit_name(i) != nullptr);
+    // One bit each, and each named once.
+    CHECK(bit != 0 && (bit & (bit - 1)) == 0);
+    CHECK((unsigned(named) & bit) == 0);
+    named |= int(bit);
+  }
+  CHECK_EQ(named, 0x3fff);   // everything but the top two, which have no name
+
+  // Where the sense is. Coast is land nobody may build on; forest is land
+  // nobody may cross; the walls are one wall bit and a second that only one of
+  // them carries, which is why they are not a human bit and an orc bit.
+  CHECK_EQ(0x0011, 0x0001 | 0x0010);
+  CHECK_EQ(0x0081, 0x0001 | 0x0080);
+  CHECK_EQ(0x0089, 0x0001 | 0x0008 | 0x0080);
+  CHECK_EQ(0x008d, 0x0001 | 0x0004 | 0x0008 | 0x0080);
+  CHECK_EQ(0x0201, 0x0001 | int(pf_movement_no_flying_bit()));
+  CHECK_EQ(0x0f00, 0x0100 | 0x0200 | 0x0400 | 0x0800);
+
+  // And the claim that matters: every value any map holds comes apart into
+  // these. A bit the table cannot name would mean the names are incomplete.
+  if (!have_corpus()) { skip("no maps"); return; }
+  long tiles = 0, unnamed = 0;
+  for (const std::string& path : g_corpus) {
+    pf_status st = PF_OK;
+    pf_map* map = pf_map_open_file(path.c_str(), &st);
+    if (!map) continue;
+    const int w = pf_map_width(map), h = pf_map_height(map);
+    const uint16_t* mv = pf_map_movement(map);
+    for (int i = 0; i < w * h; i++) {
+      tiles++;
+      if (int(mv[i]) & ~named) unnamed++;
+    }
+    pf_map_free(map);
+  }
+  std::printf("     %ld tiles, %ld holding a bit with no name\n", tiles, unnamed);
+  CHECK_EQ(unnamed, 0);
+}
 }  // namespace pft
 
 TEST(an_edit_leaves_the_map_it_did_not_reach_alone) {
