@@ -69,13 +69,13 @@ uint32_t movement_colour(int value) {
     // darker with it, so the family is visible before the name is read; the
     // three named after a bit rather than an effect take colours of their own.
     case 0x0201: return 0x3f8f52;   // ground, no flying
-    case 0x0240: return 0x27489c;   // water, no flying
     case 0x0101: return 0x2f6b3e;   // ground, no walking
+    case 0x0301: return 0x1e4a2b;   // ground, nothing crosses
     case 0x0401: return 0x5c7f46;   // ground, no AI building
     case 0x0801: return 0x71904a;   // ground, no building
-    case 0x0021: return 0xd8a63c;   // ground, victory
-    case 0x1001: return 0x9c5fb0;   // ground, runes
-    case 0x2001: return 0xb05f7a;   // ground, trigger start
+    case 0x0240: return 0x27489c;   // water, no flying
+    case 0x0840: return 0x3a63b8;   // water, no building
+    case 0x0281: return 0x8f3f28;   // forest and rock, no flying
     default: return kUnknown;
   }
 }

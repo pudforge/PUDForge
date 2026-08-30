@@ -71,7 +71,9 @@ struct MovementClass {
 /// but one wall bit and a second that only one of them carries.
 ///
 /// Five bits are never set in any of those tiles — SQ_VICTORY, SQ_RUNES,
-/// TR_START and the top two, which have no name here at all.
+/// TR_START and the top two, which have no name here at all. The first three
+/// were painted on ground and taken into the game to see: nothing happened.
+/// They are named so a map holding one can be read, and offered nowhere.
 struct MovementBit {
   uint16_t value;
   const char* name;
@@ -99,25 +101,27 @@ const MovementClass kMovementClasses[] = {
     {0x0081, "Forest and rock"},
     {0x008d, "Human wall"},
     {0x0089, "Orc wall"},
-    // War2XE's two, in its own words. Then the combinations the bits allow and
-    // no map has ever held: a restriction bit added to ground, the way War2XE
-    // writes its own "no flying units" as 0x0201 rather than as 0x0200 alone.
+    // War2XE's two, in its own words. Then the combinations the four
+    // restriction bits allow, each added to a terrain rather than painted bare:
+    // a tile with neither SQ_LAND nor SQ_WATER is a bridge, and a restriction
+    // on a tile nothing can reach says nothing. War2XE writes its own "no
+    // flying units" the same way, as 0x0201 and not as 0x0200 alone.
     //
-    // Ground rather than bare, because a tile with neither SQ_LAND nor SQ_WATER
-    // is a bridge — nothing is stopped — and a restriction on a tile nothing
-    // can reach says nothing. These are offered so they can be tried; which of
-    // them the game acts on is not known here, and the last three are named
-    // after their bit rather than after an effect for that reason.
+    // SQ_VICTORY, SQ_RUNES and TR_START are deliberately not offered. Each was
+    // painted on ground and taken into the game, and nothing happened — they
+    // are scenario machinery the map alone cannot switch on, so a palette cell
+    // for them would be a cell that does nothing. The bits keep their names in
+    // the table below, because a map that holds one still has to be read.
     {0x0000, "Bridge"},
     {0x0f00, "Space"},
     {0x0201, "Ground, no flying"},
-    {0x0240, "Water, no flying"},
     {0x0101, "Ground, no walking"},
+    {0x0301, "Ground, nothing crosses"},
     {0x0401, "Ground, no AI building"},
     {0x0801, "Ground, no building"},
-    {0x0021, "Ground, victory"},
-    {0x1001, "Ground, runes"},
-    {0x2001, "Ground, trigger start"},
+    {0x0240, "Water, no flying"},
+    {0x0840, "Water, no building"},
+    {0x0281, "Forest and rock, no flying"},
 };
 
 }  // namespace

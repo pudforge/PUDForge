@@ -23,7 +23,7 @@ section therefore covers all the commits after the previous tag.
 `scripts/prep-release.ps1` collects those commits as a start. See
 `docs/releasing.md`.
 
-## 0.1.48
+## 0.1.49
 
 **New**
 
@@ -31,8 +31,7 @@ section therefore covers all the commits after the previous tag.
   paint them over any tile whatever is drawn there.
 - A Terrain and Movement switch at the foot of the terrain panel.
 - Eighteen movement values in the palette. Eight are the ones Blizzard's maps
-  use; the rest stop flying units, walking units, building, or everything, and
-  two of them are the values the game calls Victory and Runes.
+  use; the rest stop flying units, walking units, building, or everything.
 - The palette's last cell puts a tile back to what its terrain implies.
 - The movement brush shows its outline under the pointer, as the terrain brush
   does.
