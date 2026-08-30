@@ -428,6 +428,12 @@
 #define IDM_COLUMNS_SCALE     786
 
 /* The two bulk terrain edits, on the terrain panel as well as in Tools. */
+/// The two modes this panel paints in, at its foot: Terrain and Movement. On
+/// the panel rather than only in the View menu, because the panel is what
+/// changes between them — a person looking at the palette wondering where the
+/// terrains went is looking at the control that would have told them.
+#define IDC_PANEL_MODE_FIRST  802   /* +0 terrain, +1 movement */
+
 #define IDC_TERRAIN_REPLACE   800
 #define IDC_TERRAIN_DECORATE  801
 /// The strip of commands across the top. Its buttons carry the very command

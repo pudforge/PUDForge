@@ -438,6 +438,10 @@ std::vector<int> Editor::BrushPoints(int x, int y, int shape, double density) {
   return points;
 }
 
+int Editor::MovementBrushSize() const {
+  return BrushIsCorner() ? 1 : brush_size;
+}
+
 int Editor::MovementBrushValue() const {
   if (movement_class == kMovementFromTerrain) return -1;
   const int base = (movement_class >= 0 &&
@@ -457,7 +461,9 @@ int Editor::PaintMovementAt(int x, int y) {
   // the terrain on purpose.
   const int shape = brush_shape == kShapeFill ? PF_BRUSH_SQUARE : brush_shape;
   std::vector<int> points = BrushPoints(x, y, shape, pf_scatter_density());
-  if (points.empty()) SquareAround(x, y, brush_size, points);
+  // The corner rung marks an intersection rather than a tile, and this layer is
+  // one value per tile — so the smallest movement brush is a tile.
+  if (points.empty()) SquareAround(x, y, MovementBrushSize(), points);
 
   int changed = 0;
   for (size_t i = 0; i + 1 < points.size(); i += 2) {

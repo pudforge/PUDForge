@@ -175,7 +175,8 @@ it is.
 
 ## Movement mode
 
-**View ▸ Mode ▸ Movement** (M) paints the layer under the artwork: what may
+**View ▸ Mode ▸ Movement** (M), or the **Movement** button at the foot of the
+terrain panel, paints the layer under the artwork: what may
 walk, swim, sail or fly over each tile. The terrain palette becomes the eight
 movement values the game uses, in the colours the movement overlay draws them,
 and the overlay comes on while you are in the mode.

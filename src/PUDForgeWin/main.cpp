@@ -658,6 +658,21 @@ struct App : Host {
     Log::The().Add(full, warn);
   }
 
+  void OnPanelMode(Mode mode) override {
+    editor.SetMode(mode);
+    // The layer is invisible under the artwork, so entering the mode turns it
+    // on and leaving puts back whatever was on show. Painting what you cannot
+    // see is not a tool, it is a guess.
+    if (mode == Mode::kMovement) {
+      overlay_before_movement_ = editor.overlay;
+      editor.overlay = PF_OVERLAY_MOVEMENT;
+    } else if (editor.overlay == PF_OVERLAY_MOVEMENT) {
+      editor.overlay = overlay_before_movement_;
+    }
+    canvas.MarkMapChanged();
+    OnEditorChanged();
+  }
+
   void OnBulkEdit(BulkEdit which) override {
     std::wstring note;
     const bool changed =
@@ -1454,19 +1469,9 @@ struct App : Host {
       case IDM_VIEW_MODE_TERRAIN:
       case IDM_VIEW_MODE_UNITS:
       case IDM_VIEW_MODE_MOVEMENT:
-        editor.SetMode(id == IDM_VIEW_MODE_TERRAIN    ? Mode::kTerrain
-                       : id == IDM_VIEW_MODE_MOVEMENT ? Mode::kMovement
-                                                      : Mode::kUnit);
-        // The layer is invisible under the artwork, so entering the mode turns
-        // it on and leaving puts back whatever was on show. Painting what you
-        // cannot see is not a tool, it is a guess.
-        if (editor.mode() == Mode::kMovement) {
-          overlay_before_movement_ = editor.overlay;
-          editor.overlay = PF_OVERLAY_MOVEMENT;
-        } else if (editor.overlay == PF_OVERLAY_MOVEMENT) {
-          editor.overlay = overlay_before_movement_;
-        }
-        canvas.MarkMapChanged();
+        OnPanelMode(id == IDM_VIEW_MODE_TERRAIN    ? Mode::kTerrain
+                    : id == IDM_VIEW_MODE_MOVEMENT ? Mode::kMovement
+                                                   : Mode::kUnit);
         OnEditorChanged();
         return true;
 

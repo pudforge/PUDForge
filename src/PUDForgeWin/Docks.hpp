@@ -147,6 +147,10 @@ class TerrainPanel {
   /// Replace and Decorate are always here, because their scope is the map when
   /// there is no rectangle and so they mean something either way.
   HWND bulk_[2] = {};
+  /// Terrain and Movement, at the foot of the panel and shown in both modes.
+  /// The panel is the thing that changes between them, so it carries the
+  /// switch — the View menu has the same two items and the same keys.
+  HWND mode_[2] = {};
   HWND labels_[5] = {};   ///< Detail, Shape, Size, Mirror, Shade
   HWND brush_name_ = nullptr;     ///< what is selected, under the palette
   /// One tooltip for the panel, moved between controls as the pointer goes.

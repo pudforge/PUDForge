@@ -599,6 +599,11 @@ class Editor {
   /// four, so it combines instead of replacing.
   bool movement_no_flying = false;
 
+  /// The movement brush's reach in tiles. The corner rung is a mark on an
+  /// intersection, and this layer holds one value per tile, so it rounds up to
+  /// a tile rather than painting nothing.
+  int MovementBrushSize() const;
+
   /// The value the movement brush would lay, or -1 for the entry that takes
   /// whatever the terrain under each tile implies — to which the flag still
   /// applies, so it can be added to a tile without disturbing its class.

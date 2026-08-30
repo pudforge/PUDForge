@@ -641,13 +641,22 @@ void MapWindow::DrawOverlays(HDC dc) {
   // The pointer-following marks: brush outline when painting, footprint ghost
   // when placing - green where it may stand, red where it may not.
   if (!editor_->pasting() && hover_tx_ >= 0 && drag_ != Drag::kPan) {
-    if (editor_->mode() == Mode::kTerrain && editor_->tool() == Tool::kPaint) {
+    // The movement brush is the same brush, so it gets the same outline: it is
+    // the one mark that says what the next click covers, and painting a layer
+    // you cannot see needs it more than terrain does, not less.
+    const bool painting = editor_->tool() == Tool::kPaint ||
+                          editor_->tool() == Tool::kWalkable;
+    if (painting) {
+      const bool walkable = editor_->tool() == Tool::kWalkable;
       const int shape = editor_->brush_shape;
-      const int size = shape == Editor::kShapeFill ? 1 : editor_->brush_size;
+      const int size = shape == Editor::kShapeFill ? 1
+                       : walkable                  ? editor_->MovementBrushSize()
+                                                   : editor_->brush_size;
       // The corner brush marks an intersection, not a square, so it gets a small
       // box centred on the corner rather than an outline round a tile. Drawn
       // from the pointer's pixels for the same reason the paint is.
-      const bool corner = size == PF_BRUSH_SIZE_CORNER &&
+      // Never for the movement brush, which has no corner rung to mark.
+      const bool corner = !walkable && size == PF_BRUSH_SIZE_CORNER &&
                           shape != Editor::kShapeFill;
       if (corner) {
         int cx = 0, cy = 0;

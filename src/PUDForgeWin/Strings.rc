@@ -106,6 +106,13 @@ BEGIN
   IDS_HINT_MOVEMENT     "Drag to paint  Colours are the movement overlay"
   /* The shade row, asked again in movement mode. Two answers, not three: the
      bit is on or it is not. */
+  /* The panel's mode switch. The same two words the View menu uses, because
+     they are the same two modes. */
+  IDS_PANEL_MODE_TERRAIN "Terrain"
+  IDS_PANEL_MODE_MOVEMENT "Movement"
+  IDS_TIP_PANEL_TERRAIN  "Paint the ground itself: what the map is made of and what it looks like."
+  IDS_TIP_PANEL_MOVEMENT "Paint the layer under the artwork: what may walk, swim, sail or fly over each tile, whatever is drawn there."
+
   IDS_ROW_FLYING        "Flying"
   IDS_FLYING_ALLOWED    "Allowed"
   IDS_FLYING_BLOCKED    "Blocked"

@@ -403,6 +403,17 @@ void TerrainPanel::Build() {
   bulk_[1] = MakeButton(hwnd_, instance_, Str(IDS_BULK_DECORATE).c_str(),
                         IDC_TERRAIN_DECORATE, 0);
 
+  // Last of all, at the foot: which of the two the panel is painting in.
+  const UINT modes[] = {IDS_PANEL_MODE_TERRAIN, IDS_PANEL_MODE_MOVEMENT};
+  for (int i = 0; i < 2; i++) {
+    mode_[i] = MakeButton(hwnd_, instance_, Str(modes[i]).c_str(),
+                          IDC_PANEL_MODE_FIRST + i,
+                          BS_AUTORADIOBUTTON | BS_PUSHLIKE |
+                              (i == 0 ? WS_GROUP : 0));
+  }
+  Explain(mode_[0], IDS_TIP_PANEL_TERRAIN);
+  Explain(mode_[1], IDS_TIP_PANEL_MOVEMENT);
+
   const UINT tips[] = {
       IDS_TIP_DETAIL_PLAIN, IDS_TIP_DETAIL_MIXED, IDS_TIP_DETAIL_DETAIL,
       IDS_TIP_SHAPE_SQUARE, IDS_TIP_SHAPE_CIRCLE, IDS_TIP_SHAPE_SCATTER,
@@ -756,6 +767,13 @@ void TerrainPanel::Layout() {
   for (int i = 0; i < 2; i++) {
     place(bulk_[i], pad + bulk_w * i, y, bulk_w, row - 2);
   }
+  if (!movement) y += row;
+
+  // The mode switch under everything, in both modes, so it is in the same place
+  // whichever one you are in.
+  for (int i = 0; i < 2; i++) {
+    place(mode_[i], pad + bulk_w * i, y, bulk_w, row - 2);
+  }
   y += row;
 
   if (defer) EndDeferWindowPos(defer);
@@ -772,6 +790,15 @@ void TerrainPanel::OnCommand(int id) {
     Refresh();
     // The palette's cells draw the chosen shade, so they are now all wrong.
     if (palette_.hwnd()) InvalidateRect(palette_.hwnd(), nullptr, TRUE);
+  } else if (id >= IDC_PANEL_MODE_FIRST && id <= IDC_PANEL_MODE_FIRST + 1) {
+    // Through the host, not editor_->SetMode: entering movement mode turns the
+    // overlay on and leaving puts back what was there, and that is the
+    // application's to remember. The menu item does the same work.
+    if (host_) {
+      host_->OnPanelMode(id == IDC_PANEL_MODE_FIRST ? Mode::kTerrain
+                                                    : Mode::kMovement);
+    }
+    return;
   } else if (id >= IDC_FLYING_FIRST && id <= IDC_FLYING_FIRST + 1) {
     editor_->movement_no_flying = id == IDC_FLYING_FIRST + 1;
     ArmTheBrush();
@@ -902,6 +929,8 @@ void TerrainPanel::Refresh() {
   for (HWND control : flying_) ShowWindow(control, movement ? SW_SHOW : SW_HIDE);
   SetWindowTextW(labels_[4],
                  Str(movement ? IDS_ROW_FLYING : IDS_ROW_SHADE).c_str());
+  Button_SetCheck(mode_[0], !movement);
+  Button_SetCheck(mode_[1], movement);
   Button_SetCheck(flying_[0], !editor_->movement_no_flying);
   Button_SetCheck(flying_[1], editor_->movement_no_flying);
 

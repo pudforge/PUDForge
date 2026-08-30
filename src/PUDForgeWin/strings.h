@@ -514,6 +514,12 @@
 #define IDS_MOVE_FROM_TERRAIN      1863
 /* The status bar in movement mode: which tool is in hand, and its chords. */
 /* The shade row's other question, asked in movement mode. */
+/* The panel's own mode switch, at its foot. */
+#define IDS_PANEL_MODE_TERRAIN     1871
+#define IDS_PANEL_MODE_MOVEMENT    1872
+#define IDS_TIP_PANEL_TERRAIN      1873
+#define IDS_TIP_PANEL_MOVEMENT     1874
+
 #define IDS_ROW_FLYING             1866
 #define IDS_FLYING_ALLOWED         1867
 #define IDS_FLYING_BLOCKED         1868
