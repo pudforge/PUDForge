@@ -3368,13 +3368,23 @@ inline uint32_t pack_rgb(uint32_t rgb) {
 
 /// Mix two packed colours; `t` is how much of `b`.
 inline uint32_t blend_px(uint32_t a, uint32_t b, double t) {
-  const auto mix = [t](uint32_t x, uint32_t y) {
-    return uint32_t(std::lround(double(x) + (double(y) - double(x)) * t));
-  };
-  return 0xff000000u
-       | (mix((a >> 16) & 0xff, (b >> 16) & 0xff) << 16)
-       | (mix((a >> 8) & 0xff, (b >> 8) & 0xff) << 8)
-       | mix(a & 0xff, b & 0xff);
+  // Two channels at a time in integers, not three through std::lround.
+  //
+  // An overlay tints every pixel of the view: 2.7 million of them for a
+  // maximised window, and three lround calls apiece made one frame take 80 ms.
+  // That is ten frames a second while the pointer moves, which is what
+  // "choppy" was. The same arithmetic in fixed point is under a millisecond.
+  //
+  // Red and blue sit in alternate byte lanes and green in its own, so each pair
+  // multiplies without carrying into the other: the widest either can reach is
+  // 0x00ff00ff * 256, which still fits.
+  const uint32_t w = uint32_t(t * 256.0 + 0.5);
+  const uint32_t v = 256u - w;
+  const uint32_t rb = ((((a & 0x00ff00ffu) * v + (b & 0x00ff00ffu) * w) >> 8) &
+                       0x00ff00ffu);
+  const uint32_t g = ((((a & 0x0000ff00u) * v + (b & 0x0000ff00u) * w) >> 8) &
+                      0x0000ff00u);
+  return 0xff000000u | rb | g;
 }
 
 /// Golden-ratio hue stepping: adjacent labels land far apart in colour. Region
@@ -3668,10 +3678,21 @@ int pf_map_compose_region(const pf_map* map, const pf_render_options* o,
             ? pack_rgb(pf::movement_colour(value))
             : hsv_packed(std::fmod(double(value) * 137.508, 360.0), 0.75, 1.0);
 
+        // Fixed point, hoisted out of the pixel loop: the tint and the weight
+        // are the same for all 1,024 pixels of the tile.
+        const uint32_t w = 141u;                  // 0.55 of 256
+        const uint32_t v = 256u - w;
+        const uint32_t trb = (tint & 0x00ff00ffu) * w;
+        const uint32_t tg = (tint & 0x0000ff00u) * w;
         const int ox = col * pf::kTilePx, oy = row * pf::kTilePx;
         for (int y = 0; y < pf::kTilePx; y++) {
           uint32_t* dst = out + size_t(oy + y) * size_t(width) + size_t(ox);
-          for (int x = 0; x < pf::kTilePx; x++) dst[x] = blend_px(dst[x], tint, 0.55);
+          for (int x = 0; x < pf::kTilePx; x++) {
+            const uint32_t p = dst[x];
+            dst[x] = 0xff000000u |
+                     (((((p & 0x00ff00ffu) * v + trb) >> 8) & 0x00ff00ffu)) |
+                     (((((p & 0x0000ff00u) * v + tg) >> 8) & 0x0000ff00u));
+          }
         }
         // An override is the only reason to look at the movement layer, so it
         // is marked rather than merely tinted: a corner no ordinary tile has.

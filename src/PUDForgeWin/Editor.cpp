@@ -478,7 +478,12 @@ int Editor::PaintMovementAt(int x, int y) {
       int value = want >= 0 ? want : pf_tile_movement(pf_map_tile_at(map_, tx, ty));
       if (want < 0 && movement_no_flying) value |= int(pf_movement_no_flying_bit());
       if (value < 0 || pf_map_movement_at(map_, tx, ty) == value) continue;
-      if (pf_map_set_movement(map_, tx, ty, value) == PF_OK) changed++;
+      if (pf_map_set_movement(map_, tx, ty, value) != PF_OK) continue;
+      // Say which tiles moved, so the canvas recomposes those rather than the
+      // whole visible region. Without it every dab of a 17-tile brush redrew
+      // the view, overlay and all.
+      MarkPainted(tx, ty, 1);
+      changed++;
     }
   }
   if (changed) Bump();

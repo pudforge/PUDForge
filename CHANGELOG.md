@@ -23,7 +23,7 @@ section therefore covers all the commits after the previous tag.
 `scripts/prep-release.ps1` collects those commits as a start. See
 `docs/releasing.md`.
 
-## 0.1.45
+## 0.1.46
 
 **New**
 
@@ -42,6 +42,8 @@ section therefore covers all the commits after the previous tag.
 
 - Movement you paint by hand survives a terrain edit over the same tile. The
   editor rewrote it from the terrain.
+- The map draws about a hundred times faster with an overlay on. Painting and
+  zooming were choppy.
 
 ## 0.1.40
 
