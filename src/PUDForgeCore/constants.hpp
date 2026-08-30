@@ -228,6 +228,13 @@ enum UnitDomain {
 /// works before one is open and for maps with no UDTA of their own.
 UnitDomain default_unit_domain(int unit_id);
 
+/// Whether a painted movement value lets this kind of unit stand on the tile,
+/// and whether it lets anything be built there. Only consulted for a tile whose
+/// value is not the one its terrain implies; see the override for why.
+bool movement_allows(uint16_t sq, UnitDomain domain);
+bool movement_allows_building(uint16_t sq);
+
+
 /// Footprint from the retail defaults, for maps carrying no UDTA.
 void default_unit_footprint(int unit_id, int& w, int& h);
 

@@ -875,6 +875,15 @@ PF_API int pf_movement_class_offered(int index);
 PF_API int pf_movement_class_of(int value);
 
 /**
+ * Whether a movement value lets a unit of this domain (`pf_unit_domain`) stand
+ * on the tile, and whether it lets anything be built there. Placement asks
+ * these of a tile whose value somebody painted; where the value is the one the
+ * terrain implies, the quadrant rules decide instead.
+ */
+PF_API int pf_movement_allows(int movement, int domain);
+PF_API int pf_movement_allows_building(int movement);
+
+/**
  * Decode a tile into its four quadrant terrains, in the order
  * top-left, top-right, bottom-left, bottom-right. `out` must hold 4 bytes.
  */

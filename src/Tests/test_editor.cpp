@@ -35,6 +35,164 @@ int brush_for(int terrain) {
   return -1;
 }
 
+/**
+ * A tile painted walkable takes a walker, whatever the artwork says.
+ *
+ * The point of the movement layer is that the drawing stops being the
+ * authority, so placement has to read the layer and not the quadrants. Water
+ * painted 0x0000 - land and water at once - is the case the release notes
+ * lead with.
+ */
+TEST(painted_movement_decides_what_may_stand_there) {
+  pf_map* map = blank();
+  Editor ed(map);
+
+  // A lake, which a footman may not stand in.
+  ed.SetMode(pfwin::Mode::kTerrain);
+  ed.brush_index = brush_for(PF_TERRAIN_WATER_LIGHT);
+  CHECK(ed.brush_index >= 0);
+  ed.brush_size = 9;
+  ed.BeginStroke();
+  CHECK(ed.PaintAt(30, 30));
+  ed.EndStroke();
+  ed.placing_type = 0;   // footman
+  CHECK_EQ(ed.PlaceUnit(30, 30), -1);
+
+  // Paint one tile of it land and water at once, and he may.
+  ed.SetMode(pfwin::Mode::kMovement);
+  ed.brush_size = 1;
+  ed.movement_value = 0x0000;
+  ed.BeginStroke();
+  CHECK_EQ(ed.PaintMovementAt(30, 30), 1);
+  ed.EndStroke();
+  ed.SetMode(pfwin::Mode::kUnit);
+  ed.placing_type = 0;
+  CHECK(ed.PlaceUnit(30, 30) >= 0);
+
+  // And a ship still may too, because that value declares neither.
+  ed.placing_type = 0x1e;   // Elven Destroyer, 2x2, so give it four tiles
+  ed.SetMode(pfwin::Mode::kMovement);
+  ed.BeginStroke();
+  for (int y = 40; y < 42; y++) {
+    for (int x = 40; x < 42; x++) CHECK_EQ(ed.PaintMovementAt(x, y), 1);
+  }
+  ed.EndStroke();
+  ed.SetMode(pfwin::Mode::kUnit);
+  CHECK(ed.PlaceUnit(40, 40) >= 0);
+  pf_map_free(map);
+}
+
+/**
+ * Reset takes the permission away again.
+ *
+ * The palette's first cell puts a tile back to what its terrain implies, and a
+ * unit standing there on the strength of a painted value has to stop being
+ * legal when the value goes - otherwise the layer is a one-way door.
+ */
+TEST(resetting_movement_takes_back_what_it_allowed) {
+  pf_map* map = blank();
+  Editor ed(map);
+  ed.SetMode(pfwin::Mode::kTerrain);
+  ed.brush_index = brush_for(PF_TERRAIN_WATER_LIGHT);
+  ed.brush_size = 9;
+  ed.BeginStroke();
+  CHECK(ed.PaintAt(30, 30));
+  ed.EndStroke();
+
+  ed.SetMode(pfwin::Mode::kMovement);
+  ed.brush_size = 1;
+  ed.movement_value = 0x0000;
+  ed.BeginStroke();
+  CHECK_EQ(ed.PaintMovementAt(30, 30), 1);
+  ed.EndStroke();
+  CHECK_EQ(pf_map_placement_check(map, 30, 30, 0), PF_PLACE_OK);
+
+  // -1 is the palette's Reset cell.
+  ed.movement_value = -1;
+  ed.BeginStroke();
+  CHECK_EQ(ed.PaintMovementAt(30, 30), 1);
+  ed.EndStroke();
+  CHECK_EQ(pf_map_movement_at(map, 30, 30),
+           pf_tile_movement(pf_map_tile_at(map, 30, 30)));
+  CHECK(pf_map_placement_check(map, 30, 30, 0) != PF_PLACE_OK);
+  pf_map_free(map);
+}
+
+/**
+ * Painting a tile shut strands whoever is standing on it.
+ *
+ * Terrain painting has always swept up the units its stroke stranded; the
+ * movement brush changes the same fact about a tile by another route, so it
+ * ends a stroke the same way. Only what this stroke stranded, which is why the
+ * unit painted around rather than over survives.
+ */
+TEST(painting_movement_shut_removes_the_units_it_strands) {
+  pf_map* map = blank();
+  Editor ed(map);
+  ed.placing_type = 0;   // footman
+  const int doomed = ed.PlaceUnit(10, 10);
+  const int spared = ed.PlaceUnit(40, 40);
+  CHECK(doomed >= 0);
+  CHECK(spared >= 0);
+  CHECK_EQ(pf_map_unit_count(map), 2);
+
+  ed.SetMode(pfwin::Mode::kMovement);
+  ed.brush_size = 1;
+  ed.movement_value = 0x0281;   // no walking or flying
+  ed.BeginStroke();
+  CHECK_EQ(ed.PaintMovementAt(10, 10), 1);
+  CHECK_EQ(ed.EndStroke(), 1);
+
+  CHECK_EQ(pf_map_unit_count(map), 1);
+  pf_unit left{};
+  CHECK_EQ(pf_map_unit(map, 0, &left), PF_OK);
+  CHECK_EQ(int(left.x), 40);
+
+  // With the option off the map keeps them, which is the same switch terrain
+  // painting obeys.
+  Editor keep(map);
+  keep.keep_stranded_units = true;
+  keep.placing_type = 0;
+  CHECK(keep.PlaceUnit(20, 20) >= 0);
+  keep.SetMode(pfwin::Mode::kMovement);
+  keep.brush_size = 1;
+  keep.movement_value = 0x0281;
+  keep.BeginStroke();
+  CHECK_EQ(keep.PaintMovementAt(20, 20), 1);
+  CHECK_EQ(keep.EndStroke(), 0);
+  CHECK_EQ(pf_map_unit_count(map), 2);
+  pf_map_free(map);
+}
+
+/**
+ * The no-flying bit refuses a flier and nobody else.
+ *
+ * Fliers were let through placement without a look at the tile, because
+ * terrain cannot stop one. A painted tile can.
+ */
+TEST(no_flying_refuses_only_the_things_that_fly) {
+  pf_map* map = blank();
+  Editor ed(map);
+  ed.SetMode(pfwin::Mode::kMovement);
+  ed.brush_size = 1;
+  ed.movement_value = 0x0201;   // ground, no flying
+  ed.BeginStroke();
+  for (int y = 30; y < 32; y++) {
+    for (int x = 30; x < 32; x++) CHECK_EQ(ed.PaintMovementAt(x, y), 1);
+  }
+  ed.EndStroke();
+
+  int flier = -1;
+  for (int i = 0; i < PF_UNIT_COUNT; i++) {
+    if (pf_unit_domain(i) == 2) { flier = i; break; }
+  }
+  CHECK(flier >= 0);
+  CHECK_EQ(pf_map_placement_check(map, 30, 30, flier), PF_PLACE_BLOCKED);
+  // The footman walks over it, because that value is ground with one bit added.
+  CHECK_EQ(pf_map_placement_check(map, 30, 30, 0), PF_PLACE_OK);
+  pf_map_free(map);
+}
+
 }  // namespace
 
 TEST(stroke_is_one_undo_step) {

@@ -1455,7 +1455,10 @@ void MapWindow::EndEditDrag() {
       host_->OnMapEdited();
     }
   } else if (drag_ == Drag::kPaint || drag_ == Drag::kSpray) {
-    if (editor_->tool() == Tool::kPaint) {
+    // The movement brush ends a stroke the same way. Painting a tile shut is a
+    // reason for a unit to be stranded exactly as painting rock over it is, and
+    // the check that finds them reads the movement layer now.
+    if (editor_->tool() == Tool::kPaint || editor_->tool() == Tool::kWalkable) {
       const int stranded = editor_->EndStroke();
       if (host_) {
         if (stranded > 0) {

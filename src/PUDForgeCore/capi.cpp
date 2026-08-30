@@ -1427,6 +1427,17 @@ int pf_movement_class_count(void) { return pf::movement_class_count(); }
 int pf_movement_class_value(int index) { return pf::movement_class_value(index); }
 const char* pf_movement_class_name(int index) { return pf::movement_class_name(index); }
 int pf_movement_class_offered(int i) { return pf::movement_class_offered(i) ? 1 : 0; }
+int pf_movement_allows(int movement, int domain) {
+  if (movement < 0 || movement > 0xffff) return 0;
+  if (domain < 0 || domain > 3) return 0;
+  return pf::movement_allows(uint16_t(movement), pf::UnitDomain(domain)) ? 1 : 0;
+}
+
+int pf_movement_allows_building(int movement) {
+  if (movement < 0 || movement > 0xffff) return 0;
+  return pf::movement_allows_building(uint16_t(movement)) ? 1 : 0;
+}
+
 int pf_movement_class_of(int value) { return pf::movement_class_of(value); }
 
 void pf_tile_quadrants(uint16_t tile, uint8_t* out) {
@@ -2228,6 +2239,19 @@ int pf_map_placement_check(const pf_map* map, int x, int y, int type) {
     return PF_PLACE_OFF_GRID;
   }
 
+  // A tile whose movement value somebody painted answers for itself. The
+  // quadrant rules below read the artwork, and the movement layer exists
+  // precisely so the artwork stops being the last word: a water tile painted
+  // walkable has to take a footman, and grass painted shut has to refuse one.
+  // Where the value is the one the terrain implies there is nothing to say, so
+  // the quadrant rules keep the cases they know better - which side of a
+  // shoreline a shipyard sits on, a coast tile against the water beside it.
+  auto painted = [&m](int tx, int ty) -> int {
+    const size_t i = size_t(ty) * size_t(m.width()) + size_t(tx);
+    const uint16_t sq = m.movement()[i];
+    return sq == pf::tile_movement(m.tiles()[i]) ? -1 : int(sq);
+  };
+
   const pf::UnitDomain domain = pf::default_unit_domain(type);
   const uint32_t flags = pf_unit_flags(type);
   // Only land buildings. Oil patches and platforms carry the building flag too
@@ -2244,8 +2268,16 @@ int pf_map_placement_check(const pf_map* map, int x, int y, int type) {
   // both water and coast, and not one is inland.
   if (building_flag && shore) {
     bool any_water = false, any_coast = false, any_blocked = false;
+    bool any_painted = false, any_unpainted = false;
     for (int ty = y; ty < y + fh; ty++) {
       for (int tx = x; tx < x + fw; tx++) {
+        const int sq = painted(tx, ty);
+        if (sq >= 0) {
+          if (!pf::movement_allows_building(uint16_t(sq))) return PF_PLACE_NEEDS_GROUND;
+          any_painted = true;
+          continue;
+        }
+        any_unpainted = true;
         uint8_t q[4];
         pf::decode_tile(m.tile_at(tx, ty), q);
         for (int i = 0; i < 4; i++) {
@@ -2255,6 +2287,11 @@ int pf_map_placement_check(const pf_map* map, int x, int y, int type) {
                          q[i] == pf::kWallHuman || q[i] == pf::kWallOrc;
         }
       }
+    }
+    if (any_painted) {
+      // Painted tiles carry no shoreline to straddle, so the requirement can
+      // only be read off the ones still saying what their terrain says.
+      if (!any_unpainted) return PF_PLACE_OK;
     }
     if (any_blocked) return PF_PLACE_BLOCKED;
     if (!any_water || !any_coast) return PF_PLACE_NEEDS_SHORE;
@@ -2266,6 +2303,11 @@ int pf_map_placement_check(const pf_map* map, int x, int y, int type) {
     m.unit_footprint(type, fw2, fh2);
     for (int ty = y; ty < y + fh2; ty++) {
       for (int tx = x; tx < x + fw2; tx++) {
+        const int sq = painted(tx, ty);
+        if (sq >= 0) {
+          if (!pf::movement_allows_building(uint16_t(sq))) return PF_PLACE_NEEDS_GROUND;
+          continue;
+        }
         uint8_t q[4];
         pf::decode_tile(m.tile_at(tx, ty), q);
         for (int i = 0; i < 4; i++) {
@@ -2297,12 +2339,30 @@ int pf_map_placement_check(const pf_map* map, int x, int y, int type) {
     return PF_PLACE_OK;
   }
 
-  if (domain == pf::kDomainAir || domain == pf::kDomainAny) return PF_PLACE_OK;
+  // Fliers cross anything the terrain can hold, so only a painted tile can
+  // refuse one, and only SQ_MAN_AIR does it.
+  if (domain == pf::kDomainAir || domain == pf::kDomainAny) {
+    for (int ty = y; ty < y + fh; ty++) {
+      for (int tx = x; tx < x + fw; tx++) {
+        const int sq = painted(tx, ty);
+        if (sq >= 0 && !pf::movement_allows(uint16_t(sq), domain)) {
+          return PF_PLACE_BLOCKED;
+        }
+      }
+    }
+    return PF_PLACE_OK;
+  }
 
   // Every tile of the footprint must suit the unit. A quadrant is water when
   // it is one of the two water classes; anything else is standable ground.
   for (int ty = y; ty < y + fh; ty++) {
     for (int tx = x; tx < x + fw; tx++) {
+      const int sq = painted(tx, ty);
+      if (sq >= 0) {
+        if (pf::movement_allows(uint16_t(sq), domain)) continue;
+        if (domain == pf::kDomainWater) return PF_PLACE_NEEDS_WATER;
+        return (sq & 0x0040) ? PF_PLACE_NEEDS_LAND : PF_PLACE_BLOCKED;
+      }
       uint8_t q[4];
       pf::decode_tile(m.tile_at(tx, ty), q);
       bool any_water = false, any_land = false, any_blocked = false;

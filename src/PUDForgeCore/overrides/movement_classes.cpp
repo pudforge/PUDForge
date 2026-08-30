@@ -85,6 +85,11 @@ struct MovementBit {
 };
 
 constexpr uint16_t kNoFlying = 0x0200;
+constexpr uint16_t kUnpassable = 0x0080;
+constexpr uint16_t kWater = 0x0040;
+constexpr uint16_t kUnbuildable = 0x0010;
+constexpr uint16_t kBuilding = 0x0800;
+constexpr uint16_t kLand = 0x0001;
 
 const MovementBit kMovementBits[] = {
     {0x2000, "TR_START"},        {0x1000, "SQ_RUNES"},
@@ -188,6 +193,36 @@ int movement_class_of(int value) {
     if (kMovementClasses[i].value == value) return i;
   }
   return -1;
+}
+
+// What a painted movement value lets stand on the tile.
+//
+// SQ_UNPASSABLE stops a walker and nothing else, SQ_MAN_AIR stops a flier, and
+// the rest of the low byte says which of land and water the tile is - a tile
+// declaring neither is both. That reproduces the terrain values: 0x0001
+// walkable and not floatable, 0x0040 the reverse, 0x0000 both.
+//
+// UNPASSABLE reads as though it stopped everything, and does not. Every one of
+// the 53 unit tiles in the corpus holding 0x0082, shore mostly water, carries a
+// hull - so the bit that keeps a footman out of the trees is the same bit a
+// ship ignores. Held to 84,365 unit tiles by
+// units_in_real_maps_suit_their_own_movement, which is also what caught the
+// stronger reading.
+//
+// Only asked about a tile somebody painted. Where the value is the one the
+// terrain implies, the quadrant rules decide instead: they know things one word
+// per tile cannot, such as which side of a shoreline a shipyard sits on.
+bool movement_allows(uint16_t sq, UnitDomain domain) {
+  switch (domain) {
+    case kDomainLand: return !(sq & (kUnpassable | kWater));
+    case kDomainWater: return !(sq & kLand);
+    case kDomainAir: return !(sq & kNoFlying);
+    default: return true;
+  }
+}
+
+bool movement_allows_building(uint16_t sq) {
+  return !(sq & (kUnpassable | kUnbuildable | kBuilding));
 }
 
 }  // namespace pf

@@ -2,6 +2,8 @@
 //
 // See harness.hpp for the assertions, fixtures and registration.
 
+#include <map>
+
 #include "harness.hpp"
 #include "../PUDForgeCore/noise.hpp"
 #include "../PUDForgeCore/view.hpp"
@@ -1511,6 +1513,78 @@ TEST(movement_values_are_made_of_named_bits) {
   std::printf("     %ld tiles, %ld holding a bit with no name\n", tiles, unnamed);
   CHECK_EQ(unnamed, 0);
 }
+
+// The reading of the movement bits that placement now leans on, held against
+// every unit in every real map. If SQ_UNPASSABLE and SQ_WATER are what stop a
+// walker and SQ_LAND is what stops a hull, then no unit the game shipped can be
+// standing somewhere its own tile forbids — so a violation here is the model
+// being wrong, not the map.
+//
+// Asserted only over the maps the game's own editor wrote, which are the ones
+// whose REGM uses the 0xfffa shore sentinel. The rest are measured and printed:
+// a community map can hold a placement the game would refuse, and one of them
+// does - a single Orc Cannon Tower standing in the trees in My_Map.pud, four
+// tiles of the 84,365.
+//
+// Reported per value rather than summed, because a single bad value hiding in a
+// pass rate is exactly how the earlier guesses about SQ_MAN survived.
+TEST(units_in_real_maps_suit_their_own_movement) {
+  if (pft::g_corpus.empty()) { skip("no corpus"); return; }
+  std::map<uint16_t, std::pair<long long, long long>> tally;  // value -> {seen, bad}
+  long long units = 0, bad = 0, other_units = 0, other_bad = 0;
+  for (const std::string& path : pft::g_corpus) {
+    pf_map* m = pf_map_open_file(path.c_str(), nullptr);
+    if (!m) continue;
+    const int w = pf_map_width(m), h = pf_map_height(m);
+    const uint16_t* mv = pf_map_movement(m);
+    const int count = pf_map_unit_count(m);
+    const uint16_t* regions = pf_map_regions(m);
+    bool game_editor = false;
+    for (int i = 0; regions && i < w * h; i++) {
+      if (regions[i] == 0xfffa) { game_editor = true; break; }
+    }
+    for (int u = 0; u < count; u++) {
+      pf_unit info{};
+      if (pf_map_unit(m, u, &info) != PF_OK) continue;
+      const int domain = pf_unit_domain(info.type);
+      if (domain == 2 || domain == 3) continue;   // air and markers go anywhere
+      int fw = 1, fh = 1;
+      pf_map_unit_footprint(m, info.type, &fw, &fh);
+      for (int ty = info.y; ty < info.y + fh; ty++) {
+        for (int tx = info.x; tx < info.x + fw; tx++) {
+          if (tx < 0 || ty < 0 || tx >= w || ty >= h) continue;
+          const uint16_t sq = mv[size_t(ty) * size_t(w) + size_t(tx)];
+          const bool ok = pf_movement_allows(sq, domain) != 0;
+          if (!game_editor) {
+            other_units++;
+            if (!ok) other_bad++;
+            continue;
+          }
+          auto& cell = tally[sq];
+          cell.first++;
+          units++;
+          if (!ok) {
+            cell.second++;
+            bad++;
+            if (bad <= 12) {
+              std::printf("       %s: %s (domain %d) at %d,%d on 0x%04x\n",
+                          path.c_str(), pf_unit_name(info.type), domain, tx, ty, sq);
+            }
+          }
+        }
+      }
+    }
+    pf_map_free(m);
+  }
+  std::printf("     %lld unit tiles by the game's editor, %lld their own movement forbids;"
+              " elsewhere %lld of %lld\n", units, bad, other_bad, other_units);
+  for (const auto& kv : tally) {
+    if (!kv.second.second) continue;
+    std::printf("       0x%04x: %lld of %lld\n", kv.first, kv.second.second, kv.second.first);
+  }
+  CHECK_EQ(bad, 0);
+}
+
 }  // namespace pft
 
 TEST(an_edit_leaves_the_map_it_did_not_reach_alone) {
