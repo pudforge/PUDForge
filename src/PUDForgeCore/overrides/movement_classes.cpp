@@ -117,7 +117,6 @@ const MovementClass kMovementClasses[] = {
     {0x0201, "Ground, no flying"},
     {0x0101, "Ground, no walking"},
     {0x0301, "Ground, nothing crosses"},
-    {0x0401, "Ground, no AI building"},
     {0x0801, "Ground, no building"},
     {0x0240, "Water, no flying"},
     {0x0840, "Water, no building"},

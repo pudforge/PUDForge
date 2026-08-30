@@ -3681,21 +3681,17 @@ int pf_map_compose_region(const pf_map* map, const pf_render_options* o,
             ? pack_rgb(pf::movement_colour(value))
             : hsv_packed(std::fmod(double(value) * 137.508, 360.0), 0.75, 1.0);
 
-        // Fixed point, hoisted out of the pixel loop: the tint and the weight
-        // are the same for all 1,024 pixels of the tile.
-        const uint32_t w = 141u;                  // 0.55 of 256
-        const uint32_t v = 256u - w;
-        const uint32_t trb = (tint & 0x00ff00ffu) * w;
-        const uint32_t tg = (tint & 0x0000ff00u) * w;
+        // The colour itself, not a tint of it. A palette cell and the tiles it
+        // paints have to be the same colour or the palette is a legend for
+        // something else: at 55% over artwork the same value came out one green
+        // on grass and another on snow, and no two cells could be told apart on
+        // sight. The artwork is what the other layers are for, and the grid and
+        // the units are still drawn over this.
+        const uint32_t solid = 0xff000000u | tint;
         const int ox = col * pf::kTilePx, oy = row * pf::kTilePx;
         for (int y = 0; y < pf::kTilePx; y++) {
           uint32_t* dst = out + size_t(oy + y) * size_t(width) + size_t(ox);
-          for (int x = 0; x < pf::kTilePx; x++) {
-            const uint32_t p = dst[x];
-            dst[x] = 0xff000000u |
-                     (((((p & 0x00ff00ffu) * v + trb) >> 8) & 0x00ff00ffu)) |
-                     (((((p & 0x0000ff00u) * v + tg) >> 8) & 0x0000ff00u));
-          }
+          for (int x = 0; x < pf::kTilePx; x++) dst[x] = solid;
         }
         // An override is the only reason to look at the movement layer, so it
         // is marked rather than merely tinted: a corner no ordinary tile has.

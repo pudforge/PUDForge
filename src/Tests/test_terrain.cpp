@@ -502,11 +502,11 @@ TEST(movement_follows_the_tiles_it_is_painted_from) {
   // SQM is very nearly a function of the tile. Across the shipped maps, 1268
   // tiles disagree with the table it is derived from — 236 out of 6,975,488. So the table has to agree
   // with the corpus almost everywhere, and painting has to keep it that way.
-  // Eighteen: the eight the shipped maps use, then Bridge and Space from
-  // War2XE, then eight combinations the bits allow and nothing has ever
+  // Seventeen: the eight the shipped maps use, then Bridge and Space from
+  // War2XE, then seven combinations the bits allow and nothing has ever
   // written. The eight come first, so an index into them still means what it
   // always did.
-  CHECK_EQ(pf_movement_class_count(), 18);
+  CHECK_EQ(pf_movement_class_count(), 17);
   for (int i = 0; i < pf_movement_class_count(); i++) {
     const int value = pf_movement_class_value(i);
     // Bridge is 0x0000 — the value that stops nothing — so a class value may
