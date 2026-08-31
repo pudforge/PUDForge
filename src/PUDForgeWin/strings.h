@@ -587,6 +587,9 @@
 #define IDS_REPORT_FAILED         1889
 #define IDS_REPORT_EMPTY          1890
 #define IDS_REPORT_TITLE          1891
+/* The success dialog, which is a task dialog so the link can be clicked. */
+#define IDS_REPORT_SENT_MAIN      1892
+#define IDS_REPORT_SENT_FOLLOW    1893
 
 // ------------------------------------------------------ restrictions, redux
 /* 1800 and 1801 said which of the two states the map was in, for a read-only

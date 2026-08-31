@@ -12,6 +12,8 @@
 
 #include "Report.hpp"
 
+#include <commctrl.h>
+#include <shellapi.h>
 #include <winhttp.h>
 
 #include <string>
@@ -168,6 +170,54 @@ bool Post(const std::string& body, std::wstring& answer) {
   return sent;
 }
 
+/// The task dialog's own callback, so a clicked link opens.
+///
+/// A hyperlink in a task dialog is not a control that does anything by itself.
+/// The dialog reports the click and the program decides; which is the right way
+/// round, because "open this in a browser" is a decision and not a side effect.
+HRESULT CALLBACK ReportLinkProc(HWND, UINT message, WPARAM, LPARAM lparam,
+                                LONG_PTR) {
+  if (message == TDN_HYPERLINK_CLICKED) {
+    ShellExecuteW(nullptr, L"open", reinterpret_cast<const wchar_t*>(lparam),
+                  nullptr, nullptr, SW_SHOWNORMAL);
+  }
+  return S_OK;
+}
+
+/// Say it worked, with the issue's address as something to click.
+///
+/// A message box would show the same URL as dead text, and an address somebody
+/// has to retype is an address nobody visits. A task dialog carries links, so
+/// this is one.
+void SaySent(HWND owner, const std::wstring& url) {
+  // The anchor is markup rather than prose, so it is built here; the sentences
+  // around it are in the string table where a translator can reach them.
+  const std::wstring content =
+      Str(IDS_REPORT_SENT_FOLLOW) + L"\n<a href=\"" + url + L"\">" + url + L"</a>";
+  const std::wstring title = Str(IDS_REPORT_TITLE);
+  const std::wstring main = Str(IDS_REPORT_SENT_MAIN);
+
+  TASKDIALOGCONFIG config = {};
+  config.cbSize = sizeof(config);
+  config.hwndParent = owner;
+  config.dwFlags = TDF_ENABLE_HYPERLINKS | TDF_ALLOW_DIALOG_CANCELLATION;
+  config.dwCommonButtons = TDCBF_OK_BUTTON;
+  config.pszWindowTitle = title.c_str();
+  config.pszMainIcon = TD_INFORMATION_ICON;
+  config.pszMainInstruction = main.c_str();
+  config.pszContent = content.c_str();
+  config.pfCallback = ReportLinkProc;
+  config.lpCallbackData = reinterpret_cast<LONG_PTR>(url.c_str());
+
+  // Falls back to a message box if the task dialog cannot be had - an old
+  // comctl32, or a manifest that did not take. The link is not clickable then,
+  // which is worse but not useless.
+  if (FAILED(TaskDialogIndirect(&config, nullptr, nullptr, nullptr))) {
+    MessageBoxW(owner, Format(IDS_REPORT_SENT, url.c_str()).c_str(),
+                title.c_str(), MB_OK | MB_ICONINFORMATION);
+  }
+}
+
 INT_PTR CALLBACK ReportProc(HWND dialog, UINT message, WPARAM wparam, LPARAM) {
   switch (message) {
     case WM_INITDIALOG: {
@@ -217,8 +267,7 @@ INT_PTR CALLBACK ReportProc(HWND dialog, UINT message, WPARAM wparam, LPARAM) {
       EnableWindow(GetDlgItem(dialog, IDCANCEL), TRUE);
 
       if (sent) {
-        MessageBoxW(dialog, Format(IDS_REPORT_SENT, answer.c_str()).c_str(),
-                    Str(IDS_REPORT_TITLE).c_str(), MB_OK | MB_ICONINFORMATION);
+        SaySent(dialog, answer);
         EndDialog(dialog, IDOK);
       } else {
         // The window stays open with the text still in it. Losing what somebody

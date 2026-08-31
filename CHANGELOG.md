@@ -23,6 +23,12 @@ section therefore covers all the commits after the previous tag.
 `scripts/prep-release.ps1` collects those commits as a start. See
 `docs/releasing.md`.
 
+## 0.1.67
+
+**Changed**
+
+- The link to your report is clickable when you send one. You had to copy it
+  and type it into a browser.
 ## 0.1.66
 
 **New**

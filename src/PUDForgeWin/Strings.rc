@@ -641,6 +641,8 @@ BEGIN
   IDS_REPORT_FAILED     "The report was not sent and has not been saved.\n\n%ls\n\nPlease copy your text from the window before you close it. You can also report the issue at github.com/pudforge/PUDForge/issues"
   IDS_REPORT_EMPTY      "Please describe the issue before you send the report."
   IDS_REPORT_TITLE      "Report an Issue"
+  IDS_REPORT_SENT_MAIN  "Thank you. Your report was received."
+  IDS_REPORT_SENT_FOLLOW "You can follow its progress here:"
 
   /* ---------------------------------------------------------------- help */
   IDS_ABOUT_TITLE       "About PUDForge"
