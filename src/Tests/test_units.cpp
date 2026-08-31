@@ -1347,28 +1347,34 @@ TEST(the_zeroed_units_are_the_expansion_heroes) {
 
 
 /**
- * What the game's own editor writes into a unit's value.
+ * 1 is the value a unit gets, and 0 is the exception.
  *
- * The field means the resource amount on a mine or an oil patch and a state on
- * everything else, and the polarity of that state came from the game rather
- * than from here. The maps cannot settle it, which is what this records:
+ * The specification calls the field "0 passive 1 active" for everything that is
+ * not a mine or an oil patch. The maps cannot confirm that wording - nothing in
+ * them separates the two values by meaning:
  *
- *   1 on 6,434 of the 7,014 units the game's editor placed - 92%
- *   0 on the other 580, spread over footmen, peons, farms and halls alike
- *   no correlation with the owner: every one of the 301 units belonging to a
- *   Rescue (passive) player holds 1, and so do 90 of the 98 belonging to a
- *   Rescue (active) one
+ *   critters, which never fight in any map ever made, are 1,706 to 35 for 1
+ *   footmen, which always do, are 454 to 161 for 1 - the same way
+ *   units under a passive computer are 1,722 to 35 for 1
+ *   units under a human player are 5,672 to 366 for 1
+ *   units under a Rescue (passive) player are 301 to 0 for 1, and under a
+ *   Rescue (active) player 90 to 8 - the same way again
  *
- * So the value does not track the owner's rescue setting in either direction,
- * and one value is simply what nearly everything holds. A reading that makes
- * that value the exceptional state is a reading worth doubting; this test does
- * not assert which, it holds the numbers still so a later answer has something
- * to argue with.
+ * No unit type and no owner prefers 0. What the maps do settle is which value
+ * is the default: of 239 maps by the game's own editor, 215 hold nothing but 1
+ * and not one holds nothing but 0.
+ *
+ * That is enough for unit_default_value without settling the polarity at all.
+ * PUDForge placed units at 0, the value no map is made of; it places them at 1,
+ * the value nearly every unit in every map holds. The label on the two buttons
+ * rests on the specification, and this test is what a later answer has to argue
+ * with if that label turns out to be backwards.
  */
 TEST(units_carry_one_for_the_value_the_editor_writes) {
   if (pft::g_corpus.empty()) { skip("no corpus"); return; }
   long long editor_zero = 0, editor_one = 0;
-  long long rescue_passive[2] = {}, rescue_active[2] = {};
+  long long rescue_passive[2] = {}, rescue_active[2] = {}, critter[2] = {};
+  long long editor_maps = 0, maps_all_one = 0, maps_all_zero = 0;
   for (const std::string& path : pft::g_corpus) {
     pf_map* m = pf_map_open_file(path.c_str(), nullptr);
     if (!m) continue;
@@ -1378,6 +1384,7 @@ TEST(units_carry_one_for_the_value_the_editor_writes) {
     for (int i = 0; rg && i < w * h; i++) {
       if (rg[i] == 0xfffa) { game_editor = true; break; }
     }
+    bool map_holds[2] = {false, false};
     for (int i = 0; i < pf_map_unit_count(m); i++) {
       pf_unit u{};
       if (pf_map_unit(m, i, &u) != PF_OK) continue;
@@ -1390,6 +1397,13 @@ TEST(units_carry_one_for_the_value_the_editor_writes) {
       const int owner = pf_map_owner(m, u.owner);
       if (owner == PF_OWNER_RESCUE_PASSIVE) rescue_passive[slot]++;
       if (owner == PF_OWNER_RESCUE_ACTIVE) rescue_active[slot]++;
+      if (u.type == 0x39) critter[slot]++;   // never fights, in any map
+      map_holds[slot] = true;
+    }
+    if (game_editor && (map_holds[0] || map_holds[1])) {
+      editor_maps++;
+      if (map_holds[1] && !map_holds[0]) maps_all_one++;
+      if (map_holds[0] && !map_holds[1]) maps_all_zero++;
     }
     pf_map_free(m);
   }
@@ -1400,6 +1414,10 @@ TEST(units_carry_one_for_the_value_the_editor_writes) {
               " rescue active owners: %lld at 0, %lld at 1\n",
               rescue_passive[0], rescue_passive[1],
               rescue_active[0], rescue_active[1]);
+  std::printf("     critters (never fight): %lld at 0, %lld at 1\n",
+              critter[0], critter[1]);
+  std::printf("     of %lld editor maps: %lld hold only 1, %lld hold only 0\n",
+              editor_maps, maps_all_one, maps_all_zero);
   if (editor_zero + editor_one == 0) { skip("no maps by the game's editor"); return; }
   // One value dominates by a wide margin. If that ever stops being true the
   // reading of this field is a different question from the one described above.
@@ -1410,6 +1428,16 @@ TEST(units_carry_one_for_the_value_the_editor_writes) {
   // nothing is an assertion that passes for the wrong reason.
   if (rescue_passive[0] + rescue_passive[1]) CHECK(rescue_passive[1] > rescue_passive[0]);
   if (rescue_active[0] + rescue_active[1]) CHECK(rescue_active[1] > rescue_active[0]);
+  // The critter is the control: a unit that never fights holds the same value
+  // as a footman, so the field is not telling them apart.
+  if (critter[0] + critter[1]) CHECK(critter[1] > critter[0]);
+  // And the part unit_default_value actually rests on: 1 is what a map is made
+  // of, and no map is made of 0.
+  if (editor_maps) {
+    CHECK(maps_all_one > 0);
+    CHECK_EQ(maps_all_zero, 0);
+  }
 }
+
 
 }  // namespace pft
