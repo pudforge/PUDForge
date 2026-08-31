@@ -353,6 +353,9 @@ bool MapWindow::ComposePatch() {
   // a zoom moves every pixel, and there is nothing to patch into.
   int x0 = 0, y0 = 0, cols = 0, rows = 0;
   pf::view_region(view_, x0, y0, cols, rows);
+  // A patch redraws part of the last composition, so it cannot serve a change
+  // of layer: the tiles it does not touch would keep the old one.
+  if (editor_ && editor_->VisibleOverlay() != composed_overlay_) return false;
   if (x0 != composed_x0_ || y0 != composed_y0_ || cols != composed_cols_ ||
       rows != composed_rows_ || view_.zoom != composed_zoom_) {
     return false;
@@ -422,7 +425,7 @@ pf_render_options MapWindow::ComposeOptions(int x0, int y0, int cols, int rows) 
   o.vary_facing = vary_facing_ ? 1 : 0;
   o.placeholders = 1;
   if (editor_) {
-    o.overlay = editor_->overlay;
+    o.overlay = editor_->VisibleOverlay();
     o.unit_filter = editor_->unit_filter;
     o.grid = editor_->show_grid ? 1 : 0;
     o.mark_special = editor_->mark_special_units ? 1 : 0;
@@ -437,11 +440,13 @@ void MapWindow::Compose() {
   if (cols <= 0 || rows <= 0) return;
 
   const int revision = editor_ ? editor_->revision() : 0;
+  const int overlay = editor_ ? editor_->VisibleOverlay() : PF_OVERLAY_NONE;
   if (!dirty_ && revision == composed_revision_ && x0 == composed_x0_ &&
       y0 == composed_y0_ && cols == composed_cols_ && rows == composed_rows_ &&
-      view_.zoom == composed_zoom_) {
+      view_.zoom == composed_zoom_ && overlay == composed_overlay_) {
     return;   // nothing moved and nothing changed
   }
+  composed_overlay_ = overlay;
 
   if (ComposePatch()) return;
   patch_x1_ = patch_x0_ - 1;   // a full compose covers whatever it named

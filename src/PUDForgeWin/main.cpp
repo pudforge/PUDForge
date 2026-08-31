@@ -515,7 +515,6 @@ struct App : Host {
 
   /// The layer that was on show before movement mode turned its own on, so
   /// leaving puts back what the person had rather than nothing.
-  int overlay_before_movement_ = PF_OVERLAY_NONE;
 
   /// Where the context menu was opened, for the items that act on a tile.
   POINT context_tile_{};
@@ -658,23 +657,14 @@ struct App : Host {
     Log::The().Add(full, warn);
   }
 
-  /// Enter a mode, and put the right layer on show with it.
+  /// Enter a mode from the View menu, and redraw for it.
   ///
-  /// Not a Host hook any more: the only way in is the View menu, and that is
-  /// this window's own. It stays one function because entering movement mode
-  /// turns its overlay on and leaving puts back whatever was showing, and two
-  /// places doing that would eventually disagree.
+  /// Which layer shows is Editor::VisibleOverlay's business, not this one's.
+  /// It was this one's, and that was issue #2: five other places set unit mode
+  /// without coming through here, so the movement layer stayed on over the
+  /// artwork.
   void EnterMode(Mode mode) {
     editor.SetMode(mode);
-    // The layer is invisible under the artwork, so entering the mode turns it
-    // on and leaving puts back whatever was on show. Painting what you cannot
-    // see is not a tool, it is a guess.
-    if (mode == Mode::kMovement) {
-      overlay_before_movement_ = editor.overlay;
-      editor.overlay = PF_OVERLAY_MOVEMENT;
-    } else if (editor.overlay == PF_OVERLAY_MOVEMENT) {
-      editor.overlay = overlay_before_movement_;
-    }
     canvas.MarkMapChanged();
     OnEditorChanged();
   }

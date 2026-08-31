@@ -274,6 +274,12 @@ class MapWindow {
   int patch_x0_ = 0, patch_y0_ = 0, patch_x1_ = -1, patch_y1_ = -1;
   int composed_x0_ = -1, composed_y0_ = -1, composed_cols_ = 0, composed_rows_ = 0;
   int composed_zoom_ = -1;
+  /// Which layer the last composition was drawn with.
+  ///
+  /// Part of the cache key rather than something a caller marks, because the
+  /// visible layer follows the mode and the mode is set from half a dozen
+  /// places. Issue #2 was those places not knowing they had to say so.
+  int composed_overlay_ = -1;
   /// Set by anything that edits the map, so the next paint recomposes. The
   /// editor's revision counter is compared too; this catches edits that
   /// bypass it (see MarkMapChanged).

@@ -193,6 +193,55 @@ TEST(no_flying_refuses_only_the_things_that_fly) {
   pf_map_free(map);
 }
 
+/**
+ * The movement layer is on in movement mode and nowhere else.
+ *
+ * Reported as issue #2: going from movement mode to unit mode and then to
+ * terrain mode left the overlay drawn over the artwork, and only View, Layer,
+ * None took it off.
+ *
+ * The overlay used to be written when the mode changed and put back when it
+ * changed again, which held for the one path that did the putting back. Five
+ * other places set unit mode directly - Select All, the unit menu, select by
+ * kind, select by owner, the context menu - and none of them knew they had to.
+ * So it is derived from the mode now, and the test walks the reporter's route
+ * as well as asserting the rule.
+ */
+TEST(the_movement_layer_shows_in_movement_mode_and_nowhere_else) {
+  pf_map* map = blank();
+  Editor ed(map);
+
+  // What the View menu chose stays chosen throughout.
+  ed.overlay = PF_OVERLAY_NONE;
+  ed.SetMode(pfwin::Mode::kTerrain);
+  CHECK_EQ(ed.VisibleOverlay(), PF_OVERLAY_NONE);
+
+  ed.SetMode(pfwin::Mode::kMovement);
+  CHECK_EQ(ed.VisibleOverlay(), PF_OVERLAY_MOVEMENT);
+
+  // The reported route, and the one that was broken: straight to unit mode
+  // without passing through the window's own EnterMode.
+  ed.SetMode(pfwin::Mode::kUnit);
+  CHECK_EQ(ed.VisibleOverlay(), PF_OVERLAY_NONE);
+  ed.SetMode(pfwin::Mode::kTerrain);
+  CHECK_EQ(ed.VisibleOverlay(), PF_OVERLAY_NONE);
+
+  // A layer somebody did choose survives the same round trip, rather than being
+  // swapped for None on the way back.
+  ed.overlay = PF_OVERLAY_REGIONS;
+  ed.SetMode(pfwin::Mode::kMovement);
+  CHECK_EQ(ed.VisibleOverlay(), PF_OVERLAY_MOVEMENT);
+  ed.SetMode(pfwin::Mode::kUnit);
+  CHECK_EQ(ed.VisibleOverlay(), PF_OVERLAY_REGIONS);
+
+  // And SetTool, which sets the mode as well, is the sixth way in.
+  ed.SetTool(pfwin::Tool::kWalkable);
+  CHECK_EQ(ed.VisibleOverlay(), PF_OVERLAY_MOVEMENT);
+  ed.SetTool(pfwin::Tool::kSelect);
+  CHECK_EQ(ed.VisibleOverlay(), PF_OVERLAY_REGIONS);
+  pf_map_free(map);
+}
+
 }  // namespace
 
 TEST(stroke_is_one_undo_step) {

@@ -23,6 +23,12 @@ section therefore covers all the commits after the previous tag.
 `scripts/prep-release.ps1` collects those commits as a start. See
 `docs/releasing.md`.
 
+## 0.1.65
+
+**Fixed**
+
+- The movement layer goes off when you leave movement mode. It stayed on the
+  map until you set View, Layer, None.
 ## 0.1.64
 
 **Fixed**

@@ -146,7 +146,24 @@ class Editor {
 
   // ----------------------------------------------------------------- view
   int unit_filter = PF_UNITS_ALL;       ///< pf_unit_filter
-  int overlay = PF_OVERLAY_NONE;        ///< pf_overlay
+  int overlay = PF_OVERLAY_NONE;        ///< pf_overlay, as the View menu set it
+
+  /// The layer the canvas should actually draw.
+  ///
+  /// Movement mode shows its own layer whatever the View menu says, because
+  /// painting a layer you cannot see is a guess rather than a tool. Every other
+  /// mode shows what was chosen, so leaving movement mode puts the choice back
+  /// without anything having to remember it.
+  ///
+  /// Derived rather than assigned. It used to be written when the mode changed
+  /// and put back when it changed again, which held only for the one path that
+  /// did the putting back: five other places set unit mode directly and the
+  /// overlay stayed on over the artwork until View, Layer, None was picked by
+  /// hand. A rule kept in step by hand across six call sites is a rule that is
+  /// eventually wrong.
+  int VisibleOverlay() const {
+    return mode_ == Mode::kMovement ? PF_OVERLAY_MOVEMENT : overlay;
+  }
   bool show_grid = false;
 
   // --------------------------------------------------------------- options
