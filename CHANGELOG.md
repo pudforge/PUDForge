@@ -23,6 +23,12 @@ section therefore covers all the commits after the previous tag.
 `scripts/prep-release.ps1` collects those commits as a start. See
 `docs/releasing.md`.
 
+## 0.1.66
+
+**New**
+
+- Help, Report an Issue sends a report to the PUDForge issue list. You can
+  include the message log with it, and the reply gives you a link to follow.
 ## 0.1.65
 
 **Fixed**

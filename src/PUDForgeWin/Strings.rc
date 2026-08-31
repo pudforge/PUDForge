@@ -635,11 +635,11 @@ BEGIN
   IDS_RESET_ALL_DONE    "Reset %d to default"
   IDS_DEFAULTS_CLEARED  "Cleared ""Use the game default table"", or this change would not reach the game."
   IDS_REPORT_VERSION    "PUDForge %ls"
-  IDS_REPORT_HINT       "This goes to the PUDForge issue list, where you can follow it. Do not put anything private in it."
-  IDS_REPORT_SENDING    "Sending…"
-  IDS_REPORT_SENT       "Thank you. Your report is at:\n\n%ls"
-  IDS_REPORT_FAILED     "The report was not sent, so it is not saved anywhere.\n\n%ls\n\nYou can copy your text out of the box and open an issue at github.com/pudforge/PUDForge/issues"
-  IDS_REPORT_EMPTY      "Say what happened first."
+  IDS_REPORT_HINT       "Your report is published to the PUDForge issue list, where you can follow its progress. Please do not include personal information."
+  IDS_REPORT_SENDING    "Sending the report…"
+  IDS_REPORT_SENT       "Thank you. Your report was received and is available at:\n\n%ls"
+  IDS_REPORT_FAILED     "The report was not sent and has not been saved.\n\n%ls\n\nPlease copy your text from the window before you close it. You can also report the issue at github.com/pudforge/PUDForge/issues"
+  IDS_REPORT_EMPTY      "Please describe the issue before you send the report."
   IDS_REPORT_TITLE      "Report an Issue"
 
   /* ---------------------------------------------------------------- help */
