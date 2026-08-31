@@ -9,13 +9,27 @@ is different for a user. One bullet for each change, under **Fixed**, **New**
 or **Changed** — a person reads a release to find out whether a fault they hit
 is gone, and that is a different question from what is new.
 
-- One idea in each sentence. No more than 25 words.
+**Terse is the house style.** One line for one change, and nothing around it.
+Boring is correct here: this is a list of what moved, not an account of it.
+
+- One idea in each sentence. No more than 25 words, and usually far fewer.
 - The active voice, the present tense, and the same word for the same thing.
 - No metaphors, no jargon, and no words that only the code explains.
-- Give the change and not the reason. What was wrong, why it was wrong and how
-  it was found belong in the commit message.
+- Give the change and nothing else. Not the reason, not what it was like
+  before, not why it matters, not what else it touches. All of that is in the
+  commit message, which is where it belongs.
 - Leave out the conditions, the defaults and the exceptions. Most people want
   to know what is different, not when it applies. The user guide has the rest.
+- Nothing unrelated to what shipped.
+
+So:
+
+    - Report an Issue, on the Help menu.
+
+and not:
+
+    - Help, Report an Issue sends a report to the PUDForge issue list. You can
+      include the message log with it, and the reply gives you a link to follow.
 
 A section is for a *release*, not for a commit. `version.h` gets a patch bump
 on every commit, but only the version on `master` when CI runs gets a tag. A
@@ -27,20 +41,21 @@ section therefore covers all the commits after the previous tag.
 
 **Changed**
 
-- The link to your report is clickable when you send one. You had to copy it
-  and type it into a browser.
+- The link to a sent report is clickable.
+
 ## 0.1.66
 
 **New**
 
-- Help, Report an Issue sends a report to the PUDForge issue list. You can
-  include the message log with it, and the reply gives you a link to follow.
+- Report an Issue, on the Help menu. It can include the message log.
+
 ## 0.1.65
 
 **Fixed**
 
 - The movement layer goes off when you leave movement mode. It stayed on the
   map until you set View, Layer, None.
+
 ## 0.1.64
 
 **Fixed**
@@ -51,6 +66,7 @@ section therefore covers all the commits after the previous tag.
 
 - Unit properties give the active and passive states two buttons, in place of
   a number.
+
 ## 0.1.63
 
 **New**
@@ -58,6 +74,7 @@ section therefore covers all the commits after the previous tag.
 - Map validation reports units that have no hit points, and says how to put
   them back. A map made before the expansion gives the expansion units no
   statistics.
+
 ## 0.1.62
 
 **Fixed**
@@ -71,12 +88,14 @@ section therefore covers all the commits after the previous tag.
 
 - A Reset All button on the unit and upgrade pages puts the whole table back to
   the values Warcraft II uses.
+
 ## 0.1.61
 
 **Fixed**
 
 - The Daemon and the Eye of Kilrogg follow the rules for air units. They
   occupy 2 x 2 tiles and go on every other tile.
+
 ## 0.1.60
 
 **New**
