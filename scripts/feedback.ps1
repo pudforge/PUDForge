@@ -40,7 +40,12 @@ function Get-Issues($labels) {
   $json = gh issue list --repo $repo --state open --label $labels `
     --limit 100 --json number,title,labels,createdAt,url 2>$null
   if (-not $json) { return @() }
-  return $json | ConvertFrom-Json
+  # ConvertFrom-Json answers an empty list with $null, not with an empty array,
+  # and @($null) is an array holding one null rather than an empty one. So an
+  # empty queue counted as 1 and then died reading its date.
+  $parsed = $json | ConvertFrom-Json
+  if ($null -eq $parsed) { return @() }
+  return @($parsed) | Where-Object { $null -ne $_ }
 }
 
 function Has-Label($issue, $name) {
