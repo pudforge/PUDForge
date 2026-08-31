@@ -39,9 +39,10 @@ section therefore covers all the commits after the previous tag.
 
 ## 0.1.67
 
-**Changed**
+**New**
 
-- The link to a sent report is clickable.
+- Report an Issue, on the Help menu. It can include the message log, and gives
+  you a link to your report.
 
 ## 0.1.66
 
