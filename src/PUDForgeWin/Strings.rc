@@ -390,12 +390,12 @@ BEGIN
   IDS_INSPECT_AT        "Standing at %d, %d"
   /* The one number the format keeps per unit means two different things. */
   IDS_INSPECT_AMOUNT    "Amount"
-  IDS_INSPECT_FLAG      "Rescue"
+  IDS_INSPECT_FLAG      "State"
   /* %1 what a newly placed one of these carries. Typed in gold or oil, kept in
      the file as that divided by 2,500, which is why a typed number can come
      back rounded — so the field says so before it happens. */
   IDS_INSPECT_STEP      "In steps of 2,500; anything else rounds to the nearest. A new one is placed with %lld."
-  IDS_INSPECT_FLAG_NOTE "0 is passive, 1 is active. Only rescuable units read it."
+  IDS_INSPECT_FLAG_NOTE "Passive is 0, active is 1."
   IDS_UNIT_UPDATED      "%ls updated"
 
   /* ------------------------------------ putting the client back to new */

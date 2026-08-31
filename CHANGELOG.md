@@ -23,6 +23,16 @@ section therefore covers all the commits after the previous tag.
 `scripts/prep-release.ps1` collects those commits as a start. See
 `docs/releasing.md`.
 
+## 0.1.64
+
+**Fixed**
+
+- A unit that you place is active. PUDForge made every unit passive.
+
+**Changed**
+
+- Unit properties give the active and passive states two buttons, in place of
+  a number.
 ## 0.1.63
 
 **New**

@@ -696,6 +696,11 @@ void ReadInspector(HWND dialog, InspectSheet& sheet) {
       uint8_t(std::min(PF_PLAYER_COUNT - 1,
                        std::max(0, SlotForRow(ComboIndex(dialog,
                                                         IDC_INSPECT_OWNER)))));
+  if (!sheet.amount) {
+    sheet.unit.value =
+        IsDlgButtonChecked(dialog, IDC_INSPECT_ACTIVE) == BST_CHECKED ? 1 : 0;
+    return;
+  }
   BOOL ok = FALSE;
   const UINT typed = GetDlgItemInt(dialog, IDC_INSPECT_VALUE, &ok, FALSE);
   if (!ok) return;
@@ -729,7 +734,7 @@ INT_PTR CALLBACK InspectProc(HWND dialog, UINT message, WPARAM wparam, LPARAM lp
                       Format(IDS_INSPECT_AT, sheet->unit.x, sheet->unit.y).c_str());
       FillPlayerCombo(GetDlgItem(dialog, IDC_INSPECT_OWNER), sheet->unit.owner);
       // The one number the format keeps per unit means two different things, so
-      // the label says which: an amount on a resource, the rescue flag on
+      // the label says which: an amount on a resource, active or passive on
       // everything else. Editing one as the other quietly wipes the oil.
       sheet->amount = pf_unit_value_is_amount(sheet->unit.type) != 0;
       // The game names it per resource — "Gold Left:", "Oil Left:" — which is
@@ -750,6 +755,23 @@ INT_PTR CALLBACK InspectProc(HWND dialog, UINT message, WPARAM wparam, LPARAM lp
                     UINT(sheet->amount ? pf_resource_amount(sheet->unit.value)
                                        : sheet->unit.value),
                     FALSE);
+      // A resource types an amount; everything else picks one of two states, so
+      // only one of the two controls is ever up. A spin box for a thing with
+      // two states is a spin box you have to think in.
+      ShowWindow(GetDlgItem(dialog, IDC_INSPECT_VALUE),
+                 sheet->amount ? SW_SHOW : SW_HIDE);
+      ShowWindow(GetDlgItem(dialog, IDC_INSPECT_ACTIVE),
+                 sheet->amount ? SW_HIDE : SW_SHOW);
+      ShowWindow(GetDlgItem(dialog, IDC_INSPECT_PASSIVE),
+                 sheet->amount ? SW_HIDE : SW_SHOW);
+      if (!sheet->amount) {
+        // Anything that is not 0 reads as passive rather than as nothing: the
+        // field is the format's 16 bits and a map may hold any of them, and a
+        // dialog that showed neither button would lose the value on OK.
+        CheckRadioButton(dialog, IDC_INSPECT_ACTIVE, IDC_INSPECT_PASSIVE,
+                         sheet->unit.value ? IDC_INSPECT_ACTIVE
+                                           : IDC_INSPECT_PASSIVE);
+      }
       // The step is the reason a typed number can come back changed, and the
       // default is what a mine dropped on the map starts with — both are things
       // only this line says anywhere in the client.

@@ -205,16 +205,23 @@ int name_score(const char* query, const char* name) {
   return score;
 }
 
-/// What a resource should hold when the editor places one.
+/// What a unit should hold when the editor places one.
 ///
 /// A gold mine dropped with nothing in it is scenery that does nothing. The
 /// numbers are the shipped maps' own habit: 40,000 gold and 20,000 oil are far
 /// and away the commonest, stored in units of 2,500, so 16 and 8.
+///
+/// Everything else takes the active/passive flag, and active is 1 — "0 passive
+/// 1 active" is the format specification's wording. The editor placed 0 here,
+/// which made every unit it ever put down passive. The maps say the same thing
+/// the other way round: 6,434 of the 7,014 units the game's own editor placed
+/// hold 1, spread over every type and every owner, and that is what a default
+/// looks like.
 int unit_default_value(int unit_id, int resource) {
   if (resource == 1) return 16;   // gold, 40,000
   if (resource == 2) return 8;    // oil, 20,000
   (void)unit_id;
-  return 0;
+  return 1;
 }
 
 }  // namespace pf

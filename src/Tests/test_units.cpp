@@ -465,7 +465,10 @@ TEST(a_resource_says_which_one_it_is_and_what_it_starts_with) {
   // And what the editor fills a freshly placed one with.
   CHECK_EQ(pf_unit_default_value(0x5c), 16);   // 40,000 gold
   CHECK_EQ(pf_unit_default_value(0x5d), 8);    // 20,000 oil
-  CHECK_EQ(pf_unit_default_value(0x00), 0);    // a footman is passive
+  // "0 passive 1 active" is the format specification's wording, so a footman
+  // the editor places is active. It used to be placed at 0, which made every
+  // unit PUDForge ever put down passive.
+  CHECK_EQ(pf_unit_default_value(0x00), 1);
 }
 
 TEST(unit_sounds_name_files_the_game_actually_ships) {
@@ -1340,6 +1343,73 @@ TEST(the_zeroed_units_are_the_expansion_heroes) {
   // The heroes are the part that is always there, so they are the part the
   // reading rests on.
   for (int h : heroes) CHECK(zeroed[h] > 0);
+}
+
+
+/**
+ * What the game's own editor writes into a unit's value.
+ *
+ * The field means the resource amount on a mine or an oil patch and a state on
+ * everything else, and the polarity of that state came from the game rather
+ * than from here. The maps cannot settle it, which is what this records:
+ *
+ *   1 on 6,434 of the 7,014 units the game's editor placed - 92%
+ *   0 on the other 580, spread over footmen, peons, farms and halls alike
+ *   no correlation with the owner: every one of the 301 units belonging to a
+ *   Rescue (passive) player holds 1, and so do 90 of the 98 belonging to a
+ *   Rescue (active) one
+ *
+ * So the value does not track the owner's rescue setting in either direction,
+ * and one value is simply what nearly everything holds. A reading that makes
+ * that value the exceptional state is a reading worth doubting; this test does
+ * not assert which, it holds the numbers still so a later answer has something
+ * to argue with.
+ */
+TEST(units_carry_one_for_the_value_the_editor_writes) {
+  if (pft::g_corpus.empty()) { skip("no corpus"); return; }
+  long long editor_zero = 0, editor_one = 0;
+  long long rescue_passive[2] = {}, rescue_active[2] = {};
+  for (const std::string& path : pft::g_corpus) {
+    pf_map* m = pf_map_open_file(path.c_str(), nullptr);
+    if (!m) continue;
+    const int w = pf_map_width(m), h = pf_map_height(m);
+    const uint16_t* rg = pf_map_regions(m);
+    bool game_editor = false;
+    for (int i = 0; rg && i < w * h; i++) {
+      if (rg[i] == 0xfffa) { game_editor = true; break; }
+    }
+    for (int i = 0; i < pf_map_unit_count(m); i++) {
+      pf_unit u{};
+      if (pf_map_unit(m, i, &u) != PF_OK) continue;
+      // Only where the field is the state. On a mine or an oil patch it is an
+      // amount and says nothing about this.
+      if (pf_unit_value_is_amount(u.type)) continue;
+      if (pf_unit_in_group(u.type, PF_GROUP_START_LOCATIONS)) continue;
+      const int slot = u.value ? 1 : 0;
+      if (game_editor) { if (slot) editor_one++; else editor_zero++; }
+      const int owner = pf_map_owner(m, u.owner);
+      if (owner == PF_OWNER_RESCUE_PASSIVE) rescue_passive[slot]++;
+      if (owner == PF_OWNER_RESCUE_ACTIVE) rescue_active[slot]++;
+    }
+    pf_map_free(m);
+  }
+  std::printf("     game editor: %lld hold 0, %lld hold 1 (%.0f%% are 1)\n",
+              editor_zero, editor_one,
+              100.0 * double(editor_one) / double(editor_zero + editor_one ? editor_zero + editor_one : 1));
+  std::printf("     rescue passive owners: %lld at 0, %lld at 1;"
+              " rescue active owners: %lld at 0, %lld at 1\n",
+              rescue_passive[0], rescue_passive[1],
+              rescue_active[0], rescue_active[1]);
+  if (editor_zero + editor_one == 0) { skip("no maps by the game's editor"); return; }
+  // One value dominates by a wide margin. If that ever stops being true the
+  // reading of this field is a different question from the one described above.
+  CHECK(editor_one > editor_zero * 4);
+  // And it dominates under both rescue settings, which is the part that says
+  // the field is not the owner's setting repeated per unit. Only where such a
+  // player exists at all: the five fixtures have none, and an assertion over
+  // nothing is an assertion that passes for the wrong reason.
+  if (rescue_passive[0] + rescue_passive[1]) CHECK(rescue_passive[1] > rescue_passive[0]);
+  if (rescue_active[0] + rescue_active[1]) CHECK(rescue_active[1] > rescue_active[0]);
 }
 
 }  // namespace pft

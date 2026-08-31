@@ -575,6 +575,9 @@
    reach the game at all. */
 #define IDS_DEFAULTS_CLEARED      1883
 
+/* The rescue flag's own note, now that the two states are buttons. */
+#define IDS_INSPECT_FLAG_HINT     1884
+
 // ------------------------------------------------------ restrictions, redux
 /* 1800 and 1801 said which of the two states the map was in, for a read-only
    line that is a tick box now. Left unused rather than reassigned. */

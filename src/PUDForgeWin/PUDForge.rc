@@ -911,6 +911,11 @@ BEGIN
   COMBOBOX        IDC_INSPECT_OWNER, 46, 42, 156, 200, CBS_DROPDOWNLIST | WS_TABSTOP | WS_VSCROLL
   LTEXT           "", IDC_INSPECT_VALUE_LBL, 8, 66, 34, 8
   EDITTEXT        IDC_INSPECT_VALUE, 46, 64, 60, 14, ES_AUTOHSCROLL | ES_NUMBER
+  // Over the number field, and only one of the two is ever shown: the field
+  // holds an amount on a resource and a two-state flag on everything else, and
+  // a spin box for a thing with two states is a spin box you have to think in.
+  AUTORADIOBUTTON "&Active", IDC_INSPECT_ACTIVE, 46, 65, 50, 10, WS_GROUP
+  AUTORADIOBUTTON "&Passive", IDC_INSPECT_PASSIVE, 100, 65, 50, 10
   // What that number is in: the field is gold, the file keeps it in 2,500s, and
   // "Gold Left: 16" against a mine the statistics call 40,000 read as a bug.
   LTEXT           "", IDC_INSPECT_NOTE, 8, 82, 194, 18

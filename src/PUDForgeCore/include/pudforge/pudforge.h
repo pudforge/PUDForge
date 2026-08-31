@@ -223,7 +223,7 @@ PF_API int pf_unit_in_group(int unit_id, int group);
 
 /**
  * Non-zero when a placed unit's `value` holds a resource amount rather than
- * the passive/active flag.
+ * the active/passive flag.
  *
  * Gold mines and oil patches are the obvious ones. Oil *wells* are the catch:
  * they are buildings, not scenery, so they are not resources for the purpose
@@ -270,7 +270,7 @@ PF_API int pf_resource_value(int64_t amount);
 
 /**
  * What a newly placed unit's `value` should be: a sensible amount for a
- * resource, and the passive flag for everything else.
+ * resource, and the active/passive flag for everything else.
  *
  * A gold mine placed with nothing in it is scenery that does nothing, so the
  * editor fills it in. The amounts are the shipped maps' own habit rather than
@@ -903,6 +903,14 @@ PF_API pf_status pf_map_move_unit(pf_map *map, int index, int x, int y);
  * Gold mines and oil patches store the resource amount divided by 2500;
  * everything else stores 0 for passive and 1 for active. The format gives the
  * field one name and two meanings, so the caller decides which it is writing.
+ *
+ * "0 passive 1 active" is the format specification's own wording, and the maps
+ * agree with it the only way they can: 92% of the units the game's own editor
+ * placed hold 1, which is the value a unit gets by default, and a unit is
+ * active by default. See units_carry_one_for_the_value_the_editor_writes.
+ *
+ * Nothing here is about rescuable units. That was written down once as a
+ * restriction on which units read the field and is not in the specification.
  */
 PF_API pf_status pf_map_set_unit_value(pf_map *map, int index, int value);
 

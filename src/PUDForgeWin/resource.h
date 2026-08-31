@@ -397,6 +397,9 @@
 /// "Footman Unit Properties" — leaves the inspector, which is about this one
 /// unit on the map, for the sheet that is about every Footman on it.
 #define IDC_INSPECT_PROPS     726
+/* The rescue flag as the two things it can be, over the number field. */
+#define IDC_INSPECT_ACTIVE    855
+#define IDC_INSPECT_PASSIVE   856
 
 #define IDC_MOVE_CLASSES      730
 #define IDC_MOVE_COUNT        731
