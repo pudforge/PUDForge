@@ -1117,6 +1117,18 @@ PF_API pf_status pf_map_add_unit_data(pf_map *map);
 PF_API pf_status pf_map_add_upgrade_data(pf_map *map);
 
 /**
+ * Put an existing `UDTA` or `UGRD` back to the game's own table.
+ *
+ * For the moment a map stops saying "use the default data": while that flag is
+ * set the game reads its own table and the section is whatever was left in it,
+ * which in 131 of 357 real maps is zeros for every expansion hero. Clearing the
+ * flag without this would hand those zeros to the game as though they were
+ * somebody's design. Creates the section if it is absent, like the calls above.
+ */
+PF_API pf_status pf_map_reset_unit_data(pf_map *map);
+PF_API pf_status pf_map_reset_upgrade_data(pf_map *map);
+
+/**
  * Write one tile value directly, with no fitting.
  *
  * The corner model cannot express every tile a tileset holds — particular

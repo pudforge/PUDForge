@@ -467,6 +467,8 @@
 #define IDC_UGRD_EXPORT       843
 #define IDC_ALOW_IMPORT       844
 #define IDC_ALOW_EXPORT       845
+#define IDC_UDTA_RESET_ALL    853
+#define IDC_UGRD_RESET_ALL    854
 /* 846 was a read-only line saying whether the map carried an `ALOW` section,
    on the reasoning that the format has no `useDefaultData` for restrictions the
    way it does for the unit and upgrade tables. It is IDC_ALOW_DEFAULTS now, a

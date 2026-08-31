@@ -565,6 +565,16 @@
 #define IDS_ROW_RESET             1819
 #define IDS_ROW_RESET_DONE        1820
 
+/* The Reset All button on the unit and upgrade pages, and what it asks before
+   it does anything. %ls is how many subjects the map has changed. */
+#define IDS_RESET_ALL_UNITS       1879
+#define IDS_RESET_ALL_UPGRADES    1880
+#define IDS_RESET_ALL_NONE        1881
+#define IDS_RESET_ALL_DONE        1882
+/* Cleared the use-the-game-table tick because an edit needs it cleared to
+   reach the game at all. */
+#define IDS_DEFAULTS_CLEARED      1883
+
 // ------------------------------------------------------ restrictions, redux
 /* 1800 and 1801 said which of the two states the map was in, for a read-only
    line that is a tick box now. Left unused rather than reassigned. */

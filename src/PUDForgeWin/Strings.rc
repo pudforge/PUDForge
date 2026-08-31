@@ -629,6 +629,11 @@ BEGIN
   /* %ls is the row's own name, e.g. "Put Footman back to the game defaults". */
   IDS_ROW_RESET         "Reset %ls to default"
   IDS_ROW_RESET_DONE    "%ls is reset to default"
+  IDS_RESET_ALL_UNITS   "Put all %d units back to the values Warcraft II uses?\n\nEvery change this map makes to the unit table is discarded."
+  IDS_RESET_ALL_UPGRADES "Put all %d upgrades back to the values Warcraft II uses?\n\nEvery change this map makes to the upgrade table is discarded."
+  IDS_RESET_ALL_NONE    "Nothing to reset. This map already uses the values Warcraft II uses."
+  IDS_RESET_ALL_DONE    "Reset %d to default"
+  IDS_DEFAULTS_CLEARED  "Cleared ""Use the game default table"", or this change would not reach the game."
 
   /* ---------------------------------------------------------------- help */
   IDS_ABOUT_TITLE       "About PUDForge"

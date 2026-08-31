@@ -438,6 +438,7 @@ FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
   AUTOCHECKBOX    "&Use the game default unit table", IDC_UDTA_DEFAULTS,
                   8, 8, 150, 10
+  PUSHBUTTON      "&Reset All…", IDC_UDTA_RESET_ALL, 236, 6, 60, 14
   PUSHBUTTON      "Import…", IDC_UDTA_IMPORT, 300, 6, 54, 14
   PUSHBUTTON      "Export…", IDC_UDTA_EXPORT, 358, 6, 54, 14
   LISTBOX         IDC_UDTA_UNITS, 8, 24, 140, 224,
@@ -464,6 +465,7 @@ FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
   AUTOCHECKBOX    "&Use the game default upgrade table", IDC_UGRD_DEFAULTS,
                   8, 8, 160, 10
+  PUSHBUTTON      "&Reset All…", IDC_UGRD_RESET_ALL, 236, 6, 60, 14
   PUSHBUTTON      "Import…", IDC_UGRD_IMPORT, 300, 6, 54, 14
   PUSHBUTTON      "Export…", IDC_UGRD_EXPORT, 358, 6, 54, 14
   // Wider than the unit list because the names are longer: these come from the

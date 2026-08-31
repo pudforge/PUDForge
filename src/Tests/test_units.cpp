@@ -1146,4 +1146,91 @@ TEST(oil_sits_on_the_odd_tiles_of_the_same_grid) {
   pf_map_free(map);
 }
 
+
+
+/**
+ * A map that says "use the default data" is read as using it.
+ *
+ * `useDefaultData` tells the game to read its own unit table and ignore the
+ * section entirely, so whatever the section holds is not what the game reads.
+ * 131 of the 357 maps on hand set the flag over a payload whose expansion
+ * heroes are all zero, and the sheet showed those zeros - Alleria with no hit
+ * points, which is not a number the game ever sees.
+ */
+TEST(the_use_default_data_flag_hides_whatever_the_section_holds) {
+  if (pft::g_corpus.empty()) { skip("no corpus"); return; }
+  int hp = -1;
+  for (int i = 0; i < pf_udta_field_count(); i++) {
+    const std::string n = pf_udta_field_name(i) ? pf_udta_field_name(i) : "";
+    if (n == "hitPoints") hp = i;
+  }
+  CHECK(hp >= 0);
+  // Alleria and Grom Hellscream: expansion heroes, and the two the report named.
+  const int heroes[] = {0x14, 0x19};
+  long long flagged = 0, flagged_zero = 0, unflagged_zero = 0, maps = 0;
+  for (const std::string& path : pft::g_corpus) {
+    pf_map* m = pf_map_open_file(path.c_str(), nullptr);
+    if (!m) continue;
+    if (pf_map_has_unit_data(m)) {
+      maps++;
+      const bool uses_default = pf_map_unit_field(m, 0, 0, 0) != 0;
+      bool zero = false;
+      for (int h : heroes) zero |= pf_map_unit_field(m, hp, h, 0) <= 0;
+      if (uses_default) {
+        flagged++;
+        if (zero) flagged_zero++;
+      } else if (zero) {
+        unflagged_zero++;
+      }
+    }
+    pf_map_free(m);
+  }
+  std::printf("     %lld maps carry UDTA, %lld say use-the-default;"
+              " %lld of those hold a zeroed hero, %lld hold one without the flag\n",
+              maps, flagged, flagged_zero, unflagged_zero);
+  // The flag is common and the zeroed payload under it is common, which is why
+  // the sheet may not read the section when the flag is set.
+  CHECK(flagged > 0);
+  CHECK(flagged_zero > 0);
+
+  // Every hero the game ships has hit points, so a zero can only come from a
+  // section nobody reads.
+  for (int h : heroes) CHECK(pf_udta_default_field(hp, h, 0) > 0);
+}
+
+/**
+ * Clearing the flag writes the table the page was showing.
+ *
+ * While the flag is set the sheet shows the game's own values, so turning it
+ * off has to leave those values behind. Handing over the section as it lay
+ * would give the map zeroed heroes that nothing had asked for.
+ */
+TEST(clearing_use_default_data_leaves_the_games_own_table) {
+  pf_status st = PF_OK;
+  pf_map* map = pf_map_create(64, 64, PF_TILESET_FOREST, &st);
+  CHECK(map != nullptr);
+  if (!map) return;
+  int hp = -1;
+  for (int i = 0; i < pf_udta_field_count(); i++) {
+    const std::string n = pf_udta_field_name(i) ? pf_udta_field_name(i) : "";
+    if (n == "hitPoints") hp = i;
+  }
+  CHECK(hp >= 0);
+
+  CHECK_EQ(pf_map_add_unit_data(map), PF_OK);
+  // A map in the shape the corpus keeps finding: the flag on, Alleria zeroed.
+  CHECK_EQ(pf_map_set_unit_field(map, 0, 0, 0, 1), PF_OK);
+  CHECK_EQ(pf_map_set_unit_field(map, hp, 0x14, 0, 0), PF_OK);
+  CHECK_EQ(pf_map_unit_field(map, hp, 0x14, 0), 0);
+
+  CHECK_EQ(pf_map_reset_unit_data(map), PF_OK);
+  CHECK_EQ(pf_map_unit_field(map, hp, 0x14, 0),
+           pf_udta_default_field(hp, 0x14, 0));
+  CHECK(pf_map_unit_field(map, hp, 0x14, 0) > 0);
+  // The section is still there and the flag is down, so the table is now live.
+  CHECK(pf_map_has_unit_data(map) != 0);
+  CHECK_EQ(pf_map_unit_field(map, 0, 0, 0), 0);
+  pf_map_free(map);
+}
+
 }  // namespace pft

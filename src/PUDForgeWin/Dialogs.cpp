@@ -966,6 +966,8 @@ struct UnitCell {
 /// game's own value back" a deletion rather than a lookup.
 struct UnitSheet {
   pf_map* map = nullptr;
+  /// The page, so an edit can reach the tick box at the top of it.
+  HWND dialog = nullptr;
   IconCache* icons = nullptr;      ///< borrowed; null just leaves rows blank
   Form form;
   std::vector<UnitCell> cells;     ///< every per-unit (field, component)
@@ -984,7 +986,15 @@ struct UnitSheet {
   /// field it has no section for answers -1 — which is not what the game will
   /// read. 110 rows of -1 says the map is broken when it is merely ordinary.
   int64_t Stored(int field, int unit_id, int component) const {
-    if (pf_map_has_unit_data(map)) {
+    // `useDefaultData` set means the game reads its own table and never looks
+    // at this section, so what the section holds is not what the game reads.
+    // 131 of the 357 maps on hand set it over a payload that is zeros for every
+    // expansion hero — showing those zeros said Alleria has no hit points.
+    //
+    // `defaults_before` and not the live tick: the tick is what the map will
+    // become, and the baseline an edit is measured against has to hold still
+    // while somebody is editing.
+    if (pf_map_has_unit_data(map) && !defaults_before) {
       return pf_map_unit_field(map, field, unit_id, component);
     }
     return pf_udta_default_field(field, unit_id, component);
@@ -1019,6 +1029,21 @@ struct UnitSheet {
     return false;
   }
 
+  /// How many units this map has changed.
+  int ChangedCount() const {
+    int n = 0;
+    for (int u = 0; u < PF_UNIT_COUNT; u++) n += Changed(u) ? 1 : 0;
+    return n;
+  }
+
+  /// Put every unit back to the game's own table.
+  /// @return how many units moved
+  int ResetAll() {
+    int n = 0;
+    for (int u = 0; u < PF_UNIT_COUNT; u++) n += Reset(u) ? 1 : 0;
+    return n;
+  }
+
   /// Put every field of one unit back to the game's own table.
   /// @return whether anything moved
   bool Reset(int unit_id) {
@@ -1034,6 +1059,24 @@ struct UnitSheet {
     return any;
   }
 };
+
+/// Clear the use-the-game's-table tick once an edit stops matching it.
+///
+/// Ticked, the map carries no `UDTA` at all — so an edit made with it ticked is
+/// an edit the game never reads, and the person typing one has just said which
+/// of the two they want. The tick is what gives.
+///
+/// Only ever cleared, never set: a table that happens to match the game's is
+/// still something somebody may deliberately want written out.
+template <typename Sheet>
+void SyncDefaultsTick(Sheet& sheet, int control, int note, int subject) {
+  if (!sheet.defaults || !sheet.dialog || !sheet.Changed(subject)) return;
+  sheet.defaults = false;
+  CheckDlgButton(sheet.dialog, control, BST_UNCHECKED);
+  // Said out loud on the note line. A tick that comes off on its own is the
+  // right thing to happen and the wrong thing to happen quietly.
+  SetDlgItemTextW(sheet.dialog, note, Str(IDS_DEFAULTS_CLEARED).c_str());
+}
 
 /// Every per-unit field of `UDTA`, with one entry each for the two-component
 /// ones. Which fields exist and what they mean is the core's to say; this only
@@ -1171,6 +1214,7 @@ void BuildUnitForm(HWND, UnitSheet* sheet) {
       // field does not name — is somebody's data and stays.
       held = value ? (held | mask) : (held & ~mask);
       sheet->Set(at.field, sheet->at, at.component, held);
+      SyncDefaultsTick(*sheet, IDC_UDTA_DEFAULTS, IDC_UDTA_NOTE, sheet->at);
       return true;
     }
     const UnitCell& at = sheet->cells[size_t(id)];
@@ -1180,6 +1224,7 @@ void BuildUnitForm(HWND, UnitSheet* sheet) {
       value = option;
     }
     sheet->Set(at.field, sheet->at, at.component, value);
+    SyncDefaultsTick(*sheet, IDC_UDTA_DEFAULTS, IDC_UDTA_NOTE, sheet->at);
     return true;
   };
 
@@ -1263,6 +1308,7 @@ INT_PTR CALLBACK UnitDataProc(HWND dialog, UINT message, WPARAM wparam, LPARAM l
     case WM_INITDIALOG: {
       CentreOnScreen(dialog);
       sheet = reinterpret_cast<UnitSheet*>(lparam);
+      sheet->dialog = dialog;
       SetWindowLongPtrW(dialog, DWLP_USER, LONG_PTR(sheet));
       PlaceForm(sheet->form, dialog, IDC_UDTA_FORM_SLOT, IDC_UDTA_FORM);
       BuildUnitForm(dialog, sheet);
@@ -1318,6 +1364,25 @@ INT_PTR CALLBACK UnitDataProc(HWND dialog, UINT message, WPARAM wparam, LPARAM l
           sheet->shape = -1;
           ShowUnit(dialog, sheet, sheet->at);
         }
+        return TRUE;
+      }
+      if (id == IDC_UDTA_RESET_ALL) {
+        const int changed = sheet->ChangedCount();
+        if (changed <= 0) {
+          MessageBoxW(dialog, Str(IDS_RESET_ALL_NONE).c_str(),
+                      Str(IDS_TAB_UNITS).c_str(), MB_OK | MB_ICONINFORMATION);
+          return TRUE;
+        }
+        // Defaults to No. This throws away every unit change in the map, and
+        // the button is beside Import, which is a keystroke away.
+        if (MessageBoxW(dialog, Format(IDS_RESET_ALL_UNITS, changed).c_str(),
+                        Str(IDS_TAB_UNITS).c_str(),
+                        MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2) != IDYES) {
+          return TRUE;
+        }
+        sheet->ResetAll();
+        InvalidateRect(GetDlgItem(dialog, IDC_UDTA_UNITS), nullptr, TRUE);
+        sheet->form.Reload();
         return TRUE;
       }
       if (id == IDC_UDTA_EXPORT) {
@@ -1656,6 +1721,10 @@ INT_PTR CALLBACK GenerateProc(HWND dialog, UINT message, WPARAM wparam, LPARAM l
 
 /// The `UGRD` sheet. Same shape as the unit sheet and a good deal simpler:
 /// seven per-upgrade fields, all plain numbers, no components and no options.
+/// How many upgrades the sheet lists. Defined below; named here because the
+/// sheet's own members count over it.
+int UpgradeCount();
+
 struct UpgradeSheet {
   pf_map* map = nullptr;
   IconCache* icons = nullptr;      ///< borrowed
@@ -1665,13 +1734,18 @@ struct UpgradeSheet {
   /// How many rows the form was last built for. See UnitSheet::shape.
   int shape = -1;
   std::map<std::array<int, 2>, int64_t> edits;
+  /// The page, so an edit can reach the tick box at the top of it.
+  HWND dialog = nullptr;
   bool defaults = false;
   bool defaults_before = false;
 
   /// What the game will read: the map's own table where it carries one, and
   /// the game's where it does not. See UnitSheet::Stored.
   int64_t Stored(int f, int u) const {
-    if (pf_map_has_upgrade_data(map)) return pf_map_upgrade_field(map, f, u);
+    // See UnitSheet::Stored: the flag means the section is not read.
+    if (pf_map_has_upgrade_data(map) && !defaults_before) {
+      return pf_map_upgrade_field(map, f, u);
+    }
     return pf_ugrd_default_field(f, u);
   }
   int64_t Value(int f, int u) const {
@@ -1692,6 +1766,18 @@ struct UpgradeSheet {
       if (Value(f, up) != pf_ugrd_default_field(f, up)) return true;
     }
     return false;
+  }
+
+  /// How many upgrades this map has changed, and putting them all back.
+  int ChangedCount() const {
+    int n = 0;
+    for (int u = 0; u < UpgradeCount(); u++) n += Changed(u) ? 1 : 0;
+    return n;
+  }
+  int ResetAll() {
+    int n = 0;
+    for (int u = 0; u < UpgradeCount(); u++) n += Reset(u) ? 1 : 0;
+    return n;
   }
 
   /// Put every field of one upgrade back to the game's own table.
@@ -1732,6 +1818,7 @@ void BuildUpgradeForm(HWND dialog, UpgradeSheet* sheet) {
   sheet->form.write = [sheet, dialog](int id, int64_t value) {
     const int field = sheet->fields[size_t(id)];
     sheet->Set(field, sheet->at, value);
+    SyncDefaultsTick(*sheet, IDC_UGRD_DEFAULTS, IDC_UGRD_NOTE, sheet->at);
     // The list draws each upgrade with the frame this very field names, so
     // changing it has to be visible in the list too.
     if (field == UpgradeIconField()) {
@@ -1840,6 +1927,7 @@ INT_PTR CALLBACK UpgradeProc(HWND dialog, UINT message, WPARAM wparam, LPARAM lp
     case WM_INITDIALOG: {
       CentreOnScreen(dialog);
       sheet = reinterpret_cast<UpgradeSheet*>(lparam);
+      sheet->dialog = dialog;
       SetWindowLongPtrW(dialog, DWLP_USER, LONG_PTR(sheet));
       PlaceForm(sheet->form, dialog, IDC_UGRD_FORM_SLOT, IDC_UGRD_FORM);
       BuildUpgradeForm(dialog, sheet);
@@ -1868,6 +1956,23 @@ INT_PTR CALLBACK UpgradeProc(HWND dialog, UINT message, WPARAM wparam, LPARAM lp
           sheet->shape = -1;
           ShowUpgrade(dialog, sheet, sheet->at);
         }
+        return TRUE;
+      }
+      if (id == IDC_UGRD_RESET_ALL) {
+        const int changed = sheet->ChangedCount();
+        if (changed <= 0) {
+          MessageBoxW(dialog, Str(IDS_RESET_ALL_NONE).c_str(),
+                      Str(IDS_TAB_UPGRADES).c_str(), MB_OK | MB_ICONINFORMATION);
+          return TRUE;
+        }
+        if (MessageBoxW(dialog, Format(IDS_RESET_ALL_UPGRADES, changed).c_str(),
+                        Str(IDS_TAB_UPGRADES).c_str(),
+                        MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2) != IDYES) {
+          return TRUE;
+        }
+        sheet->ResetAll();
+        InvalidateRect(GetDlgItem(dialog, IDC_UGRD_LIST), nullptr, TRUE);
+        sheet->form.Reload();
         return TRUE;
       }
       if (id == IDC_UGRD_EXPORT) {
@@ -2572,6 +2677,11 @@ bool ApplyUnitSheet(UnitSheet& sheet, pf_map* map, std::wstring& note) {
   // which is what it was already using, so the map plays the same until one of
   // these edits lands.
   if (!sheet.edits.empty() && !pf_map_has_unit_data(map)) pf_map_add_unit_data(map);
+  // The page showed the game's own table while the tick was on, because that is
+  // what the game was reading. Turning it off writes out what was on show —
+  // otherwise the map inherits whatever the ignored section happened to hold,
+  // which is commonly zeros for every expansion hero.
+  if (sheet.defaults_before && !sheet.defaults) pf_map_reset_unit_data(map);
   for (const auto& [key, value] : sheet.edits) {
     pf_map_set_unit_field(map, key[0], key[1], key[2], value);
   }
@@ -2591,6 +2701,8 @@ bool ApplyUpgradeSheet(UpgradeSheet& sheet, pf_map* map, std::wstring& note) {
   if (!sheet.edits.empty() && !pf_map_has_upgrade_data(map)) {
     pf_map_add_upgrade_data(map);
   }
+  // See ApplyUnitSheet.
+  if (sheet.defaults_before && !sheet.defaults) pf_map_reset_upgrade_data(map);
   for (const auto& [key, value] : sheet.edits) {
     pf_map_set_upgrade_field(map, key[0], key[1], value);
   }

@@ -1952,6 +1952,23 @@ pf_status pf_map_add_unit_data(pf_map* map) {
   return PF_OK;
 }
 
+pf_status pf_map_reset_unit_data(pf_map* map) {
+  if (!map) return PF_ERR_INVALID_ARG;
+  pf::UnitData& udta = map->map->unit_data_mut();
+  if (!udta.present) return pf_map_add_unit_data(map);
+  udta.raw.assign(pf::kDefaultUdta, pf::kDefaultUdta + pf::kDefaultUdtaSize);
+  udta.use_default = false;
+  map->map->refresh_unit_sizes();
+  return PF_OK;
+}
+
+pf_status pf_map_reset_upgrade_data(pf_map* map) {
+  if (!map) return PF_ERR_INVALID_ARG;
+  std::vector<uint8_t>& ugrd = map->map->upgrade_data_mut();
+  ugrd.assign(pf::kDefaultUgrd, pf::kDefaultUgrd + pf::kDefaultUgrdSize);
+  return PF_OK;
+}
+
 pf_status pf_map_add_upgrade_data(pf_map* map) {
   if (!map) return PF_ERR_INVALID_ARG;
   std::vector<uint8_t>& ugrd = map->map->upgrade_data_mut();

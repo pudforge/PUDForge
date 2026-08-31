@@ -23,6 +23,19 @@ section therefore covers all the commits after the previous tag.
 `scripts/prep-release.ps1` collects those commits as a start. See
 `docs/releasing.md`.
 
+## 0.1.62
+
+**Fixed**
+
+- The unit and upgrade pages show the values Warcraft II uses when a map is set
+  to use the default tables. Expansion heroes showed zero for every statistic.
+- A change to a unit or an upgrade clears the "use the game default table"
+  tick. The change had no effect in the game while the tick stayed on.
+
+**New**
+
+- A Reset All button on the unit and upgrade pages puts the whole table back to
+  the values Warcraft II uses.
 ## 0.1.61
 
 **Fixed**
