@@ -16,11 +16,26 @@ one who decides what PUDForge should be.
 ./scripts/feedback.ps1 -Ready     # just the numbers, to loop over
 ```
 
+## A run ends in a release
+
+**Every run that changes code ends with a published release.** Not a branch, not
+a commit sitting on master waiting for a better moment - a version, a tag, an
+exe somebody can download. Work that is fixed but unreleased helps nobody and is
+indistinguishable, from outside, from work that was never done.
+
+So a run is: take what is accepted, fix what can be fixed, ship it, close what
+shipped. If nothing could be fixed, nothing is released and nothing is closed -
+that is a run too, and its output is comments on the issues saying why.
+
 ## The rule about closing
 
 **Close an issue only when a release carrying the fix is published.** Not when
 the code is written, not when the tests pass, not when it is pushed. Until the
 exe is downloadable the reporter's problem is still there.
+
+The two rules are the same rule from either end: a run always releases, so
+anything genuinely fixed in a run gets closed in that run, and nothing else
+does.
 
 If you cannot do it, say so on the issue and leave it open. An issue closed
 without a fix is worse than one left open: it tells the reporter they were heard
@@ -75,9 +90,10 @@ leave it open. Worth its own comment rather than silence:
 
 ## Several at once
 
-Group them into one release when they are small and unrelated; a release per
-one-line fix is noise in the changelog and in the tag list. Close each issue
-separately, naming the same version.
+One release for the run, not one per issue: a release per one-line fix is noise
+in the changelog and in the tag list. One changelog section, a bullet each, and
+each issue closed separately naming that same version.
 
-Do not batch a risky change with safe ones. If one of them is a rule about how
-maps are read, it ships alone, so that a regression has one suspect.
+The exception is risk, not count. A change to how maps are read ships alone,
+even if that means two releases in one run, so that a regression has one
+suspect.
