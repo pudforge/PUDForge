@@ -27,6 +27,7 @@
 #include "Form.hpp"
 #include "Icons.hpp"
 #include "Log.hpp"
+#include "Report.hpp"
 #include "Radial.hpp"
 #include "Tools.hpp"
 #include "Host.hpp"
@@ -1745,6 +1746,12 @@ struct App : Host {
       case IDM_VIEW_MINIMAP:
         show_minimap = !show_minimap;
         ShowFurniture();
+        return true;
+
+      case IDM_HELP_REPORT:
+
+        ShowReportIssue(main, instance);
+
         return true;
 
       case IDM_HELP_GUIDE:

@@ -263,6 +263,8 @@ BEGIN
     // reference now, so the key that meant "what can I press" still does.
     MENUITEM "&User Guide\tF1",            IDM_HELP_GUIDE
     MENUITEM SEPARATOR
+    MENUITEM "&Report an Issue…",          IDM_HELP_REPORT
+    MENUITEM SEPARATOR
     MENUITEM "&About PUDForge…",           IDM_HELP_ABOUT
   END
 END
@@ -636,6 +638,29 @@ BEGIN
   LTEXT           "", IDC_REPLACE_NOTE, 8, 52, 214, 20
   DEFPUSHBUTTON   "Replace", IDOK, 118, 76, 50, 14
   PUSHBUTTON      "Cancel", IDCANCEL, 172, 76, 50, 14
+END
+
+/*
+ * Report an Issue. One box to type in, one tick to send the log with it.
+ *
+ * No name, no email, no category: every field is one more reason to close the
+ * window instead of finishing. What version it is and what the editor last said
+ * are things the program knows about itself, so it should not be asking.
+ */
+IDD_REPORT DIALOGEX 0, 0, 280, 186
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Report an Issue"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+  LTEXT           "&What happened? What were you doing when it happened?",
+                  -1, 8, 8, 264, 8
+  EDITTEXT        IDC_REPORT_TEXT, 8, 20, 264, 90,
+                  ES_MULTILINE | ES_WANTRETURN | ES_AUTOVSCROLL | WS_VSCROLL | WS_TABSTOP
+  AUTOCHECKBOX    "Send the &message log with it", IDC_REPORT_LOG, 8, 116, 264, 10
+  LTEXT           "", IDC_REPORT_VERSION, 8, 130, 264, 8
+  LTEXT           "", IDC_REPORT_NOTE, 8, 142, 264, 18
+  DEFPUSHBUTTON   "Send", IDOK, 168, 166, 50, 14
+  PUSHBUTTON      "Cancel", IDCANCEL, 222, 166, 50, 14
 END
 
 IDD_DECORATE DIALOGEX 0, 0, 230, 100

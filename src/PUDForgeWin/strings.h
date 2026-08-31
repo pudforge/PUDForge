@@ -578,6 +578,16 @@
 /* The rescue flag's own note, now that the two states are buttons. */
 #define IDS_INSPECT_FLAG_HINT     1884
 
+/* Report an Issue: the version line, what it says while sending, and the four
+   ways it can end. */
+#define IDS_REPORT_VERSION        1885
+#define IDS_REPORT_HINT           1886
+#define IDS_REPORT_SENDING        1887
+#define IDS_REPORT_SENT           1888
+#define IDS_REPORT_FAILED         1889
+#define IDS_REPORT_EMPTY          1890
+#define IDS_REPORT_TITLE          1891
+
 // ------------------------------------------------------ restrictions, redux
 /* 1800 and 1801 said which of the two states the map was in, for a read-only
    line that is a tick box now. Left unused rather than reassigned. */

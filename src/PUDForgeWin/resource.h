@@ -136,6 +136,10 @@
 /// 325 rather than a number in the Tools run above it: 319 is retired and must
 /// stay so, and this belongs with Help regardless of where the gap was.
 #define IDM_HELP_GUIDE        325
+#define IDM_HELP_REPORT       326
+
+/* Report an Issue, on the Help menu. */
+#define IDD_REPORT            526
 #define IDM_HELP_ABOUT        320
 /* 321 was Help > Keyboard Shortcuts. The guide lists the keys now. */
 
@@ -472,6 +476,12 @@
 #define IDC_ALOW_EXPORT       845
 #define IDC_UDTA_RESET_ALL    853
 #define IDC_UGRD_RESET_ALL    854
+
+/* Report an Issue. */
+#define IDC_REPORT_TEXT       857
+#define IDC_REPORT_LOG        858
+#define IDC_REPORT_NOTE       859
+#define IDC_REPORT_VERSION    860
 /* 846 was a read-only line saying whether the map carried an `ALOW` section,
    on the reasoning that the format has no `useDefaultData` for restrictions the
    way it does for the unit and upgrade tables. It is IDC_ALOW_DEFAULTS now, a

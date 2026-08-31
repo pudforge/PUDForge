@@ -218,6 +218,7 @@ if (WIN32)
     PUDForgeWin/Form.cpp
     PUDForgeWin/Icons.cpp
     PUDForgeWin/Log.cpp
+    PUDForgeWin/Report.cpp
     PUDForgeWin/Radial.cpp
     PUDForgeWin/Tools.cpp
     PUDForgeWin/PaletteGrid.cpp
@@ -256,7 +257,7 @@ if (WIN32)
   # links nowhere without it (see BlitRgbaBlended in Blit.hpp).
   # winmm: PlaySound, for the unit voices. The clips are the game's own bytes,
   # so nothing is decoded here and no third-party audio library is involved.
-  target_link_libraries(PUDForgeWin PRIVATE pudforge comctl32 shell32 ole32 shlwapi msimg32 winmm)
+  target_link_libraries(PUDForgeWin PRIVATE pudforge comctl32 shell32 ole32 shlwapi msimg32 winmm winhttp)
   set_target_properties(PUDForgeWin PROPERTIES OUTPUT_NAME PUDForge)
   # Before the resource compiler runs, so the .rc always embeds artwork built
   # from the PNGs as they are now.
