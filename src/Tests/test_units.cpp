@@ -1233,4 +1233,113 @@ TEST(clearing_use_default_data_leaves_the_games_own_table) {
   pf_map_free(map);
 }
 
+
+/**
+ * A live unit table with a unit that has no hit points is reported.
+ *
+ * The pre-expansion shape: a `UDTA` written before Beyond the Dark Portal
+ * leaves the ten expansion heroes at zero, which is harmless while
+ * `useDefaultData` is set and is a broken map the moment it is not. 22 maps on
+ * hand are already in the second state, and before this nothing said so.
+ */
+TEST(a_live_unit_table_with_no_hit_points_is_reported) {
+  pf_status st = PF_OK;
+  pf_map* map = pf_map_create(64, 64, PF_TILESET_FOREST, &st);
+  CHECK(map != nullptr);
+  if (!map) return;
+  int hp = -1;
+  for (int i = 0; i < pf_udta_field_count(); i++) {
+    const std::string n = pf_udta_field_name(i) ? pf_udta_field_name(i) : "";
+    if (n == "hitPoints") hp = i;
+  }
+  CHECK(hp >= 0);
+  CHECK_EQ(pf_map_add_unit_data(map), PF_OK);
+
+  auto zero_stats_reported = [&] {
+    std::vector<pf_issue> issues(64);
+    const int n = pf_map_validate(map, issues.data(), int(issues.size()));
+    for (int i = 0; i < n && i < int(issues.size()); i++) {
+      if (issues[size_t(i)].code == PF_ISSUE_UNIT_STATS_ZERO) return true;
+    }
+    return false;
+  };
+
+  // A fresh section is the game's own table, so there is nothing to report.
+  CHECK(!zero_stats_reported());
+
+  // Alleria zeroed, the flag still up: the game reads its own table, so this is
+  // 134 of the corpus and none of them is broken.
+  CHECK_EQ(pf_map_set_unit_field(map, hp, 0x14, 0, 0), PF_OK);
+  CHECK_EQ(pf_map_set_unit_field(map, 0, 0, 0, 1), PF_OK);
+  CHECK(!zero_stats_reported());
+
+  // Flag down and the same bytes are now what the game reads.
+  CHECK_EQ(pf_map_set_unit_field(map, 0, 0, 0, 0), PF_OK);
+  CHECK(zero_stats_reported());
+
+  // And the way out that the message names.
+  CHECK_EQ(pf_map_reset_unit_data(map), PF_OK);
+  CHECK(!zero_stats_reported());
+  pf_map_free(map);
+}
+
+/**
+ * The zeroed units are the expansion ones and nothing else.
+ *
+ * Twelve ids across 156 maps: the ten Beyond the Dark Portal heroes, always,
+ * and the Ranger and the Berserker in 50 of them. 0x12 to 0x19 is contiguous,
+ * which is what a table that simply stops early looks like.
+ *
+ * Measured rather than read off the names. A thirteenth id joining the list
+ * would mean this is not a pre-expansion table after all, and the validator
+ * would be pointing at the wrong thing.
+ */
+TEST(the_zeroed_units_are_the_expansion_heroes) {
+  if (pft::g_corpus.empty()) { skip("no corpus"); return; }
+  int hp = -1;
+  for (int i = 0; i < pf_udta_field_count(); i++) {
+    const std::string n = pf_udta_field_name(i) ? pf_udta_field_name(i) : "";
+    if (n == "hitPoints") hp = i;
+  }
+  CHECK(hp >= 0);
+  // The ten heroes, which every such map zeroes.
+  const int heroes[] = {0x14, 0x15, 0x16, 0x17, 0x18,
+                        0x19, 0x23, 0x2c, 0x2e, 0x2f};
+  // Those plus the two the expansion upgrades to, which only some of them do.
+  const int expansion[] = {0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
+                           0x18, 0x19, 0x23, 0x2c, 0x2e, 0x2f};
+  long long zeroed[PF_UNIT_COUNT] = {};
+  long long maps_with_the_shape = 0;
+  for (const std::string& path : pft::g_corpus) {
+    pf_map* m = pf_map_open_file(path.c_str(), nullptr);
+    if (!m) continue;
+    if (pf_map_has_unit_data(m)) {
+      int zeros = 0;
+      for (int u = 0; u < PF_UNIT_COUNT; u++) {
+        if (pf_udta_default_field(hp, u, 0) <= 0) continue;
+        if (pf_map_unit_field(m, hp, u, 0) > 0) continue;
+        zeroed[u]++;
+        zeros++;
+      }
+      if (zeros) maps_with_the_shape++;
+    }
+    pf_map_free(m);
+  }
+  std::printf("     %lld maps hold a zeroed unit table\n", maps_with_the_shape);
+  CHECK(maps_with_the_shape > 0);
+  for (int u = 0; u < PF_UNIT_COUNT; u++) {
+    if (!zeroed[u]) continue;
+    bool known = false;
+    for (int h : expansion) known |= h == u;
+    if (!known) {
+      std::printf("       unexpected: %s 0x%02x in %lld maps\n",
+                  pf_unit_name(u), u, zeroed[u]);
+    }
+    CHECK(known);
+  }
+  // The heroes are the part that is always there, so they are the part the
+  // reading rests on.
+  for (int h : heroes) CHECK(zeroed[h] > 0);
+}
+
 }  // namespace pft

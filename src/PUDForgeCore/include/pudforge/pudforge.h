@@ -1502,7 +1502,8 @@ typedef enum pf_issue_code {
   PF_ISSUE_UNITS_OVERLAP = 10,       /* two footprints share a tile          */
   PF_ISSUE_ILLEGAL_TERRAIN = 11,     /* unit on terrain it cannot stand on   */
   PF_ISSUE_HALL_CROWDS_MINE = 12,    /* town hall too close to a gold mine   */
-  PF_ISSUE_START_NO_GOLD = 13        /* start location with no mine in reach */
+  PF_ISSUE_START_NO_GOLD = 13,       /* start location with no mine in reach */
+  PF_ISSUE_UNIT_STATS_ZERO = 14      /* a live UDTA gives a unit no hit points */
 } pf_issue_code;
 
 typedef struct pf_issue {

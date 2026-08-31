@@ -23,6 +23,13 @@ section therefore covers all the commits after the previous tag.
 `scripts/prep-release.ps1` collects those commits as a start. See
 `docs/releasing.md`.
 
+## 0.1.63
+
+**New**
+
+- Map validation reports units that have no hit points, and says how to put
+  them back. A map made before the expansion gives the expansion units no
+  statistics.
 ## 0.1.62
 
 **Fixed**

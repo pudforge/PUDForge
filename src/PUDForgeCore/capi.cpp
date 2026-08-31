@@ -3030,6 +3030,40 @@ int pf_map_validate(const pf_map* map, pf_issue* out, int capacity) {
     }
   }
 
+  // A unit table that is live and gives a unit no hit points at all. The game
+  // reads it and the unit cannot exist.
+  //
+  // This is one shape almost every time: a map written before Beyond the Dark
+  // Portal carries a `UDTA` in which the expansion units are simply zero,
+  // because those slots did not exist yet. Twelve ids across 156 of the maps on
+  // hand - the ten heroes always, the Ranger and the Berserker in 50 of them -
+  // and 0x12 to 0x19 is contiguous, which is a table that stops early. While `useDefaultData` is set that is
+  // harmless - the game reads its own table - so 134 of the 357 maps on hand
+  // hold it and play correctly. It becomes real the moment the flag comes down,
+  // and 22 of those maps are already there.
+  if (pf_map_has_unit_data(map) && !pf_map_unit_field(map, 0, 0, 0)) {
+    static const int hit_points = pf::udta_field_index("hitPoints");
+    int dead = 0;
+    const char* first = nullptr;
+    for (int u = 0; hit_points >= 0 && u < pf::kUnitCount; u++) {
+      // Only where the game's own table has a number to disagree with: the
+      // markers and the unused slots are zero by design.
+      if (pf_udta_default_field(hit_points, u, 0) <= 0) continue;
+      if (pf_map_unit_field(map, hit_points, u, 0) > 0) continue;
+      if (!dead) first = pf_unit_name(u);
+      dead++;
+    }
+    if (dead) {
+      char text[128];
+      std::snprintf(text, sizeof(text),
+                    "%d units have no hit points, starting with %s."
+                    " Reset All on the unit page puts them back",
+                    dead, first ? first : "one");
+      add_issue(issues, PF_SEVERITY_WARNING, PF_ISSUE_UNIT_STATS_ZERO,
+                -1, -1, -1, text);
+    }
+  }
+
   if (!has_gold) {
     add_issue(issues, PF_SEVERITY_WARNING, PF_ISSUE_NO_RESOURCES, -1, -1, -1,
               "The map has no gold mine");
