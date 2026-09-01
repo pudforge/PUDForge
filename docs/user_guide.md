@@ -336,6 +336,12 @@ proportions of water, coast, forest and rock, the number of clearings to carve
 for bases, and a seed. Every control redraws a preview of the map that
 **Create** would produce.
 
+The **Mirror** row is the one on the terrain panel. Choose an axis and the map
+reflects across it, and so do the gold mines and start locations, so each
+player gets the same ground. The axes combine; the first button clears them.
+With a mirror on, the number of bases is a minimum: a base and its reflection
+are carved together.
+
 The seed makes a result reproducible: the same values produce the same map.
 
 ## Tools

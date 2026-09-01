@@ -333,6 +333,12 @@
 #define IDC_GEN_DETAIL_VALUE  613
 /// Rolls every number on the sheet, and nothing about what is placed on it.
 #define IDC_GEN_RANDOMIZE     614
+/// The terrain dock's Mirror row, in the dock's order, so the two read alike.
+#define IDC_GEN_MIRROR_NONE   615
+#define IDC_GEN_MIRROR_LR     616
+#define IDC_GEN_MIRROR_TB     617
+#define IDC_GEN_MIRROR_SWNE   618
+#define IDC_GEN_MIRROR_NWSE   619
 
 #define IDC_QUICK_SEARCH      610
 #define IDC_QUICK_LIST        611

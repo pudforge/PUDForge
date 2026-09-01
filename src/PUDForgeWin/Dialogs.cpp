@@ -1422,6 +1422,11 @@ struct GenSheet {
   int clearings = 4, radius = 8;
   int seed = 12345;
   bool mines = true, starts = true;
+  /// pf_mirror flags, worked the way the terrain dock works them.
+  int mirrors = PF_MIRROR_NONE;
+  const UiIcons* ui = nullptr;   ///< borrowed; the Mirror row's drawings
+  HWND tip = nullptr;            ///< the Mirror row's tooltips; dies with the dialog
+  std::vector<std::wstring> tip_texts;   ///< what the tooltip control points at
   pf_map* preview = nullptr;
   int placed_mines = 0, placed_starts = 0;
   /// False until the controls have been filled. Setting an edit control's text
@@ -1444,9 +1449,91 @@ struct GenSheet {
     p.detail_scale = 0.10f;
     p.clearings = clearings;
     p.clearing_radius = radius;
+    p.mirrors = mirrors;
     return p;
   }
 };
+
+/// The Mirror row's buttons, in the dock's order, and what each one means.
+constexpr int kGenMirrorFlags[] = {PF_MIRROR_NONE, PF_MIRROR_LEFT_RIGHT,
+                                   PF_MIRROR_TOP_BOTTOM, PF_MIRROR_DIAG_SW_NE,
+                                   PF_MIRROR_DIAG_NW_SE};
+
+/// Show the axes that are on. "None" is lit when nothing else is, the way the
+/// dock shows it, so the row always has one button down.
+void RefreshGenMirrors(HWND dialog, const GenSheet& sheet) {
+  for (int i = 0; i < 5; i++) {
+    const bool on = i == 0 ? sheet.mirrors == PF_MIRROR_NONE
+                           : (sheet.mirrors & kGenMirrorFlags[i]) != 0;
+    CheckDlgButton(dialog, IDC_GEN_MIRROR_NONE + i, on ? BST_CHECKED : BST_UNCHECKED);
+  }
+}
+
+/// A tooltip on one of the dialog's controls. The same arrangement the dock
+/// and the property form use: one tooltip window, TTF_SUBCLASS so it hooks
+/// the control's own messages, and the text kept alive beside it.
+void ExplainGenControl(GenSheet& sheet, HWND dialog, HWND control, UINT text) {
+  if (!control) return;
+  if (!sheet.tip) {
+    sheet.tip = CreateWindowExW(WS_EX_TOPMOST, TOOLTIPS_CLASSW, nullptr,
+                                WS_POPUP | TTS_ALWAYSTIP | TTS_NOPREFIX, 0, 0, 0, 0,
+                                dialog, nullptr, nullptr, nullptr);
+    if (!sheet.tip) return;
+    SendMessageW(sheet.tip, TTM_SETMAXTIPWIDTH, 0, 320);
+  }
+  sheet.tip_texts.push_back(Str(text));
+  TOOLINFOW info = {};
+  info.cbSize = sizeof(info);
+  info.uFlags = TTF_IDISHWND | TTF_SUBCLASS;
+  info.hwnd = dialog;
+  info.uId = reinterpret_cast<UINT_PTR>(control);
+  info.lpszText = const_cast<wchar_t*>(sheet.tip_texts.back().c_str());
+  SendMessageW(sheet.tip, TTM_ADDTOOLW, 0, reinterpret_cast<LPARAM>(&info));
+}
+
+/// Make the preview a square in pixels, and give the dialog the width that
+/// then needs.
+///
+/// The template is in dialog units, and the two axes of those are not the
+/// same length: 330 by 330 of them came out 495 by 536 pixels, so a square map
+/// drawn into the box was eight percent taller than it was wide. The height is
+/// the side that stays, because it is what the column of controls beside it
+/// decided; the width follows it, and so does everything laid out against the
+/// box's right edge.
+void SquareGenPreview(HWND dialog) {
+  HWND preview = GetDlgItem(dialog, IDC_GEN_PREVIEW);
+  RECT box;
+  GetWindowRect(preview, &box);
+  MapWindowPoints(nullptr, dialog, reinterpret_cast<POINT*>(&box), 2);
+  const int side = box.bottom - box.top;
+  const int grow = side - (box.right - box.left);
+  if (grow == 0) return;
+  const UINT keep = SWP_NOZORDER | SWP_NOACTIVATE;
+  SetWindowPos(preview, nullptr, 0, 0, side, side, keep | SWP_NOMOVE);
+
+  // The note keeps the preview's width; Create and Cancel keep their distance
+  // from the right edge.
+  auto follow = [&](int id, bool move) {
+    HWND control = GetDlgItem(dialog, id);
+    RECT r;
+    GetWindowRect(control, &r);
+    MapWindowPoints(nullptr, dialog, reinterpret_cast<POINT*>(&r), 2);
+    if (move) {
+      SetWindowPos(control, nullptr, r.left + grow, r.top, 0, 0, keep | SWP_NOSIZE);
+    } else {
+      SetWindowPos(control, nullptr, 0, 0, r.right - r.left + grow, r.bottom - r.top,
+                   keep | SWP_NOMOVE);
+    }
+  };
+  follow(IDC_GEN_NOTE, false);
+  follow(IDOK, true);
+  follow(IDCANCEL, true);
+
+  RECT frame;
+  GetWindowRect(dialog, &frame);
+  SetWindowPos(dialog, nullptr, 0, 0, frame.right - frame.left + grow,
+               frame.bottom - frame.top, keep | SWP_NOMOVE);
+}
 
 /// Rebuild the preview, and place on it whatever the checkboxes ask for, so the
 /// preview shows the map Create would give rather than a different one.
@@ -1468,8 +1555,8 @@ void Regenerate(GenSheet& sheet) {
   if (!sheet.preview) return;
 
   if (sheet.mines) {
-    sheet.placed_mines =
-        pf_map_place_gold_mines(sheet.preview, std::max(2, sheet.clearings));
+    sheet.placed_mines = pf_map_place_gold_mines(sheet.preview, std::max(2, sheet.clearings),
+                                                 sheet.mirrors);
   }
   if (sheet.starts) {
     // A start location belongs to a player, and a player with no slot has
@@ -1477,7 +1564,7 @@ void Regenerate(GenSheet& sheet) {
     for (int p = 0; p < sheet.clearings && p < 16; p++) {
       pf_map_set_owner(sheet.preview, p, PF_OWNER_HUMAN);
     }
-    sheet.placed_starts = pf_map_place_start_locations(sheet.preview);
+    sheet.placed_starts = pf_map_place_start_locations(sheet.preview, sheet.mirrors);
   }
 }
 
@@ -1546,12 +1633,33 @@ void DrawGenPreview(GenSheet& sheet, const DRAWITEMSTRUCT& item) {
   }
   BlitRgba(item.hDC, rect.left, rect.top, rect.right - rect.left,
            rect.bottom - rect.top, w, h, pixels.data());
+
+  // The axes the canvas draws, in the canvas's pen: a mirrored preview shows
+  // what the mirror did, and this shows where it did it.
+  if (sheet.mirrors == PF_MIRROR_NONE) return;
+  const int pw = rect.right - rect.left, ph = rect.bottom - rect.top;
+  HPEN axis = CreatePen(PS_DOT, 1, RGB(74, 209, 255));
+  HGDIOBJ old_pen = SelectObject(item.hDC, axis);
+  const int old_mode = SetBkMode(item.hDC, TRANSPARENT);
+  auto line = [&](int x0, int y0, int x1, int y1) {
+    MoveToEx(item.hDC, rect.left + x0, rect.top + y0, nullptr);
+    LineTo(item.hDC, rect.left + x1, rect.top + y1);
+  };
+  if (sheet.mirrors & PF_MIRROR_LEFT_RIGHT) line(pw / 2, 0, pw / 2, ph);
+  if (sheet.mirrors & PF_MIRROR_TOP_BOTTOM) line(0, ph / 2, pw, ph / 2);
+  if (sheet.mirrors & PF_MIRROR_DIAG_NW_SE) line(0, 0, pw, ph);
+  if (sheet.mirrors & PF_MIRROR_DIAG_SW_NE) line(pw, 0, 0, ph);
+  SetBkMode(item.hDC, old_mode);
+  SelectObject(item.hDC, old_pen);
+  DeleteObject(axis);
 }
 
 INT_PTR CALLBACK GenerateProc(HWND dialog, UINT message, WPARAM wparam, LPARAM lparam) {
   GenSheet* sheet = reinterpret_cast<GenSheet*>(GetWindowLongPtrW(dialog, DWLP_USER));
   switch (message) {
     case WM_INITDIALOG: {
+      // Squared before it is centred, since squaring changes the width.
+      SquareGenPreview(dialog);
       CentreOnScreen(dialog);
       sheet = reinterpret_cast<GenSheet*>(lparam);
       SetWindowLongPtrW(dialog, DWLP_USER, LONG_PTR(sheet));
@@ -1589,6 +1697,18 @@ INT_PTR CALLBACK GenerateProc(HWND dialog, UINT message, WPARAM wparam, LPARAM l
       SetDlgItemInt(dialog, IDC_GEN_SEED, UINT(sheet->seed), FALSE);
       CheckDlgButton(dialog, IDC_GEN_MINES, sheet->mines ? BST_CHECKED : BST_UNCHECKED);
       CheckDlgButton(dialog, IDC_GEN_STARTS, sheet->starts ? BST_CHECKED : BST_UNCHECKED);
+      {
+        // The dock's drawings and the dock's tooltips, so the row is the one
+        // the person already knows.
+        const UINT tips[] = {IDS_TIP_MIRROR_NONE, IDS_TIP_MIRROR_LR, IDS_TIP_MIRROR_TB,
+                             IDS_TIP_MIRROR_SWNE, IDS_TIP_MIRROR_NWSE};
+        for (int i = 0; i < 5; i++) {
+          HWND button = GetDlgItem(dialog, IDC_GEN_MIRROR_NONE + i);
+          if (sheet->ui) sheet->ui->Decorate(button, kIconMirrorNone + i);
+          ExplainGenControl(*sheet, dialog, button, tips[i]);
+        }
+        RefreshGenMirrors(dialog, *sheet);
+      }
       sheet->ready = true;
       Regenerate(*sheet);
       RefreshGenNote(dialog, *sheet);
@@ -1639,11 +1759,21 @@ INT_PTR CALLBACK GenerateProc(HWND dialog, UINT message, WPARAM wparam, LPARAM l
         sheet->mines = IsDlgButtonChecked(dialog, IDC_GEN_MINES) == BST_CHECKED;
         sheet->starts = IsDlgButtonChecked(dialog, IDC_GEN_STARTS) == BST_CHECKED;
         again = true;
+      } else if (id >= IDC_GEN_MIRROR_NONE && id <= IDC_GEN_MIRROR_NWSE) {
+        // The dock's rule, Editor::ToggleMirror: the axes combine, and "none"
+        // clears them all. The buttons are auto-checkboxes, so the one pressed
+        // has already flipped itself; the row is redrawn from the flags rather
+        // than trusted.
+        const int flag = kGenMirrorFlags[id - IDC_GEN_MIRROR_NONE];
+        sheet->mirrors = flag == PF_MIRROR_NONE ? PF_MIRROR_NONE : (sheet->mirrors ^ flag);
+        RefreshGenMirrors(dialog, *sheet);
+        again = true;
       } else if (id == IDC_GEN_RANDOMIZE) {
         // Every number the shape is made of, plus the tileset, and none of the
-        // two checkboxes: those say what to put *on* the map once it exists, and
-        // a button that silently turned start locations off would be taking a
-        // decision the person had already made. The tileset is not a decision in
+        // two checkboxes or the mirror: those say what to put *on* the map once
+        // it exists and what shape it is allowed to be, and a button that
+        // silently turned start locations off would be taking a decision the
+        // person had already made. The tileset is not a decision in
         // the same way — nothing downstream depends on which one it is, and a
         // roll that only ever hands back forest is a roll that shows a quarter
         // of what the generator can make.
@@ -2764,9 +2894,10 @@ bool ApplyAllowSheet(AllowSheet& sheet, pf_map* map, std::wstring& note) {
 
 }  // namespace
 
-pf_map* ShowGenerate(HWND owner, HINSTANCE instance, int tileset) {
+pf_map* ShowGenerate(HWND owner, HINSTANCE instance, int tileset, const UiIcons* ui) {
   GenSheet sheet;
   sheet.tileset = tileset;
+  sheet.ui = ui;
   if (DialogBoxParamW(instance, MAKEINTRESOURCEW(IDD_GENERATE), owner,
                       GenerateProc, LPARAM(&sheet)) != IDOK) {
     return nullptr;

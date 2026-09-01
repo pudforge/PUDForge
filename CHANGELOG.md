@@ -37,6 +37,17 @@ section therefore covers all the commits after the previous tag.
 `scripts/prep-release.ps1` collects those commits as a start. See
 `docs/releasing.md`.
 
+## 0.1.70
+
+**New**
+
+- Generate a Map has a Mirror row. The map, its gold mines and its start
+  locations reflect across the axes you choose.
+
+**Changed**
+
+- The Generate a Map preview is square and larger.
+
 ## 0.1.69
 
 **Changed**

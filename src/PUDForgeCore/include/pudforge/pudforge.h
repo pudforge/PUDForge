@@ -663,6 +663,14 @@ typedef struct pf_generate_params {
    */
   int clearings;
   int clearing_radius;
+  /**
+   * pf_mirror flags. The noise is reflected across the chosen axes before it
+   * is cut into terrain, and the clearings are carved as mirror sets, so the
+   * map comes out symmetric rather than being mirrored after the fact.
+   * Diagonal axes only apply to a square map. Zero for a map with no
+   * symmetry.
+   */
+  int mirrors;
 } pf_generate_params;
 
 /**
@@ -1043,9 +1051,15 @@ PF_API int pf_symmetry_points(const pf_map *map, int x, int y, int w, int h,
  * map somebody has laid out. Positions are chosen on open ground, away from the
  * edge, and as far from each other as a coarse search manages.
  *
+ * `mirrors` (pf_mirror flags) places them as mirror sets: a start and its
+ * reflections go down together, each to the next player who needs one, so a
+ * symmetric map gets a fair layout. A set that does not fit — a reflection
+ * lands on water, or there are fewer players left than reflections — is passed
+ * over, and when no set fits the rest are placed singly rather than not at all.
+ *
  * @return how many were placed, or a negative value on failure.
  */
-PF_API int pf_map_place_start_locations(pf_map *map);
+PF_API int pf_map_place_start_locations(pf_map *map, int mirrors);
 
 /**
  * Scatter gold mines on open ground, spread as far apart as the land allows.
@@ -1056,9 +1070,13 @@ PF_API int pf_map_place_start_locations(pf_map *map);
  *
  * Each starts with 40,000 gold, which is what the shipped maps use most often.
  *
+ * `mirrors` (pf_mirror flags) places them as mirror sets, the way
+ * pf_map_place_start_locations does, so `count` is a floor: the last set may
+ * carry it past.
+ *
  * @return how many were placed, which may be fewer than asked for.
  */
-PF_API int pf_map_place_gold_mines(pf_map *map, int count);
+PF_API int pf_map_place_gold_mines(pf_map *map, int count, int mirrors);
 
 /**
  * Randomise the light and dark shade of every terrain in a rectangle.

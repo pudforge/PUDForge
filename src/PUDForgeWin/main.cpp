@@ -1014,7 +1014,7 @@ struct App : Host {
   void GenerateMap() {
     if (!ConfirmDiscard()) return;
     const int tileset = canvas.map() ? pf_map_tileset(canvas.map()) : 0;
-    if (pf_map* made = ShowGenerate(main, instance, tileset)) {
+    if (pf_map* made = ShowGenerate(main, instance, tileset, &ui_icons)) {
       AdoptMap(made, L"");
       // Generation happens before any artwork is attached, so the generator
       // chose from all sixteen variations of every group and 81% of the map
@@ -1136,7 +1136,7 @@ struct App : Host {
   void RunPlaceStarts() {
     if (!canvas.map()) return;
     pf_map_checkpoint(canvas.map());
-    const int placed = pf_map_place_start_locations(canvas.map());
+    const int placed = pf_map_place_start_locations(canvas.map(), PF_MIRROR_NONE);
     // An operation that did nothing must not consume an undo step.
     if (placed <= 0) pf_map_undo(canvas.map());
     else canvas.MarkMapChanged();

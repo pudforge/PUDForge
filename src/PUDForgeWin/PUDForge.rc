@@ -531,7 +531,7 @@ END
 // mapper actually reads while moving the sliders, and at a third of the width
 // it was a thumbnail you had to lean into. Everything else keeps its place and
 // the window grows around it.
-IDD_GENERATE DIALOGEX 0, 0, 578, 404
+IDD_GENERATE DIALOGEX 0, 0, 634, 420
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "Generate a Map"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
@@ -579,18 +579,29 @@ BEGIN
   AUTOCHECKBOX    "Place gold &mines", IDC_GEN_MINES, 8, 234, 100, 10
   AUTOCHECKBOX    "Place start &locations", IDC_GEN_STARTS, 8, 248, 110, 10
 
-  // 2.5x what it was in both axes. Owner-drawn and stretched to whatever rect
-  // it is given, so the size lives here and nowhere else.
-  CONTROL "", IDC_GEN_PREVIEW, "STATIC", SS_OWNERDRAW | WS_BORDER, 240, 10, 330, 330
-  // One line's worth rather than three: the note is the same length as before
-  // and the box it wraps inside is now two and a half times as wide.
-  LTEXT           "", IDC_GEN_NOTE, 240, 348, 330, 24
+  // The terrain dock's Mirror row: the same five buttons in the same order,
+  // drawn from the same sheet, working the same way — the axes combine and
+  // the first clears them. The glyphs are what shows when the sheet has no
+  // drawing for a cell.
+  LTEXT           "M&irror", -1, 8, 274, 36, 8
+  CONTROL "·", IDC_GEN_MIRROR_NONE, "BUTTON", BS_AUTOCHECKBOX | BS_PUSHLIKE | WS_TABSTOP | WS_GROUP, 46, 268, 22, 20
+  CONTROL "↔", IDC_GEN_MIRROR_LR, "BUTTON", BS_AUTOCHECKBOX | BS_PUSHLIKE | WS_TABSTOP, 70, 268, 22, 20
+  CONTROL "↕", IDC_GEN_MIRROR_TB, "BUTTON", BS_AUTOCHECKBOX | BS_PUSHLIKE | WS_TABSTOP, 94, 268, 22, 20
+  CONTROL "⤢", IDC_GEN_MIRROR_SWNE, "BUTTON", BS_AUTOCHECKBOX | BS_PUSHLIKE | WS_TABSTOP, 118, 268, 22, 20
+  CONTROL "⤡", IDC_GEN_MIRROR_NWSE, "BUTTON", BS_AUTOCHECKBOX | BS_PUSHLIKE | WS_TABSTOP, 142, 268, 22, 20
+
+  // As tall as the column of controls beside it. The width here is a guess at
+  // a square: dialog units are not the same length in both axes, so the
+  // dialog squares the box in pixels when it opens and takes up the slack in
+  // its own width. Owner-drawn and stretched to whatever rect it ends up with.
+  CONTROL "", IDC_GEN_PREVIEW, "STATIC", SS_OWNERDRAW | WS_BORDER, 232, 8, 394, 364
+  LTEXT           "", IDC_GEN_NOTE, 232, 378, 394, 12
 
   // Bottom left, away from Create: it throws the whole sheet away and rolls it
   // again, which is the one button here nobody wants to press by aiming at OK.
-  PUSHBUTTON      "&Randomize", IDC_GEN_RANDOMIZE, 8, 382, 60, 14
-  DEFPUSHBUTTON   "Create", IDOK, 466, 382, 50, 14
-  PUSHBUTTON      "Cancel", IDCANCEL, 520, 382, 50, 14
+  PUSHBUTTON      "&Randomize", IDC_GEN_RANDOMIZE, 8, 398, 60, 14
+  DEFPUSHBUTTON   "Create", IDOK, 522, 398, 50, 14
+  PUSHBUTTON      "Cancel", IDCANCEL, 576, 398, 50, 14
 END
 
 /*

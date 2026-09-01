@@ -289,7 +289,7 @@ TEST(start_locations_fill_the_active_slots) {
   pf_map_set_owner(map, 2, PF_OWNER_PASSIVE_COMPUTER);
   pf_map_set_race(map, 1, PF_RACE_ORC);
 
-  CHECK_EQ(pf_map_place_start_locations(map), 3);
+  CHECK_EQ(pf_map_place_start_locations(map, PF_MIRROR_NONE), 3);
   CHECK_EQ(pf_map_unit_count(map), 3);
 
   // The unit follows the player's race, and each active slot got exactly one.
@@ -317,7 +317,7 @@ TEST(start_locations_fill_the_active_slots) {
   }
 
   // Running it again is a no-op: it fills gaps, it does not rearrange.
-  CHECK_EQ(pf_map_place_start_locations(map), 0);
+  CHECK_EQ(pf_map_place_start_locations(map, PF_MIRROR_NONE), 0);
   CHECK_EQ(pf_map_unit_count(map), 3);
   pf_map_free(map);
 }

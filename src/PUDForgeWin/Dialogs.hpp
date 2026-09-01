@@ -95,8 +95,11 @@ enum MapSheetTab {
 /// The numbers mean very little written down and a great deal shown, so every
 /// control redraws a one-pixel-per-tile preview of exactly the map that
 /// pressing Create would hand back.
+///
+/// `ui` is the button sheet, for the Mirror row it shares with the terrain
+/// dock; null leaves the glyphs.
 /// @return the new map, owned by the caller, or null if cancelled
-pf_map* ShowGenerate(HWND owner, HINSTANCE instance, int tileset);
+pf_map* ShowGenerate(HWND owner, HINSTANCE instance, int tileset, const UiIcons* ui);
 
 /// Find a unit by typing.
 ///

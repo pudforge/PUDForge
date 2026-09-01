@@ -257,9 +257,9 @@ TEST(generated_maps_look_like_maps) {
   for (int p = 0; p < 4; p++) pf_map_set_owner(map, p, PF_OWNER_COMPUTER);
 
   // Mines first, so the starts have something to be near.
-  const int mines = pf_map_place_gold_mines(map, 8);
+  const int mines = pf_map_place_gold_mines(map, 8, PF_MIRROR_NONE);
   CHECK(mines >= 4);
-  CHECK_EQ(pf_map_place_start_locations(map), 4);
+  CHECK_EQ(pf_map_place_start_locations(map, PF_MIRROR_NONE), 4);
 
   // Every start has a mine within reach, or the base has nothing to work.
   for (int i = 0; i < pf_map_unit_count(map); i++) {
@@ -353,6 +353,93 @@ TEST(generated_maps_look_like_maps) {
     pf_map_free(other);
   }
   pf_map_free(map);
+}
+TEST(generated_maps_mirror_when_asked) {
+  pf_noise_layer layers[3] = {
+      {0.045f, 12345u, 1.0f},
+      {0.11f, 999u, 0.45f},
+      {0.30f, 4242u, 0.15f},
+  };
+  pf_generate_params params{};
+  params.width = 64;
+  params.height = 64;
+  params.tileset = 0;
+  params.water = 0.255f;
+  params.coast = 0.109f;
+  params.forest = 0.35f;
+  params.rock = 0.14f;
+  params.detail_seed = 77u;
+  params.detail_scale = 0.10f;
+  params.clearings = 4;
+  params.clearing_radius = 8;
+
+  // Each axis on its own, the two straight ones together, and the diagonals,
+  // which a square map allows.
+  const int cases[] = {PF_MIRROR_LEFT_RIGHT, PF_MIRROR_TOP_BOTTOM,
+                       PF_MIRROR_LEFT_RIGHT | PF_MIRROR_TOP_BOTTOM,
+                       PF_MIRROR_DIAG_NW_SE, PF_MIRROR_DIAG_SW_NE};
+  for (int mirrors : cases) {
+    params.mirrors = mirrors;
+    pf_map* map = pf_map_generate(&params, layers, 3, nullptr);
+    CHECK(map != nullptr);
+    if (!map) continue;
+
+    // Corner terrains, not tiles: two tiles that reflect each other hold the
+    // same four terrains in a swapped order, and different drawings of the
+    // same terrain are still the same terrain. A corner is read off the tile
+    // it is the top-left of, and off the last tile's other corners along the
+    // far edges, where there is no such tile.
+    auto corner = [&](int cx, int cy) {
+      const int tx = std::min(cx, 63), ty = std::min(cy, 63);
+      uint8_t q[4];
+      pf::decode_tile(uint16_t(pf_map_tile_at(map, tx, ty)), q);
+      return int(q[(cy > ty ? 2 : 0) + (cx > tx ? 1 : 0)]);
+    };
+    int asymmetric = 0;
+    for (int cy = 0; cy <= 64; cy++) {
+      for (int cx = 0; cx <= 64; cx++) {
+        int orbit[16];
+        const int n = pf_symmetry_corners(map, cx, cy, mirrors, orbit, 16);
+        for (int k = 0; k < n; k++) {
+          if (corner(orbit[k * 2], orbit[k * 2 + 1]) != corner(cx, cy)) asymmetric++;
+        }
+      }
+    }
+    CHECK_EQ(asymmetric, 0);
+    if (asymmetric) std::printf("     mirrors %d: %d corners differ\n", mirrors, asymmetric);
+
+    // What goes on the map reflects too, or the terrain is fair and the game
+    // is not: every mine and every start has a unit of its own type at each of
+    // its reflections.
+    for (int p = 0; p < 16; p++) pf_map_set_owner(map, p, PF_OWNER_NOBODY);
+    for (int p = 0; p < 4; p++) pf_map_set_owner(map, p, PF_OWNER_COMPUTER);
+    CHECK(pf_map_place_gold_mines(map, 4, mirrors) >= 4);
+    CHECK_EQ(pf_map_place_start_locations(map, mirrors), 4);
+    int unpaired = 0;
+    const int count = pf_map_unit_count(map);
+    for (int i = 0; i < count; i++) {
+      pf_unit u;
+      pf_map_unit(map, i, &u);
+      int fw = 1, fh = 1;
+      pf_map_unit_footprint(map, u.type, &fw, &fh);
+      int set[16];
+      const int n = pf_symmetry_points(map, u.x, u.y, fw, fh, mirrors, set, 16);
+      for (int k = 0; k < n; k++) {
+        bool found = false;
+        for (int j = 0; j < count && !found; j++) {
+          pf_unit v;
+          pf_map_unit(map, j, &v);
+          // A start is a start whichever race's it is: the reflection of a
+          // human player's belongs to whoever the next player is.
+          const auto kind = [](int type) { return type == 94 || type == 95 ? 94 : type; };
+          found = v.x == set[k * 2] && v.y == set[k * 2 + 1] && kind(v.type) == kind(u.type);
+        }
+        if (!found) unpaired++;
+      }
+    }
+    CHECK_EQ(unpaired, 0);
+    pf_map_free(map);
+  }
 }
 TEST(a_generated_map_is_drawn_with_tiles_the_tileset_has) {
   // A tile group defines sixteen variations and a tileset populates only some

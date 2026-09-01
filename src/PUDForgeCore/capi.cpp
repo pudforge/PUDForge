@@ -866,6 +866,38 @@ pf_map* pf_map_generate(const pf_generate_params* params,
     }
   }
 
+  // Reflect the fields before they are cut rather than the map after: a
+  // symmetric field cuts to symmetric terrain at every quantile, and the
+  // clearings, the mines and the starts then have a symmetric map to be fair
+  // on. Every corner takes the value of the first corner of its orbit, in
+  // reading order, so the result does not depend on which reflection the noise
+  // was sampled at — and walking in the same order means the first corner has
+  // already settled by the time its reflections look at it.
+  const int mirrors = params->mirrors;
+  auto first_of_orbit = [&](int x, int y, int& fx, int& fy) {
+    int orbit[16];
+    const int n = pf_symmetry_corners(handle, x, y, mirrors, orbit, 16);
+    fx = x;
+    fy = y;
+    for (int k = 0; k < n; k++) {
+      const int ox = orbit[k * 2], oy = orbit[k * 2 + 1];
+      if (oy < fy || (oy == fy && ox < fx)) { fx = ox; fy = oy; }
+    }
+  };
+  if (mirrors != PF_MIRROR_NONE) {
+    for (int y = 0; y < ch; y++) {
+      for (int x = 0; x < cw; x++) {
+        int fx, fy;
+        first_of_orbit(x, y, fx, fy);
+        const size_t i = size_t(y) * size_t(cw) + size_t(x);
+        const size_t from = size_t(fy) * size_t(cw) + size_t(fx);
+        land[i] = land[from];
+        growth[i] = growth[from];
+        massif[i] = massif[from];
+      }
+    }
+  }
+
   // Cut at quantiles so the requested shares come out exact, whatever shape
   // the noise happens to have. Sorting a copy is the honest way to find them.
   auto quantile = [](std::vector<float> values, float fraction) {
@@ -975,8 +1007,13 @@ pf_map* pf_map_generate(const pf_generate_params* params,
       }
     }
 
+    // Counted in clearings, not in picks: a pick under symmetry is the whole
+    // mirror set, because a clearing whose reflection is still forest is a map
+    // that is symmetric everywhere except where the bases are. Under a mirror
+    // the count is therefore a floor, and three bases left-right come out as
+    // four rather than as two and an odd one.
     std::vector<std::pair<int, int>> chosen;
-    for (int n = 0; n < wanted_clearings && !spots.empty(); n++) {
+    while (int(chosen.size()) < wanted_clearings && !spots.empty()) {
       size_t best = 0;
       long long best_score = -1;
       for (size_t i = 0; i < spots.size(); i++) {
@@ -991,7 +1028,10 @@ pf_map* pf_map_generate(const pf_generate_params* params,
                                 std::min(apart, 1LL << 20);
         if (score > best_score) { best_score = score; best = i; }
       }
-      chosen.push_back({spots[best].x, spots[best].y});
+      int set[16];
+      const int n = pf_symmetry_corners(handle, spots[best].x, spots[best].y,
+                                        mirrors, set, 16);
+      for (int k = 0; k < n; k++) chosen.push_back({set[k * 2], set[k * 2 + 1]});
       spots.erase(spots.begin() + long(best));
     }
 
@@ -1013,6 +1053,30 @@ pf_map* pf_map_generate(const pf_generate_params* params,
 
   const pf::Rect rect{0, 0, w - 1, h - 1};
   pf::legalize(grid, rect);
+  // Legalising nudges corners in scan order, and the nudge at a reflection is
+  // not always the reflection of the nudge, so the two sides drift: about a
+  // tenth of the corners on a 64x64. Folding the grid back onto its first
+  // reflection and legalising again settles within a round or two, because a
+  // legal fix is still legal when reflected. The bound is for a case that
+  // never settles, which had better hand back a tile the refit has to mend
+  // than not hand back at all.
+  if (mirrors != PF_MIRROR_NONE) {
+    for (int round = 0; round < 8; round++) {
+      int folded = 0;
+      for (int y = 0; y < ch; y++) {
+        for (int x = 0; x < cw; x++) {
+          int fx, fy;
+          first_of_orbit(x, y, fx, fy);
+          const uint8_t first = grid.get(fx, fy);
+          if (grid.get(x, y) == first) continue;
+          grid.set(x, y, first);
+          folded++;
+        }
+      }
+      if (!folded) break;
+      pf::legalize(grid, rect);
+    }
+  }
   pf::apply_corners(*handle->map, grid, rect, handle->tiles());
   pf::rebuild_regions(*handle->map);
   set_status(status, PF_OK);
@@ -1757,6 +1821,30 @@ int pf_map_randomize_shades(pf_map* map, int x, int y, int w, int h, uint32_t se
 
 namespace {
 
+/// Whether a unit of `type` can stand at a tile with `clear` tiles of open
+/// ground around it and `margin` tiles between it and the edge.
+///
+/// On its own rather than folded into the search below, because a reflected
+/// spot is seldom on the search's stride and has to be judged where it lands.
+bool open_at(pf_map* map, int tx, int ty, int type, int clear, int margin) {
+  const pf::Map& m = *map->map;
+  if (tx < margin || ty < margin || tx >= m.width() - margin || ty >= m.height() - margin) {
+    return false;
+  }
+  if (pf_map_placement_check(map, tx, ty, type) != PF_PLACE_OK) return false;
+  for (int dy = -clear; dy <= clear; dy++) {
+    for (int dx = -clear; dx <= clear; dx++) {
+      uint8_t q[4];
+      pf::decode_tile(m.tile_at(std::min(std::max(tx + dx, 0), m.width() - 1),
+                                std::min(std::max(ty + dy, 0), m.height() - 1)), q);
+      for (int i = 0; i < 4; i++) {
+        if (q[i] != pf::kGroundLight && q[i] != pf::kGroundDark) return false;
+      }
+    }
+  }
+  return true;
+}
+
 /// Every tile a unit of `type` could stand on with `clear` tiles of open
 /// ground around it, on a coarse stride so the search stays cheap.
 std::vector<std::pair<int, int>> open_spots(pf_map* map, int type, int clear, int stride) {
@@ -1764,18 +1852,7 @@ std::vector<std::pair<int, int>> open_spots(pf_map* map, int type, int clear, in
   std::vector<std::pair<int, int>> spots;
   for (int ty = clear; ty < m.height() - clear; ty += stride) {
     for (int tx = clear; tx < m.width() - clear; tx += stride) {
-      if (pf_map_placement_check(map, tx, ty, type) != PF_PLACE_OK) continue;
-      bool room = true;
-      for (int dy = -clear; dy <= clear && room; dy++) {
-        for (int dx = -clear; dx <= clear && room; dx++) {
-          uint8_t q[4];
-          pf::decode_tile(m.tile_at(tx + dx, ty + dy), q);
-          for (int i = 0; i < 4; i++) {
-            if (q[i] != pf::kGroundLight && q[i] != pf::kGroundDark) room = false;
-          }
-        }
-      }
-      if (room) spots.push_back({tx, ty});
+      if (open_at(map, tx, ty, type, clear, clear)) spots.push_back({tx, ty});
     }
   }
   return spots;
@@ -1800,7 +1877,7 @@ size_t furthest_from(const std::vector<std::pair<int, int>>& spots,
 
 }  // namespace
 
-int pf_map_place_gold_mines(pf_map* map, int count) {
+int pf_map_place_gold_mines(pf_map* map, int count, int mirrors) {
   if (!map || count <= 0) return 0;
   // A gold mine is 3x3 and wants one tile of room around it. Asking for more
   // meant no mines at all on a map of narrow islands, where start locations
@@ -1816,16 +1893,35 @@ int pf_map_place_gold_mines(pf_map* map, int count) {
     const size_t best = furthest_from(spots, taken);
     const auto spot = spots[best];
     spots.erase(spots.begin() + long(best));
-    // 40,000 gold, stored as the amount over 2500 — the commonest in the
-    // shipped maps. Owner 15 is neutral.
-    if (pf_map_add_unit(map, spot.first, spot.second, 0x5c, 15, 16) < 0) continue;
-    taken.push_back(spot);
-    placed++;
+    // The mine and its reflections together, or none of them: a mine whose
+    // reflection is missing is the one thing a mirrored map cannot be fair
+    // about. Each is checked against the ones placed just before it, so a set
+    // that folds onto itself beside an axis is taken back rather than stacked.
+    int set[16];
+    const int n = pf_symmetry_points(map, spot.first, spot.second, 3, 3, mirrors, set, 16);
+    std::vector<int> added;
+    for (int k = 0; k < n; k++) {
+      const int x = set[k * 2], y = set[k * 2 + 1];
+      if (!open_at(map, x, y, 0x5c, 2, 2)) break;
+      // 40,000 gold, stored as the amount over 2500 — the commonest in the
+      // shipped maps. Owner 15 is neutral.
+      const int index = pf_map_add_unit(map, x, y, 0x5c, 15, 16);
+      if (index < 0) break;
+      added.push_back(index);
+    }
+    if (int(added.size()) < n) {
+      // Highest index first, so removing one does not move the rest.
+      std::sort(added.rbegin(), added.rend());
+      for (int index : added) pf_map_remove_unit(map, index);
+      continue;
+    }
+    for (int k = 0; k < n; k++) taken.push_back({set[k * 2], set[k * 2 + 1]});
+    placed += n;
   }
   return placed;
 }
 
-int pf_map_place_start_locations(pf_map* map) {
+int pf_map_place_start_locations(pf_map* map, int mirrors) {
   if (!map) return -1;
   pf::Map& m = *map->map;
 
@@ -1852,19 +1948,7 @@ int pf_map_place_start_locations(pf_map* map) {
   std::vector<std::pair<int, int>> spots;
   for (int ty = margin; ty < m.height() - margin; ty++) {
     for (int tx = margin; tx < m.width() - margin; tx++) {
-      if (pf_map_placement_check(map, tx, ty, 94) != PF_PLACE_OK) continue;
-      bool clear = true;
-      for (int dy = -2; dy <= 2 && clear; dy++) {
-        for (int dx = -2; dx <= 2 && clear; dx++) {
-          uint8_t q[4];
-          pf::decode_tile(m.tile_at(std::min(std::max(tx + dx, 0), m.width() - 1),
-                                    std::min(std::max(ty + dy, 0), m.height() - 1)), q);
-          for (int i = 0; i < 4; i++) {
-            if (q[i] != pf::kGroundLight && q[i] != pf::kGroundDark) clear = false;
-          }
-        }
-      }
-      if (clear) spots.push_back({tx, ty});
+      if (open_at(map, tx, ty, 94, 2, margin)) spots.push_back({tx, ty});
     }
   }
   if (spots.empty()) return 0;
@@ -1908,33 +1992,91 @@ int pf_map_place_start_locations(pf_map* map) {
   }
 
   int placed = 0;
-  for (int p = 0; p < pf::kPlayerCount && placed < need; p++) {
-    if (!wanted[p]) continue;
+  // One pass over the players. Under a mirror a pick is the whole mirror set,
+  // handed to the next players who need one; a set that does not fit — a
+  // reflection on water, or more reflections than players left — is passed
+  // over for the next candidate. The pass is run again without the mirror when
+  // that leaves someone without, because an odd player on a mirrored map still
+  // has to start somewhere.
+  auto pass = [&](int with_mirrors) {
+    std::vector<std::pair<int, int>> pool = spots;
+    // How many reflections a spot off every axis has. A spot on an axis has
+    // fewer — it is some of its own reflections — and is only taken when
+    // there are not enough players left for a full set: taken earlier, it
+    // leaves an odd player with nothing to pair with, which is how four
+    // players came out as a pair, one on the diagonal, and one put anywhere.
+    int probe[16];
+    const int full = pf_symmetry_points(map, 1, 2, 1, 1, with_mirrors, probe, 16);
+    for (int p = 0; p < pf::kPlayerCount && placed < need; p++) {
+      if (!wanted[p]) continue;
 
-    // Farthest-first: whichever candidate is furthest from the start locations
-    // already chosen. Crude, but it puts four starts in four corners, which is
-    // what a person would have done.
-    std::vector<std::pair<int, int>> others;
-    for (const auto& t : taken) {
-      // Distance from other *starts*, not from the mines they are meant to sit
-      // beside — spreading away from the mines would defeat the point.
-      bool is_mine = false;
-      for (const auto& mine : mines) {
-        if (mine == t) { is_mine = true; break; }
+      // Farthest-first: whichever candidate is furthest from the start
+      // locations already chosen. Crude, but it puts four starts in four
+      // corners, which is what a person would have done.
+      std::vector<std::pair<int, int>> others;
+      for (const auto& t : taken) {
+        // Distance from other *starts*, not from the mines they are meant to
+        // sit beside — spreading away from the mines would defeat the point.
+        bool is_mine = false;
+        for (const auto& mine : mines) {
+          if (mine == t) { is_mine = true; break; }
+        }
+        if (!is_mine) others.push_back(t);
       }
-      if (!is_mine) others.push_back(t);
-    }
-    const size_t best = furthest_from(spots, others);
 
-    const int type = pf_map_race(map, p) == PF_RACE_ORC ? 95 : 94;
-    if (pf_map_add_unit(map, spots[best].first, spots[best].second, type, p, 0) < 0) {
-      continue;
+      while (!pool.empty()) {
+        // Farthest-first over the whole set: from the starts already down, and
+        // from its own reflections, because a spot beside an axis reflects to
+        // a start next door — two bases a tile apart, which no distance from
+        // anyone else makes up for.
+        size_t best = 0;
+        long long best_score = -1;
+        for (size_t i = 0; i < pool.size(); i++) {
+          int set[16];
+          const int n = pf_symmetry_points(map, pool[i].first, pool[i].second, 1, 1,
+                                           with_mirrors, set, 16);
+          long long score = 1LL << 40;
+          auto apart = [&](int ax, int ay, int bx, int by) {
+            const long long dx = ax - bx, dy = ay - by;
+            score = std::min(score, dx * dx + dy * dy);
+          };
+          for (int k = 0; k < n; k++) {
+            for (const auto& t : others) apart(set[k * 2], set[k * 2 + 1], t.first, t.second);
+            for (int j = 0; j < k; j++) apart(set[k * 2], set[k * 2 + 1], set[j * 2], set[j * 2 + 1]);
+          }
+          if (score > best_score) { best_score = score; best = i; }
+        }
+        const auto spot = pool[best];
+        pool.erase(pool.begin() + long(best));
+
+        int set[16];
+        const int n = pf_symmetry_points(map, spot.first, spot.second, 1, 1,
+                                         with_mirrors, set, 16);
+        if (n > need - placed) continue;
+        if (n < full && need - placed >= full) continue;
+        bool fits = true;
+        for (int k = 0; k < n && fits; k++) {
+          fits = open_at(map, set[k * 2], set[k * 2 + 1], 94, 2, margin);
+        }
+        if (!fits) continue;
+
+        int q = p;
+        for (int k = 0; k < n; k++) {
+          while (q < pf::kPlayerCount && !wanted[q]) q++;
+          if (q >= pf::kPlayerCount) break;
+          const int type = pf_map_race(map, q) == PF_RACE_ORC ? 95 : 94;
+          const int x = set[k * 2], y = set[k * 2 + 1];
+          if (pf_map_add_unit(map, x, y, type, q, 0) < 0) continue;
+          wanted[q] = false;
+          taken.push_back({x, y});
+          placed++;
+        }
+        break;
+      }
     }
-    taken.push_back(spots[best]);
-    spots.erase(spots.begin() + long(best));
-    placed++;
-    if (spots.empty()) break;
-  }
+  };
+  pass(mirrors);
+  if (placed < need && mirrors != PF_MIRROR_NONE) pass(PF_MIRROR_NONE);
   return placed;
 }
 
