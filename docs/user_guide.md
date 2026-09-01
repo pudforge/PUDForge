@@ -377,17 +377,13 @@ runs, and the two campaign workers. Leave this off unless you need them. Five
 of the slots have no unit behind them, and a map that places one stops the
 game. Walls stay out of the palette either way, because walls are terrain here.
 
-**Updates.** Whether the editor checks for a new release when it starts.
-
 Everything in this window is kept between sessions.
 
 ## Updates
 
 **Help ▸ Check for Updates…** asks the PUDForge releases page for the newest
-version. The editor also asks once a day when it starts, unless the option is
-off. When there is a newer version, a window shows what is new and offers
-**Update Now**, **Later** or **Skip This Version**. A skipped version is not
-mentioned again at start-up, but Check for Updates always shows it.
+version. The editor does not check by itself. When there is a newer version,
+a window shows what is new and offers **Update Now** or **Later**.
 
 Update Now downloads the new `PUDForge.exe`, checks it against the hash in the
 release notes, and puts it where the running one is. If that folder needs

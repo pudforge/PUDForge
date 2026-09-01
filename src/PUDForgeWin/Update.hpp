@@ -1,4 +1,5 @@
-// Check for Updates, from the Help menu and once a day at start-up.
+// Check for Updates, from the Help menu. By hand only, for now: the editor
+// asks nothing over the network that nobody asked it to.
 //
 // The exe is the whole installation, so an update is one file fetched from
 // the GitHub release and put where the running one is. A running exe cannot
@@ -21,7 +22,6 @@ namespace pfwin {
 /// the message's LPARAM, which owns it from then on.
 struct UpdateResult {
   bool ok = false;        ///< the feed was read; otherwise `why` says what happened
-  bool quiet = false;     ///< a start-up check, which says nothing unless there is news
   std::wstring version;   ///< the newest release's
   std::wstring exe_url;
   std::wstring page_url;
@@ -32,21 +32,20 @@ struct UpdateResult {
 
 /// Read the releases feed on a thread of its own and post `message` to
 /// `notify` with an UpdateResult* in LPARAM. Off the window's thread because
-/// a check at start-up must not hold the window up for as long as a bad
-/// connection takes to say so.
-void StartUpdateCheck(HWND notify, UINT message, bool quiet);
+/// a bad connection takes ten seconds to say so, and the window should not
+/// hang for them.
+void StartUpdateCheck(HWND notify, UINT message);
 
 /// Whether a release is newer than the build that is running.
 bool IsNewerThanThis(const std::wstring& version);
 
 enum class UpdateChoice {
-  kLater,            ///< nothing done; ask again next time
-  kSkip,             ///< nothing done; do not mention this version again
+  kLater,            ///< nothing done
   kRestart,          ///< installed, and the person wants it now
   kInstalledLater,   ///< installed; it runs next time the editor starts
 };
 
-/// The update window: what is new, and Update Now / Later / Skip. Update Now
+/// The update window: what is new, and Update Now / Later. Update Now
 /// downloads, checks the hash the notes state, installs, and then offers the
 /// restart. Modal.
 UpdateChoice OfferUpdate(HWND owner, HINSTANCE instance, const UpdateResult& found);
@@ -66,8 +65,5 @@ void RemoveOldExe();
 /// error, so the caller can say why when it fails.
 bool WantsInstallUpdate(int argc, wchar_t** argv);
 int RunInstallUpdate(int argc, wchar_t** argv);
-
-/// Today, as a day count, for "once a day".
-int DayNumber();
 
 }  // namespace pfwin

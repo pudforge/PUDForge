@@ -590,7 +590,7 @@
 /* The success dialog, which is a task dialog so the link can be clicked. */
 #define IDS_REPORT_SENT_MAIN      1892
 // --------------------------------------------------------------- updates
-/* Help > Check for Updates, and the once-a-day check at start-up. */
+/* Help > Check for Updates. */
 #define IDS_UPDATE_TITLE          1894
 #define IDS_UPDATE_CHECKING       1895
 #define IDS_UPDATE_NONE           1896
@@ -613,7 +613,7 @@
 #define IDS_UPDATE_INSTALLED_STATUS 1913
 #define IDS_UPDATE_LOG_CHECKED    1914
 #define IDS_UPDATE_LOG_FAILED     1915
-#define IDS_UPDATE_LOG_SKIPPED    1916
+/* 1916 said a version was skipped by the start-up check. Left unused. */
 
 #define IDS_REPORT_SENT_FOLLOW    1893
 

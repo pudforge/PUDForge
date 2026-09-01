@@ -210,13 +210,11 @@ bool WriteFileBytes(const std::wstring& path, const std::string& bytes) {
 struct CheckJob {
   HWND notify;
   UINT message;
-  bool quiet;
 };
 
 DWORD WINAPI CheckThread(void* param) {
   CheckJob* job = static_cast<CheckJob*>(param);
   auto* result = new UpdateResult();
-  result->quiet = job->quiet;
 
   std::string body;
   std::wstring why;
@@ -272,7 +270,7 @@ DWORD WINAPI DownloadThread(void* param) {
 
 void SetBusy(HWND dialog, UpdateSheet& sheet, bool busy) {
   sheet.busy = busy;
-  for (int id : {IDOK, IDCANCEL, IDC_UPDATE_SKIP, IDC_UPDATE_PAGE}) {
+  for (int id : {IDOK, IDCANCEL, IDC_UPDATE_PAGE}) {
     EnableWindow(GetDlgItem(dialog, id), !busy);
   }
   HWND progress = GetDlgItem(dialog, IDC_UPDATE_PROGRESS);
@@ -323,7 +321,6 @@ void Install(HWND dialog, UpdateSheet& sheet) {
   SetDlgItemTextW(dialog, IDC_UPDATE_HEAD, Format(IDS_UPDATE_INSTALLED, found.version.c_str()).c_str());
   SetDlgItemTextW(dialog, IDC_UPDATE_NOTE, L"");
   SetDlgItemTextW(dialog, IDOK, Str(IDS_UPDATE_RESTART).c_str());
-  ShowWindow(GetDlgItem(dialog, IDC_UPDATE_SKIP), SW_HIDE);
   SetFocus(GetDlgItem(dialog, IDOK));
 }
 
@@ -391,10 +388,6 @@ INT_PTR CALLBACK UpdateProc(HWND dialog, UINT message, WPARAM wparam, LPARAM lpa
         EndDialog(dialog, int(sheet->installed ? UpdateChoice::kInstalledLater : UpdateChoice::kLater));
         return TRUE;
       }
-      if (id == IDC_UPDATE_SKIP) {
-        EndDialog(dialog, int(UpdateChoice::kSkip));
-        return TRUE;
-      }
       if (id == IDC_UPDATE_PAGE) {
         ShellExecuteW(nullptr, L"open", sheet->found->page_url.c_str(), nullptr, nullptr,
                       SW_SHOWNORMAL);
@@ -408,12 +401,11 @@ INT_PTR CALLBACK UpdateProc(HWND dialog, UINT message, WPARAM wparam, LPARAM lpa
 
 }  // namespace
 
-void StartUpdateCheck(HWND notify, UINT message, bool quiet) {
-  auto* job = new CheckJob{notify, message, quiet};
+void StartUpdateCheck(HWND notify, UINT message) {
+  auto* job = new CheckJob{notify, message};
   HANDLE thread = CreateThread(nullptr, 0, CheckThread, job, 0, nullptr);
   if (!thread) {
     auto* result = new UpdateResult();
-    result->quiet = quiet;
     result->why = ErrorText(GetLastError());
     delete job;
     if (!PostMessageW(notify, message, 0, reinterpret_cast<LPARAM>(result))) delete result;
@@ -457,13 +449,6 @@ bool WantsInstallUpdate(int argc, wchar_t** argv) {
 int RunInstallUpdate(int argc, wchar_t** argv) {
   if (!WantsInstallUpdate(argc, argv)) return int(ERROR_INVALID_PARAMETER);
   return int(SwapExe(ThisExe(), argv[2]));
-}
-
-int DayNumber() {
-  FILETIME now = {};
-  GetSystemTimeAsFileTime(&now);
-  const ULONGLONG ticks = (ULONGLONG(now.dwHighDateTime) << 32) | now.dwLowDateTime;
-  return int(ticks / (10000000ULL * 86400ULL));
 }
 
 }  // namespace pfwin

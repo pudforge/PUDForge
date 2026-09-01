@@ -530,7 +530,6 @@ struct OptionSheet {
   int* unit_art = nullptr;
   bool* vary_facing = nullptr;
   bool* unit_sounds = nullptr;
-  bool* check_updates = nullptr;
   bool reset = false;
 };
 
@@ -567,7 +566,6 @@ INT_PTR CALLBACK OptionsProc(HWND dialog, UINT message, WPARAM wparam, LPARAM lp
       set(IDC_OPT_UNUSED_UNITS, ed.offer_unused_units);
       set(IDC_OPT_FACING, sheet->vary_facing && *sheet->vary_facing);
       set(IDC_OPT_SOUNDS, sheet->unit_sounds && *sheet->unit_sounds);
-      set(IDC_OPT_UPDATES, sheet->check_updates && *sheet->check_updates);
       HWND art = GetDlgItem(dialog, IDC_OPT_UNIT_ART);
       SendMessageW(art, CB_ADDSTRING, 0,
                    reinterpret_cast<LPARAM>(Str(IDS_ART_PORTRAIT).c_str()));
@@ -596,7 +594,6 @@ INT_PTR CALLBACK OptionsProc(HWND dialog, UINT message, WPARAM wparam, LPARAM lp
         ed.ApplyPlacementOption();
         if (sheet->vary_facing) *sheet->vary_facing = get(IDC_OPT_FACING);
         if (sheet->unit_sounds) *sheet->unit_sounds = get(IDC_OPT_SOUNDS);
-        if (sheet->check_updates) *sheet->check_updates = get(IDC_OPT_UPDATES);
         if (sheet->unit_art) {
           *sheet->unit_art = std::max(0, ComboIndex(dialog, IDC_OPT_UNIT_ART));
         }
@@ -1473,14 +1470,12 @@ bool ShowGameSetup(HWND owner, HINSTANCE instance, GameData& game, bool required
 }
 
 bool ShowOptions(HWND owner, HINSTANCE instance, Editor& editor, int* unit_art,
-                 bool* vary_facing, bool* unit_sounds, bool* check_updates,
-                 bool* reset) {
+                 bool* vary_facing, bool* unit_sounds, bool* reset) {
   OptionSheet sheet;
   sheet.editor = &editor;
   sheet.unit_art = unit_art;
   sheet.vary_facing = vary_facing;
   sheet.unit_sounds = unit_sounds;
-  sheet.check_updates = check_updates;
   const bool ok = DialogBoxParamW(instance, MAKEINTRESOURCEW(IDD_OPTIONS), owner,
                                   OptionsProc, LPARAM(&sheet)) == IDOK;
   if (reset) *reset = sheet.reset;

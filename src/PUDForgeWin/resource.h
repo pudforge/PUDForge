@@ -393,8 +393,8 @@
 /// Offer the units an editor normally keeps back — the dead slots, the runtime
 /// leftovers, the campaign workers. 692 rather than reusing retired 691.
 #define IDC_OPT_UNUSED_UNITS  692
-/// Whether the editor asks the releases feed once a day when it starts.
-#define IDC_OPT_UPDATES       693
+/* 693 was "Check for updates when PUDForge starts", retired with the
+   start-up check. Left unused until one comes back. */
 
 /* 700 was the keyboard shortcut list box, retired with its dialog. */
 
@@ -500,7 +500,8 @@
 #define IDC_UPDATE_NOTES      863
 #define IDC_UPDATE_PROGRESS   864
 #define IDC_UPDATE_NOTE       865
-#define IDC_UPDATE_SKIP       866
+/* 866 was Skip This Version, which only means something to a check that
+   runs by itself. Left unused until one does. */
 #define IDC_UPDATE_PAGE       867
 /* 846 was a read-only line saying whether the map carried an `ALOW` section,
    on the reasoning that the format has no `useDefaultData` for restrictions the

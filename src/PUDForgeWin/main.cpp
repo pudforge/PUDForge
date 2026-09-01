@@ -42,7 +42,6 @@
 #include "Toolbar.hpp"
 #include "UiIcons.hpp"
 #include "Update.hpp"
-#include "UpdateFeed.hpp"   // PackVersion
 #include "pudforge/pudforge.h"
 #include "resource.h"
 #include "strings.h"
@@ -343,11 +342,8 @@ struct App : Host {
   // Off unless asked for: an editor that talks back is a preference, not a
   // default, and it needs the game to hand to say anything at all.
   bool unit_sounds = LoadSetting(L"UnitSounds", 0) != 0;
-  /// Ask the releases feed once a day at start-up. On by default, because a
-  /// new release is otherwise a thing nobody is told about; Options has the
-  /// switch, since it is a question over the network.
-  bool check_updates = LoadSetting(L"CheckUpdates", 1) != 0;
-  /// A check is out and has not answered: a second one would answer twice.
+  /// A check for updates is out and has not answered: a second one would
+  /// answer twice.
   bool update_pending = false;
   /// The furniture, hideable the way the web client's is. The canvas takes
   /// whatever is left, so hiding a dock is a real gain in room to work.
@@ -513,7 +509,6 @@ struct App : Host {
     SaveSetting(L"UnitArt", unit_art);
     SaveSetting(L"VaryFacing", vary_facing);
     SaveSetting(L"UnitSounds", unit_sounds);
-    SaveSetting(L"CheckUpdates", check_updates);
     for (const Editor::Option& option : Editor::SavedOptions()) {
       SaveSetting(FromUtf8(option.name).c_str(), option.get(editor));
     }
@@ -1023,14 +1018,13 @@ struct App : Host {
     if (!note.empty()) OnStatus(note, outcome.dropped_units > 0);
   }
 
-  /// Ask the releases feed. `quiet` is the start-up check, which says
-  /// nothing unless there is a newer release that has not been skipped; the
-  /// menu command reports whatever it finds, including that there is nothing.
-  void CheckForUpdates(bool quiet) {
+  /// Ask the releases feed, and report whatever it says — including that
+  /// there is nothing newer, since the person asked.
+  void CheckForUpdates() {
     if (update_pending) return;
     update_pending = true;
-    if (!quiet) OnStatus(Str(IDS_UPDATE_CHECKING), false);
-    StartUpdateCheck(main, kMsgUpdateChecked, quiet);
+    OnStatus(Str(IDS_UPDATE_CHECKING), false);
+    StartUpdateCheck(main, kMsgUpdateChecked);
   }
 
   void OnUpdateChecked(UpdateResult* answer) {
@@ -1039,33 +1033,17 @@ struct App : Host {
     if (!result) return;
     if (!result->ok) {
       Log::The().Add(Format(IDS_UPDATE_LOG_FAILED, result->why.c_str()), true);
-      if (!result->quiet) {
-        MessageBoxW(main, Format(IDS_UPDATE_FAILED, result->why.c_str()).c_str(),
-                    Str(IDS_UPDATE_TITLE).c_str(), MB_OK | MB_ICONWARNING);
-      }
+      MessageBoxW(main, Format(IDS_UPDATE_FAILED, result->why.c_str()).c_str(),
+                  Str(IDS_UPDATE_TITLE).c_str(), MB_OK | MB_ICONWARNING);
       return;
     }
-    // A day is counted from an answer, not from a question: a machine that
-    // is offline in the morning gets asked again in the afternoon.
-    SaveSetting(L"LastUpdateCheck", DayNumber());
     Log::The().Add(Format(IDS_UPDATE_LOG_CHECKED, result->version.c_str()), false);
     if (!IsNewerThanThis(result->version)) {
-      if (!result->quiet) {
-        MessageBoxW(main, Format(IDS_UPDATE_NONE, PF_APP_VERSION_WSTR).c_str(),
-                    Str(IDS_UPDATE_TITLE).c_str(), MB_OK | MB_ICONINFORMATION);
-      }
-      return;
-    }
-    // Skipped means skipped at start-up. Asking by hand is asking to see it.
-    const unsigned packed = PackVersion(ToUtf8(result->version));
-    if (result->quiet && unsigned(LoadSetting(L"SkipVersion", 0)) == packed) {
-      Log::The().Add(Format(IDS_UPDATE_LOG_SKIPPED, result->version.c_str()), false);
+      MessageBoxW(main, Format(IDS_UPDATE_NONE, PF_APP_VERSION_WSTR).c_str(),
+                  Str(IDS_UPDATE_TITLE).c_str(), MB_OK | MB_ICONINFORMATION);
       return;
     }
     switch (OfferUpdate(main, instance, *result)) {
-      case UpdateChoice::kSkip:
-        SaveSetting(L"SkipVersion", int(packed));
-        break;
       case UpdateChoice::kRestart:
         RestartForUpdate();
         break;
@@ -1703,8 +1681,7 @@ struct App : Host {
       case IDM_TOOLS_OPTIONS: {
         bool reset = false;
         const bool changed = ShowOptions(main, instance, editor, &unit_art,
-                                         &vary_facing, &unit_sounds, &check_updates,
-                                         &reset);
+                                         &vary_facing, &unit_sounds, &reset);
         // The running window keeps the layout it has — moving everything under
         // somebody mid-edit is worse than waiting for the restart the dialog
         // told them about. What must not happen is writing it all back out on
@@ -1839,7 +1816,7 @@ struct App : Host {
         return true;
 
       case IDM_HELP_UPDATE:
-        CheckForUpdates(false);
+        CheckForUpdates();
         return true;
 
       case IDM_HELP_ABOUT: {
@@ -2499,13 +2476,8 @@ int APIENTRY wWinMain(HINSTANCE instance, HINSTANCE, LPWSTR, int show) {
   ShowWindow(app.main, maximized ? SW_SHOWMAXIMIZED : show);
   UpdateWindow(app.main);
 
-  // The exe a previous update moved aside, now that nothing runs from it. And
-  // the once-a-day question, after the window is up so a slow answer holds
-  // nothing back.
+  // The exe a previous update moved aside, now that nothing runs from it.
   RemoveOldExe();
-  if (app.check_updates && LoadSetting(L"LastUpdateCheck", 0) != DayNumber()) {
-    app.CheckForUpdates(true);
-  }
 
   HACCEL accel = LoadAcceleratorsW(instance, MAKEINTRESOURCEW(IDR_ACCELERATORS));
   MSG msg;

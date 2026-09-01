@@ -671,7 +671,6 @@ BEGIN
   IDS_UPDATE_INSTALLED_STATUS "PUDForge %ls is installed and runs from the next start"
   IDS_UPDATE_LOG_CHECKED "Update check: the newest release is %ls"
   IDS_UPDATE_LOG_FAILED "Update check failed: %ls"
-  IDS_UPDATE_LOG_SKIPPED "Update check: %ls is available and is skipped"
 
   /* ---------------------------------------------------------------- help */
   IDS_ABOUT_TITLE       "About PUDForge"
