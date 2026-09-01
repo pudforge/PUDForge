@@ -589,6 +589,32 @@
 #define IDS_REPORT_TITLE          1891
 /* The success dialog, which is a task dialog so the link can be clicked. */
 #define IDS_REPORT_SENT_MAIN      1892
+// --------------------------------------------------------------- updates
+/* Help > Check for Updates, and the once-a-day check at start-up. */
+#define IDS_UPDATE_TITLE          1894
+#define IDS_UPDATE_CHECKING       1895
+#define IDS_UPDATE_NONE           1896
+#define IDS_UPDATE_FAILED         1897
+#define IDS_UPDATE_AVAILABLE      1898
+#define IDS_UPDATE_NOTES          1899
+#define IDS_UPDATE_DOWNLOADING    1900
+#define IDS_UPDATE_INSTALLING     1901
+#define IDS_UPDATE_PERMISSION     1902
+#define IDS_UPDATE_INSTALLED      1903
+#define IDS_UPDATE_RESTART        1904
+#define IDS_UPDATE_NOT_INSTALLED  1905
+#define IDS_UPDATE_MISMATCH       1906
+#define IDS_UPDATE_UNCHECKED      1907
+#define IDS_UPDATE_DECLINED       1908
+#define IDS_UPDATE_NO_EXE         1909
+#define IDS_UPDATE_BAD_FEED       1910
+#define IDS_UPDATE_HTTP           1911
+#define IDS_UPDATE_ERROR_CODE     1912
+#define IDS_UPDATE_INSTALLED_STATUS 1913
+#define IDS_UPDATE_LOG_CHECKED    1914
+#define IDS_UPDATE_LOG_FAILED     1915
+#define IDS_UPDATE_LOG_SKIPPED    1916
+
 #define IDS_REPORT_SENT_FOLLOW    1893
 
 // ------------------------------------------------------ restrictions, redux

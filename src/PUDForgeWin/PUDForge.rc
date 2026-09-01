@@ -262,6 +262,7 @@ BEGIN
     // F1, which the shortcut list used to answer: the guide holds the keyboard
     // reference now, so the key that meant "what can I press" still does.
     MENUITEM "&User Guide\tF1",            IDM_HELP_GUIDE
+    MENUITEM "&Check for Updates…",        IDM_HELP_UPDATE
     MENUITEM SEPARATOR
 #ifdef PF_ENABLE_REPORT
     MENUITEM "&Report an Issue…",          IDM_HELP_REPORT
@@ -678,6 +679,30 @@ BEGIN
 END
 #endif
 
+/*
+ * Check for Updates. One window for the whole thing: what is new, then the
+ * download's progress in the same place, then the offer of a restart. The
+ * head and the notes' label are filled at run time because both name a
+ * version. Skip is a checkbox's worth of decision dressed as a button so the
+ * three answers sit in one row.
+ */
+IDD_UPDATE DIALOGEX 0, 0, 320, 200
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Check for Updates"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+  LTEXT           "", IDC_UPDATE_HEAD, 8, 8, 304, 10
+  LTEXT           "", IDC_UPDATE_NOTES_LABEL, 8, 24, 304, 8
+  EDITTEXT        IDC_UPDATE_NOTES, 8, 34, 304, 100,
+                  ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL | WS_VSCROLL | WS_TABSTOP
+  CONTROL         "", IDC_UPDATE_PROGRESS, "msctls_progress32", PBS_MARQUEE, 8, 140, 304, 10
+  LTEXT           "", IDC_UPDATE_NOTE, 8, 154, 304, 20
+  PUSHBUTTON      "&Release Page", IDC_UPDATE_PAGE, 8, 178, 64, 14
+  DEFPUSHBUTTON   "&Update Now", IDOK, 122, 178, 60, 14
+  PUSHBUTTON      "&Later", IDCANCEL, 186, 178, 50, 14
+  PUSHBUTTON      "&Skip This Version", IDC_UPDATE_SKIP, 240, 178, 72, 14
+END
+
 IDD_DECORATE DIALOGEX 0, 0, 230, 100
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "Decorate with a Terrain"
@@ -766,7 +791,7 @@ END
  * them — and they outgrew it: a menu shows one at a time and says nothing
  * about which belong together.
  */
-IDD_OPTIONS DIALOGEX 0, 0, 250, 254
+IDD_OPTIONS DIALOGEX 0, 0, 250, 290
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "Options"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
@@ -799,11 +824,16 @@ BEGIN
   // here. See Editor::offer_unused_units.
   AUTOCHECKBOX    "Offer un&used and special units (may crash the game)", IDC_OPT_UNUSED_UNITS, 16, 212, 218, 10
 
+  // On by default: a release is a file nobody is told about otherwise. It
+  // is a question over the network, so it is a switch and not a habit.
+  GROUPBOX        "Updates", -1, 8, 234, 234, 30
+  AUTOCHECKBOX    "&Check for updates when PUDForge starts", IDC_OPT_UPDATES, 16, 248, 218, 10
+
   // Away from OK and Cancel, on the other side of the row: it is the one
   // button on this page that discards something.
-  PUSHBUTTON      "&Reset Everything…", IDC_OPT_RESET, 8, 234, 80, 14
-  DEFPUSHBUTTON   "OK", IDOK, 138, 234, 50, 14
-  PUSHBUTTON      "Cancel", IDCANCEL, 192, 234, 50, 14
+  PUSHBUTTON      "&Reset Everything…", IDC_OPT_RESET, 8, 270, 80, 14
+  DEFPUSHBUTTON   "OK", IDOK, 138, 270, 50, 14
+  PUSHBUTTON      "Cancel", IDCANCEL, 192, 270, 50, 14
 END
 
 /*

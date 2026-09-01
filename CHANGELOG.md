@@ -37,6 +37,15 @@ section therefore covers all the commits after the previous tag.
 `scripts/prep-release.ps1` collects those commits as a start. See
 `docs/releasing.md`.
 
+## 0.1.71
+
+**New**
+
+- Check for Updates, on the Help menu. It downloads and installs a new release
+  and offers a restart.
+- PUDForge checks for a new release once a day when it starts. Options has the
+  switch.
+
 ## 0.1.70
 
 **New**

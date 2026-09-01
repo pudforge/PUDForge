@@ -91,16 +91,19 @@ add_executable(pf_tests
   Tests/test_corpus.cpp
   Tests/test_api.cpp
   Tests/test_editor.cpp
+  Tests/test_update.cpp
   # The Windows client's editor state is deliberately Win32-free, which is
   # what lets the client's behaviour be tested on machines with no MSVC.
   PUDForgeWin/Editor.cpp
+  # And the reading of the releases feed, for the same reason.
+  PUDForgeWin/UpdateFeed.cpp
 )
 target_link_libraries(pf_tests PRIVATE pudforge)
 target_include_directories(pf_tests PRIVATE PUDForgeCore)
 # Register each group separately so `ctest -j` runs them in parallel, in their
 # own processes. Per-test registration would be finer but slower: every process
 # rediscovers the map corpus, and that walk costs more than most single tests.
-foreach(group format terrain units art api editor)
+foreach(group format terrain units art api editor update)
   add_test(NAME ${group}
            COMMAND pf_tests "${CMAKE_CURRENT_SOURCE_DIR}/.." --group ${group})
 endforeach()
@@ -207,13 +210,12 @@ if (WIN32)
       "on a Windows machine after changing either PNG.")
   endif()
 
-  # Report an Issue is the only thing in this client that opens a socket, and
-  # this compiles it out rather than hiding it. v0.1.66 was the first build to
-  # import WINHTTP.dll at all, and it is the first anybody was told was a
-  # virus; the question is whether a build carrying neither the import nor the
-  # hostname stops being called one. A feature left in but unreachable would
-  # not answer that, because the scanner reads the file and not the menu.
-  # docs/releasing.md has the measurements. Back to ON once this is settled.
+  # Report an Issue was the only thing in this client that opened a socket,
+  # and this compiled it out rather than hiding it: v0.1.66 was the first
+  # build to import WINHTTP.dll at all, and the first anybody was told was a
+  # virus. Check for Updates brought the import back in 0.1.71, so the
+  # experiment is over; what stays out is the POST with a `log` field and the
+  # workers.dev hostname, which docs/releasing.md measures as the worse half.
   option(PF_ENABLE_REPORT "Build Help > Report an Issue, which posts over HTTPS" OFF)
 
   add_executable(PUDForgeWin WIN32
@@ -235,6 +237,8 @@ if (WIN32)
     PUDForgeWin/Toolbar.cpp
     PUDForgeWin/UiIcons.cpp
     PUDForgeWin/Sounds.cpp
+    PUDForgeWin/UpdateFeed.cpp
+    PUDForgeWin/Update.cpp
     PUDForgeWin/PUDForge.rc)
   target_include_directories(PUDForgeWin PRIVATE
     PUDForgeCore
@@ -265,7 +269,9 @@ if (WIN32)
   # links nowhere without it (see BlitRgbaBlended in Blit.hpp).
   # winmm: PlaySound, for the unit voices. The clips are the game's own bytes,
   # so nothing is decoded here and no third-party audio library is involved.
-  target_link_libraries(PUDForgeWin PRIVATE pudforge comctl32 shell32 ole32 shlwapi msimg32 winmm)
+  # winhttp and bcrypt: Check for Updates reads the releases feed and checks
+  # the download against the hash the release notes state.
+  target_link_libraries(PUDForgeWin PRIVATE pudforge comctl32 shell32 ole32 shlwapi msimg32 winmm winhttp bcrypt)
   # The source, the library and the definition move together: the definition
   # reaches the resource compiler too, which is what drops the menu item, the
   # dialog and its strings, so an off build carries none of the words either.

@@ -137,9 +137,12 @@
 /// stay so, and this belongs with Help regardless of where the gap was.
 #define IDM_HELP_GUIDE        325
 #define IDM_HELP_REPORT       326
+#define IDM_HELP_UPDATE       327
 
 /* Report an Issue, on the Help menu. */
 #define IDD_REPORT            526
+/* Check for Updates: a newer release, and the buttons to take it or not. */
+#define IDD_UPDATE            527
 #define IDM_HELP_ABOUT        320
 /* 321 was Help > Keyboard Shortcuts. The guide lists the keys now. */
 
@@ -390,6 +393,8 @@
 /// Offer the units an editor normally keeps back — the dead slots, the runtime
 /// leftovers, the campaign workers. 692 rather than reusing retired 691.
 #define IDC_OPT_UNUSED_UNITS  692
+/// Whether the editor asks the releases feed once a day when it starts.
+#define IDC_OPT_UPDATES       693
 
 /* 700 was the keyboard shortcut list box, retired with its dialog. */
 
@@ -488,6 +493,15 @@
 #define IDC_REPORT_LOG        858
 #define IDC_REPORT_NOTE       859
 #define IDC_REPORT_VERSION    860
+
+/* Check for Updates. */
+#define IDC_UPDATE_HEAD       861
+#define IDC_UPDATE_NOTES_LABEL 862
+#define IDC_UPDATE_NOTES      863
+#define IDC_UPDATE_PROGRESS   864
+#define IDC_UPDATE_NOTE       865
+#define IDC_UPDATE_SKIP       866
+#define IDC_UPDATE_PAGE       867
 /* 846 was a read-only line saying whether the map carried an `ALOW` section,
    on the reasoning that the format has no `useDefaultData` for restrictions the
    way it does for the unit and upgrade tables. It is IDC_ALOW_DEFAULTS now, a

@@ -16,6 +16,7 @@
 #include <shellapi.h>
 #include <shobjidl.h>
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -40,6 +41,8 @@
 #include "Strings.hpp"
 #include "Toolbar.hpp"
 #include "UiIcons.hpp"
+#include "Update.hpp"
+#include "UpdateFeed.hpp"   // PackVersion
 #include "pudforge/pudforge.h"
 #include "resource.h"
 #include "strings.h"
@@ -305,6 +308,8 @@ enum StatusCell {
 /// in it the game could not place. Posted rather than called, so it lands on
 /// the message loop with the window up and the settings restored.
 constexpr UINT kMsgOfferCleanup = WM_APP + 1;
+/// The update check has an answer. LPARAM is the UpdateResult, ours to free.
+constexpr UINT kMsgUpdateChecked = WM_APP + 2;
 
 struct App : Host {
   HWND main = nullptr;
@@ -338,6 +343,12 @@ struct App : Host {
   // Off unless asked for: an editor that talks back is a preference, not a
   // default, and it needs the game to hand to say anything at all.
   bool unit_sounds = LoadSetting(L"UnitSounds", 0) != 0;
+  /// Ask the releases feed once a day at start-up. On by default, because a
+  /// new release is otherwise a thing nobody is told about; Options has the
+  /// switch, since it is a question over the network.
+  bool check_updates = LoadSetting(L"CheckUpdates", 1) != 0;
+  /// A check is out and has not answered: a second one would answer twice.
+  bool update_pending = false;
   /// The furniture, hideable the way the web client's is. The canvas takes
   /// whatever is left, so hiding a dock is a real gain in room to work.
   bool show_docks = LoadSetting(L"ShowDocks", 1) != 0;
@@ -502,6 +513,7 @@ struct App : Host {
     SaveSetting(L"UnitArt", unit_art);
     SaveSetting(L"VaryFacing", vary_facing);
     SaveSetting(L"UnitSounds", unit_sounds);
+    SaveSetting(L"CheckUpdates", check_updates);
     for (const Editor::Option& option : Editor::SavedOptions()) {
       SaveSetting(FromUtf8(option.name).c_str(), option.get(editor));
     }
@@ -1009,6 +1021,71 @@ struct App : Host {
     // How many units the new grid had no room for decides whether this is a
     // warning; nothing else in the window can lose anything.
     if (!note.empty()) OnStatus(note, outcome.dropped_units > 0);
+  }
+
+  /// Ask the releases feed. `quiet` is the start-up check, which says
+  /// nothing unless there is a newer release that has not been skipped; the
+  /// menu command reports whatever it finds, including that there is nothing.
+  void CheckForUpdates(bool quiet) {
+    if (update_pending) return;
+    update_pending = true;
+    if (!quiet) OnStatus(Str(IDS_UPDATE_CHECKING), false);
+    StartUpdateCheck(main, kMsgUpdateChecked, quiet);
+  }
+
+  void OnUpdateChecked(UpdateResult* answer) {
+    update_pending = false;
+    std::unique_ptr<UpdateResult> result(answer);
+    if (!result) return;
+    if (!result->ok) {
+      Log::The().Add(Format(IDS_UPDATE_LOG_FAILED, result->why.c_str()), true);
+      if (!result->quiet) {
+        MessageBoxW(main, Format(IDS_UPDATE_FAILED, result->why.c_str()).c_str(),
+                    Str(IDS_UPDATE_TITLE).c_str(), MB_OK | MB_ICONWARNING);
+      }
+      return;
+    }
+    // A day is counted from an answer, not from a question: a machine that
+    // is offline in the morning gets asked again in the afternoon.
+    SaveSetting(L"LastUpdateCheck", DayNumber());
+    Log::The().Add(Format(IDS_UPDATE_LOG_CHECKED, result->version.c_str()), false);
+    if (!IsNewerThanThis(result->version)) {
+      if (!result->quiet) {
+        MessageBoxW(main, Format(IDS_UPDATE_NONE, PF_APP_VERSION_WSTR).c_str(),
+                    Str(IDS_UPDATE_TITLE).c_str(), MB_OK | MB_ICONINFORMATION);
+      }
+      return;
+    }
+    // Skipped means skipped at start-up. Asking by hand is asking to see it.
+    const unsigned packed = PackVersion(ToUtf8(result->version));
+    if (result->quiet && unsigned(LoadSetting(L"SkipVersion", 0)) == packed) {
+      Log::The().Add(Format(IDS_UPDATE_LOG_SKIPPED, result->version.c_str()), false);
+      return;
+    }
+    switch (OfferUpdate(main, instance, *result)) {
+      case UpdateChoice::kSkip:
+        SaveSetting(L"SkipVersion", int(packed));
+        break;
+      case UpdateChoice::kRestart:
+        RestartForUpdate();
+        break;
+      case UpdateChoice::kInstalledLater:
+        OnStatus(Format(IDS_UPDATE_INSTALLED_STATUS, result->version.c_str()), false);
+        break;
+      case UpdateChoice::kLater:
+        break;
+    }
+  }
+
+  /// Close this instance and start the exe that is now in its place. The
+  /// close goes first so the unsaved-changes question is asked before a
+  /// second window is up, and the settings are written by the window's own
+  /// teardown before the new one reads them.
+  void RestartForUpdate() {
+    if (!ConfirmDiscard()) return;
+    const std::wstring exe = ThisExe();
+    DestroyWindow(main);
+    LaunchExe(exe);
   }
 
   void GenerateMap() {
@@ -1626,7 +1703,8 @@ struct App : Host {
       case IDM_TOOLS_OPTIONS: {
         bool reset = false;
         const bool changed = ShowOptions(main, instance, editor, &unit_art,
-                                         &vary_facing, &unit_sounds, &reset);
+                                         &vary_facing, &unit_sounds, &check_updates,
+                                         &reset);
         // The running window keeps the layout it has — moving everything under
         // somebody mid-edit is worse than waiting for the restart the dialog
         // told them about. What must not happen is writing it all back out on
@@ -1758,6 +1836,10 @@ struct App : Host {
 
       case IDM_HELP_GUIDE:
         if (!OpenUserGuide(main)) OnStatus(Str(IDS_GUIDE_FAILED), true);
+        return true;
+
+      case IDM_HELP_UPDATE:
+        CheckForUpdates(false);
         return true;
 
       case IDM_HELP_ABOUT: {
@@ -2203,6 +2285,11 @@ LRESULT CALLBACK MainProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
       if (app) app->OfferToRemoveMisplaced();
       return 0;
 
+    case kMsgUpdateChecked:
+      if (app) app->OnUpdateChecked(reinterpret_cast<UpdateResult*>(lparam));
+      else delete reinterpret_cast<UpdateResult*>(lparam);
+      return 0;
+
     case WM_DROPFILES: {
       if (!app) break;
       auto drop = reinterpret_cast<HDROP>(wparam);
@@ -2262,6 +2349,13 @@ int APIENTRY wWinMain(HINSTANCE instance, HINSTANCE, LPWSTR, int show) {
   {
     int argc = 0;
     LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc);
+    // The elevated half of an update: this exe is the downloaded one, and
+    // the only thing it does is copy itself over the installed one.
+    if (argv && WantsInstallUpdate(argc, argv)) {
+      const int code = RunInstallUpdate(argc, argv);
+      LocalFree(argv);
+      return code;
+    }
     if (argv && WantsCapture(argc, argv)) {
       const int code = RunCapture(argc, argv);
       LocalFree(argv);
@@ -2404,6 +2498,14 @@ int APIENTRY wWinMain(HINSTANCE instance, HINSTANCE, LPWSTR, int show) {
   const bool maximized = RestorePlacement(app.main);
   ShowWindow(app.main, maximized ? SW_SHOWMAXIMIZED : show);
   UpdateWindow(app.main);
+
+  // The exe a previous update moved aside, now that nothing runs from it. And
+  // the once-a-day question, after the window is up so a slow answer holds
+  // nothing back.
+  RemoveOldExe();
+  if (app.check_updates && LoadSetting(L"LastUpdateCheck", 0) != DayNumber()) {
+    app.CheckForUpdates(true);
+  }
 
   HACCEL accel = LoadAcceleratorsW(instance, MAKEINTRESOURCEW(IDR_ACCELERATORS));
   MSG msg;

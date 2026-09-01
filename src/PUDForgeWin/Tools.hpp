@@ -51,15 +51,16 @@ bool ShowExportPng(HWND owner, HINSTANCE instance, Editor& editor,
                    std::wstring& note);
 
 /// The editing and placement options, which used to be checkable menu items.
-/// `unit_art`, `vary_facing` and `unit_sounds` belong to the client rather than
-/// the editor, so they travel separately.
+/// `unit_art`, `vary_facing`, `unit_sounds` and `check_updates` belong to the
+/// client rather than the editor, so they travel separately.
 ///
 /// `reset` comes back true when the person asked, and confirmed, that every
 /// remembered setting be forgotten. The caller has to stop saving on exit, which
 /// only it can do.
 /// @return whether anything changed
 bool ShowOptions(HWND owner, HINSTANCE instance, Editor& editor, int* unit_art,
-                 bool* vary_facing, bool* unit_sounds, bool* reset);
+                 bool* vary_facing, bool* unit_sounds, bool* check_updates,
+                 bool* reset);
 
 /// Whether the client has been reset this session, so nothing it remembers is
 /// written back out.

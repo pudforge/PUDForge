@@ -646,6 +646,33 @@ BEGIN
   IDS_REPORT_SENT_FOLLOW "You can follow its progress here:"
 #endif
 
+  /* ------------------------------------------------------------- updates */
+  IDS_UPDATE_TITLE      "Check for Updates"
+  IDS_UPDATE_CHECKING   "Checking for updates"
+  /* %ls is this application's version. */
+  IDS_UPDATE_NONE       "You have the newest version, PUDForge %ls."
+  IDS_UPDATE_FAILED     "Could not check for updates.\n\n%ls"
+  /* The newer version, then this one. */
+  IDS_UPDATE_AVAILABLE  "PUDForge %ls is available. You have %ls."
+  IDS_UPDATE_NOTES      "What is new in %ls:"
+  IDS_UPDATE_DOWNLOADING "Downloading PUDForge %ls…"
+  IDS_UPDATE_INSTALLING "Installing…"
+  IDS_UPDATE_PERMISSION "PUDForge is in a folder that needs permission to change. Windows will ask."
+  IDS_UPDATE_INSTALLED  "PUDForge %ls is installed. Restart PUDForge to use it."
+  IDS_UPDATE_RESTART    "Restart Now"
+  IDS_UPDATE_NOT_INSTALLED "The update was not installed.\n\n%ls"
+  IDS_UPDATE_MISMATCH   "The downloaded file does not match the release."
+  IDS_UPDATE_UNCHECKED  "The release notes carry no hash, so the download was not checked against one"
+  IDS_UPDATE_DECLINED   "Windows did not allow the change."
+  IDS_UPDATE_NO_EXE     "This release has no PUDForge.exe to download."
+  IDS_UPDATE_BAD_FEED   "The reply from GitHub could not be read."
+  IDS_UPDATE_HTTP       "GitHub answered with status %d."
+  IDS_UPDATE_ERROR_CODE "Error %d"
+  IDS_UPDATE_INSTALLED_STATUS "PUDForge %ls is installed and runs from the next start"
+  IDS_UPDATE_LOG_CHECKED "Update check: the newest release is %ls"
+  IDS_UPDATE_LOG_FAILED "Update check failed: %ls"
+  IDS_UPDATE_LOG_SKIPPED "Update check: %ls is available and is skipped"
+
   /* ---------------------------------------------------------------- help */
   IDS_ABOUT_TITLE       "About PUDForge"
   /* %ls is this application's version.

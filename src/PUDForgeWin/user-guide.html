@@ -95,6 +95,7 @@
 <li><a href="#generating-a-map">Generating a map</a></li>
 <li><a href="#tools">Tools</a></li>
 <li><a href="#options">Options</a></li>
+<li><a href="#updates">Updates</a></li>
 <li><a href="#resetting-the-editor">Resetting the editor</a></li>
 <li><a href="#keyboard-reference">Keyboard reference</a></li>
 <li class="sub"><a href="#file">File</a></li>
@@ -452,7 +453,11 @@ Path=D:\Games\Warcraft II</pre>
 <p><strong>Unit placement.</strong> Three overrides: allow illegal positions, allow units on top of each other, and allow units on the map edge. A fourth setting marks special units on the map. All are off by default.</p>
 <p><strong>Unit display.</strong> Unit artwork as command-button icons or as sprites, varied facing, the game's unit sounds, whether the palette lists every race or only the selected player's, and whether it offers the unused and special units.</p>
 <p>The unused and special units are the ones an editor normally holds back: the slots the game has no unit for, the corpses and rubble the game makes while it runs, and the two campaign workers. Leave this off unless you need them. Five of the slots have no unit behind them, and a map that places one stops the game. Walls stay out of the palette either way, because walls are terrain here.</p>
+<p><strong>Updates.</strong> Whether the editor checks for a new release when it starts.</p>
 <p>Everything in this window is kept between sessions.</p>
+<h2 id="updates">Updates</h2>
+<p><strong>Help ▸ Check for Updates…</strong> asks the PUDForge releases page for the newest version. The editor also asks once a day when it starts, unless the option is off. When there is a newer version, a window shows what is new and offers <strong>Update Now</strong>, <strong>Later</strong> or <strong>Skip This Version</strong>. A skipped version is not mentioned again at start-up, but Check for Updates always shows it.</p>
+<p>Update Now downloads the new <code>PUDForge.exe</code>, checks it against the hash in the release notes, and puts it where the running one is. If that folder needs administrator permission, Windows asks for it once. The editor then offers to restart; otherwise the new version runs from the next start.</p>
 <h2 id="resetting-the-editor">Resetting the editor</h2>
 <p><strong>Tools ▸ Options… ▸ Reset Everything</strong> discards everything PUDForge has stored: the options, the window size and layout, the view settings, the list of recent maps, and the game installation path. The command lists what will be discarded and asks for confirmation.</p>
 <p>No map file is affected and the open map stays open. The defaults apply from the next start, and the editor asks again which installation to use.</p>
@@ -629,6 +634,7 @@ Path=D:\Games\Warcraft II</pre>
 PUDForge.exe --render map.pud --out shot.png --tiles 0,0,64,64 --scale 2 --grid
 PUDForge.exe --tilesheet 0 --out forest.png
 PUDForge.exe --version</pre>
+<p><code>--install-update &lt;path&gt;</code> is what an update runs, elevated, to copy the new exe over the old one. It is not meant to be typed.</p>
 <p>Rendering uses the same code the canvas paints with, so the output matches the editor. <code>--data &lt;folder&gt;</code> overrides the game installation for that run.</p>
 <p>PUDForge is a windowed application, so a shell does not wait for it and does not receive its exit code. Run it with <code>Start-Process -Wait</code> from PowerShell if the exit code is needed.</p>
 <footer>PUDForge user guide. Generated from <code>docs/user_guide.md</code>.

@@ -99,7 +99,12 @@ knowing when reading a report:
 
 - **The exe now phones home.** v0.1.66 is the first build that imports
   `WINHTTP.dll` at all — ten new imports, every one of them network. Before it
-  the program made no outbound connection of any kind.
+  the program made no outbound connection of any kind. Check for Updates
+  (0.1.71) keeps the import for good: it reads the releases API and downloads
+  the exe from the release, which is a GET to `api.github.com` and
+  `github.com` and nothing else. A downloader that replaces its own exe is a
+  shape scanners weigh too, and the checks above are what a report should be
+  read against.
 - **What sits beside those imports reads badly.** v0.1.66 adds forty strings to
   v0.1.65, and `pudforge-feedback.pudforge.workers.dev`, `/report`,
   `Content-Type: application/json` and `,"log":` are all among them. To a
