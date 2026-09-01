@@ -27,7 +27,9 @@
 #include "Form.hpp"
 #include "Icons.hpp"
 #include "Log.hpp"
+#ifdef PF_ENABLE_REPORT
 #include "Report.hpp"
+#endif
 #include "Radial.hpp"
 #include "Tools.hpp"
 #include "Host.hpp"
@@ -1748,11 +1750,11 @@ struct App : Host {
         ShowFurniture();
         return true;
 
+#ifdef PF_ENABLE_REPORT
       case IDM_HELP_REPORT:
-
         ShowReportIssue(main, instance);
-
         return true;
+#endif
 
       case IDM_HELP_GUIDE:
         if (!OpenUserGuide(main)) OnStatus(Str(IDS_GUIDE_FAILED), true);

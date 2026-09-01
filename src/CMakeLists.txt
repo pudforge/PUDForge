@@ -207,6 +207,15 @@ if (WIN32)
       "on a Windows machine after changing either PNG.")
   endif()
 
+  # Report an Issue is the only thing in this client that opens a socket, and
+  # this compiles it out rather than hiding it. v0.1.66 was the first build to
+  # import WINHTTP.dll at all, and it is the first anybody was told was a
+  # virus; the question is whether a build carrying neither the import nor the
+  # hostname stops being called one. A feature left in but unreachable would
+  # not answer that, because the scanner reads the file and not the menu.
+  # docs/releasing.md has the measurements. Back to ON once this is settled.
+  option(PF_ENABLE_REPORT "Build Help > Report an Issue, which posts over HTTPS" OFF)
+
   add_executable(PUDForgeWin WIN32
     PUDForgeWin/main.cpp
     PUDForgeWin/Capture.cpp
@@ -218,7 +227,6 @@ if (WIN32)
     PUDForgeWin/Form.cpp
     PUDForgeWin/Icons.cpp
     PUDForgeWin/Log.cpp
-    PUDForgeWin/Report.cpp
     PUDForgeWin/Radial.cpp
     PUDForgeWin/Tools.cpp
     PUDForgeWin/PaletteGrid.cpp
@@ -257,7 +265,15 @@ if (WIN32)
   # links nowhere without it (see BlitRgbaBlended in Blit.hpp).
   # winmm: PlaySound, for the unit voices. The clips are the game's own bytes,
   # so nothing is decoded here and no third-party audio library is involved.
-  target_link_libraries(PUDForgeWin PRIVATE pudforge comctl32 shell32 ole32 shlwapi msimg32 winmm winhttp)
+  target_link_libraries(PUDForgeWin PRIVATE pudforge comctl32 shell32 ole32 shlwapi msimg32 winmm)
+  # The source, the library and the definition move together: the definition
+  # reaches the resource compiler too, which is what drops the menu item, the
+  # dialog and its strings, so an off build carries none of the words either.
+  if (PF_ENABLE_REPORT)
+    target_sources(PUDForgeWin PRIVATE PUDForgeWin/Report.cpp)
+    target_link_libraries(PUDForgeWin PRIVATE winhttp)
+    target_compile_definitions(PUDForgeWin PRIVATE PF_ENABLE_REPORT=1)
+  endif()
   set_target_properties(PUDForgeWin PROPERTIES OUTPUT_NAME PUDForge)
   # Before the resource compiler runs, so the .rc always embeds artwork built
   # from the PNGs as they are now.

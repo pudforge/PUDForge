@@ -263,8 +263,10 @@ BEGIN
     // reference now, so the key that meant "what can I press" still does.
     MENUITEM "&User Guide\tF1",            IDM_HELP_GUIDE
     MENUITEM SEPARATOR
+#ifdef PF_ENABLE_REPORT
     MENUITEM "&Report an Issue…",          IDM_HELP_REPORT
     MENUITEM SEPARATOR
+#endif
     MENUITEM "&About PUDForge…",           IDM_HELP_ABOUT
   END
 END
@@ -647,6 +649,7 @@ END
  * window instead of finishing. What version it is and what the editor last said
  * are things the program knows about itself, so it should not be asking.
  */
+#ifdef PF_ENABLE_REPORT
 IDD_REPORT DIALOGEX 0, 0, 280, 186
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "Report an Issue"
@@ -662,6 +665,7 @@ BEGIN
   DEFPUSHBUTTON   "Send Report", IDOK, 150, 168, 60, 14
   PUSHBUTTON      "Cancel", IDCANCEL, 214, 168, 58, 14
 END
+#endif
 
 IDD_DECORATE DIALOGEX 0, 0, 230, 100
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU

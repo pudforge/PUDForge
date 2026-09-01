@@ -634,6 +634,7 @@ BEGIN
   IDS_RESET_ALL_NONE    "Nothing to reset. This map already uses the values Warcraft II uses."
   IDS_RESET_ALL_DONE    "Reset %d to default"
   IDS_DEFAULTS_CLEARED  "Cleared ""Use the game default table"", or this change would not reach the game."
+#ifdef PF_ENABLE_REPORT
   IDS_REPORT_VERSION    "PUDForge %ls"
   IDS_REPORT_HINT       "Your report is published to the PUDForge issue list, where you can follow its progress. Please do not include personal information."
   IDS_REPORT_SENDING    "Sending the report…"
@@ -643,6 +644,7 @@ BEGIN
   IDS_REPORT_TITLE      "Report an Issue"
   IDS_REPORT_SENT_MAIN  "Thank you. Your report was received."
   IDS_REPORT_SENT_FOLLOW "You can follow its progress here:"
+#endif
 
   /* ---------------------------------------------------------------- help */
   IDS_ABOUT_TITLE       "About PUDForge"
