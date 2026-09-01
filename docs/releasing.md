@@ -84,6 +84,105 @@ under a second name so the editor can be run while the real one is being
 relinked, and is deliberately not uploaded — shipping it would suggest there
 are two programs.
 
+## Signing
+
+`PUDForge.exe` is signed by [SignPath Foundation](https://signpath.org), which
+gives open source projects free code signing. The padlock is not the point.
+Windows attaches reputation to the *signer*, and that outlives any single
+build, so every signed release inherits what the ones before it earned.
+Unsigned, each release is a hash the world has never seen, carrying no
+publisher name, and browsers and scanners answer that by guessing. That is why
+people were told the download was a virus.
+
+Two things made it worse than the average unsigned binary, and both are worth
+knowing when reading a report:
+
+- **The exe now phones home.** v0.1.66 is the first build that imports
+  `WINHTTP.dll` at all — ten new imports, every one of them network. Before it
+  the program made no outbound connection of any kind.
+- **What sits beside those imports reads badly.** v0.1.66 adds forty strings to
+  v0.1.65, and `pudforge-feedback.pudforge.workers.dev`, `/report`,
+  `Content-Type: application/json` and `,"log":` are all among them. To a
+  classifier that is an unsigned executable carrying a hardcoded host, a JSON
+  POST and a field called `log` — the feature vector of an infostealer — and
+  `*.workers.dev` is a namespace heavily abused for command and control. A
+  custom domain in front of the worker costs nothing and removes the worst of
+  it.
+
+  **Do not answer this by splitting or encoding the string.** Hiding a hostname
+  from a scanner is what malware does, and string obfuscation is itself
+  something scanners weigh. It would make the score worse, not better.
+
+### How the workflow does it
+
+CI never hands the binary to SignPath. It uploads `PUDForge.exe` as a workflow
+artifact, and SignPath reads it back out of the run through GitHub's own API,
+so what gets signed is provably what that run built rather than whatever the
+holder of the API token felt like uploading. The signed file comes back to
+`signed/`, and that is what is hashed and released — the hash in the release
+notes is taken after signing, because signing rewrites the file.
+
+**Signing is skipped, not failed, when it is not configured.** The API token is
+the one part that cannot live in the repository, so its absence is exactly what
+"not set up yet" looks like, and holding a release back over it would help
+nobody. The run says `NOT SIGNED` in the log and the release notes fall back to
+the paragraph about false positives. If a release goes out unsigned when it
+should not have, that line in the log is where it says so — an expired token
+looks the same as an unconfigured one.
+
+### Setting it up
+
+1. **Apply** at <https://signpath.org/apply>. The project qualifies: MIT
+   licensed, public repository, built entirely by GitHub-hosted runners.
+   Approval takes days rather than minutes and is done by a person.
+2. **In SignPath**, once the organization exists: add the predefined
+   `GitHub.com` trusted build system, create a project for this repository and
+   link the build system to it.
+3. **The artifact configuration** has to match what `upload-artifact` produces.
+   It uploads a ZIP, so the root element must be `<zip-file>` containing the
+   `<pe-file>` for `PUDForge.exe`. This is the step that usually goes wrong
+   first, and it fails with a message about the artifact not matching the
+   configuration.
+4. **In this repository**, add one secret and three variables. All four go
+   together; the workflow checks for the token and the organization id and
+   skips signing unless both are present.
+
+   | | |
+   |---|---|
+   | secret `SIGNPATH_API_TOKEN` | an API token for a SignPath user with submitter rights |
+   | variable `SIGNPATH_ORGANIZATION_ID` | the organization GUID |
+   | variable `SIGNPATH_PROJECT_SLUG` | the project slug |
+   | variable `SIGNPATH_SIGNING_POLICY_SLUG` | `test-signing` while proving it out, `release-signing` after |
+
+   ```powershell
+   gh secret set SIGNPATH_API_TOKEN --repo pudforge/PUDForge
+   gh variable set SIGNPATH_ORGANIZATION_ID --repo pudforge/PUDForge --body '<guid>'
+   gh variable set SIGNPATH_PROJECT_SLUG --repo pudforge/PUDForge --body '<slug>'
+   gh variable set SIGNPATH_SIGNING_POLICY_SLUG --repo pudforge/PUDForge --body 'release-signing'
+   ```
+
+5. **Check the first signed release** rather than assuming it. The run log
+   should say `signed:` and not `NOT SIGNED`:
+
+   ```powershell
+   gh release download v<version> --pattern PUDForge.exe --output signed.exe
+   Get-AuthenticodeSignature signed.exe | Format-List Status, SignerCertificate
+   ```
+
+   `Status` is `Valid` and the certificate names the project. Anything else and
+   the release went out unsigned.
+
+Reputation is not instant with the OV certificate SignPath Foundation issues —
+it accrues over weeks of downloads. Releasing less often helps it along: a hash
+that stays current for a fortnight collects some, and one replaced the same
+afternoon collects none. Twelve releases in three days is what the last week
+looked like, and it is the other half of why nothing was ever trusted.
+
+Until reputation builds, a false positive is still worth reporting to whoever
+made it. Microsoft's form is <https://www.microsoft.com/en-us/wdsi/filesubmission>
+and usually answers within a few days. It clears one hash, so it is worth doing
+for a release people are actually downloading and not for every patch bump.
+
 ## If something goes wrong
 
 - **CI went red after the push.** Nothing was released: the release step runs

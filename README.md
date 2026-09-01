@@ -5,6 +5,12 @@ PUDForge is a Warcraft II map editor for Windows. It reads and writes `.pud` fil
 [Download the latest release](https://github.com/pudforge/PUDForge/releases/latest)
 [Feature walkthrough](https://www.youtube.com/watch?v=nTLuCuUqlOg)
 
+A browser or a scanner sometimes calls the download a virus. It is not one - an
+unsigned release is a file nothing has seen before and nobody's name is on, and
+some scanners guess at that. Releases are being signed by SignPath Foundation
+to stop it, and each one publishes the SHA-256 of the file GitHub Actions built;
+[`docs/releasing.md`](docs/releasing.md) has the detail.
+
 ## Documentation
 
 - [`docs/user_guide.md`](docs/user_guide.md) - the editor: what is on screen,

@@ -8,14 +8,22 @@ on:
   pull_request:
   workflow_dispatch:
 
-# The release step creates a tag and uploads to it.
+# contents: write creates the tag and uploads to the release. actions: read is
+# what the SignPath connector needs to read this run and fetch the artifact it
+# is asked to sign. Naming any permission drops every permission not named, so
+# the second one has to be written down rather than inherited.
 permissions:
   contents: write
+  actions: read
 
 jobs:
   build:
     name: windows-latest
     runs-on: windows-latest
+    # Lifted out of the secrets context so a step condition can ask whether
+    # signing is configured at all: `if:` can read env and cannot read secrets.
+    env:
+      SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
     steps:
       - uses: actions/checkout@v5
 
@@ -47,27 +55,86 @@ jobs:
           # and every run would try to release.
           $existing = git ls-remote --tags origin "refs/tags/v$version"
           $isNew = [string]::IsNullOrWhiteSpace($existing)
+          # Whether this run releases, answered once. Three steps below need it
+          # — upload, sign, publish — and three copies of the condition would be
+          # three chances to change two of them.
+          $release = $isNew -and
+                     ('${{ github.event_name }}' -eq 'push') -and
+                     ('${{ github.ref }}' -eq 'refs/heads/master')
           "version=$version"  | Out-File $env:GITHUB_OUTPUT -Append
           "is_new=$($isNew.ToString().ToLower())" | Out-File $env:GITHUB_OUTPUT -Append
+          "release=$($release.ToString().ToLower())" | Out-File $env:GITHUB_OUTPUT -Append
           if ($isNew) {
             "v$version is new - this run will release it"
           } else {
             "v$version is already released - bump version.h to cut another"
           }
 
+      # ----------------------------------------------------------- signing
+      #
+      # Signed by SignPath Foundation, which signs open source for free. The
+      # point is not the padlock. Windows attaches reputation to the *signer*,
+      # and that outlives any single build, so a signed release inherits what
+      # every release before it earned. Unsigned, every release is a file the
+      # world has never seen before, which is why a browser calls it a virus.
+      #
+      # SignPath will not take the binary handed to it. It reads the artifact
+      # back out of this workflow run through GitHub's own API, so what gets
+      # signed is provably what this run built rather than whatever the holder
+      # of the API token chose to upload. That round trip is the reason the exe
+      # is uploaded as an artifact before it is signed, and the reason the
+      # upload has to happen in the same run.
+      - name: Upload the unsigned exe for signing
+        id: unsigned
+        if: steps.version.outputs.release == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: PUDForge-unsigned
+          path: build/Release/PUDForge.exe
+
+      # Skipped rather than failed when SignPath is not configured. The token
+      # is the one part that cannot be committed, so its absence is exactly
+      # what "not set up yet" looks like, and holding a release back over it
+      # would help nobody. The Release step says out loud which way it went, so
+      # an unsigned release cannot pass quietly for a signed one.
+      - name: Sign
+        id: sign
+        if: >-
+          steps.version.outputs.release == 'true' &&
+          env.SIGNPATH_API_TOKEN != '' &&
+          vars.SIGNPATH_ORGANIZATION_ID != ''
+        uses: signpath/github-action-submit-signing-request@v2
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          github-artifact-id: ${{ steps.unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: signed
+
       # Only from master, and only once per version. version.h asks for a patch
       # bump on every commit, so a commit that bumps it ships and a commit that
       # does not just builds — rather than failing on a tag that already exists.
       - name: Release
-        if: >-
-          github.event_name == 'push' &&
-          github.ref == 'refs/heads/master' &&
-          steps.version.outputs.is_new == 'true'
+        if: steps.version.outputs.release == 'true'
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           $v = '${{ steps.version.outputs.version }}'
+          # The signed file when signing ran, the build output when it did not.
+          # Which of the two it is decides what is uploaded *and* what the notes
+          # say about it: an unsigned release described as a signed one is the
+          # single thing here worth never shipping.
+          $exe = 'signed/PUDForge.exe'
+          $signed = Test-Path $exe
+          if ($signed) {
+            "signed: releasing $exe"
+          } else {
+            $exe = 'build/Release/PUDForge.exe'
+            "NOT SIGNED: no SignPath configuration in this repository - releasing the build output as it is"
+          }
           # The notes are CHANGELOG.md's section for this version, verbatim:
           # the words somebody wrote while making the change are better than
           # anything generated here, and having one place to write them is why
@@ -89,6 +156,15 @@ jobs:
           } else {
             "no '## $v' section in CHANGELOG.md - shipping the standing text alone"
           }
+          # The hash of the exact file about to be uploaded, published beside
+          # it. Taken after signing rather than before, because signing rewrites
+          # the file and a hash of the unsigned one would match nothing anybody
+          # can download.
+          $sha = (Get-FileHash $exe -Algorithm SHA256).Hash.ToLower()
+          # Assembled outside the array below: a backtick inside a
+          # double-quoted PowerShell string is an escape character, and one
+          # markdown code span is not worth two levels of quoting.
+          $shaLine = '- SHA-256 `' + $sha + '`'
           # What is true of every release, under whatever this one changed.
           # Built as an array rather than a here-string: a PowerShell
           # here-string wants its closing '@ in column 0, which is not
@@ -104,11 +180,50 @@ jobs:
             "portraits: that data is Blizzard's and is not redistributable, so",
             'it is not here. Either Battle.net Edition or Warcraft II',
             'Remastered works, and dropping the exe into the game folder is',
-            'enough.'
-          ) -join "`n"
-          $notes = if ($body) { "$body`n`n---`n`n$standing" } else { $standing }
+            'enough.',
+            ''
+          )
+          # Only one of these is ever true, so only one is ever said. A signed
+          # release does not warn people about a problem it no longer has.
+          $trust = if ($signed) {
+            @(
+              '### Checking the download',
+              '',
+              'The exe is signed by SignPath Foundation, which gives open',
+              'source projects free code signing. Windows shows the publisher',
+              'in the file properties and in any prompt about running it, so',
+              'a copy that came from somewhere else is one you can tell apart.',
+              '',
+              $shaLine
+            )
+          } else {
+            @(
+              '### If your browser says the download is a virus',
+              '',
+              'It is a false positive. The exe is not code-signed, so every',
+              'release is a file the scanners have never seen before and that',
+              'carries no publisher name. Some of them answer that by guessing,',
+              'and the guess reaches you as "Virus detected" or as a SmartScreen',
+              'warning. A build is least trusted on the day it is published,',
+              'which is the day you are reading this.',
+              '',
+              'What there is to check instead:',
+              '',
+              $shaLine,
+              '- The source is all in this repository, and GitHub Actions built',
+              '  this file from it. Nothing was uploaded from a desktop.',
+              '- <https://www.virustotal.com/> gives you every other scanner on',
+              '  the same file, rather than the one that stopped you.',
+              '',
+              'Telling the vendor that made the call is what makes it stop for',
+              'the next person. Microsoft takes reports at',
+              '<https://www.microsoft.com/en-us/wdsi/filesubmission>.'
+            )
+          }
+          $notes = ($standing + $trust) -join "`n"
+          if ($body) { $notes = "$body`n`n---`n`n$notes" }
           # PUDForgeTest.exe is deliberately not uploaded: it is a byte copy of
           # the same binary under a second name, for running the editor while
           # still being able to relink it. Shipping it suggests two programs.
-          gh release create "v$v" build/Release/PUDForge.exe `
+          gh release create "v$v" $exe `
             --title "PUDForge $v" --notes $notes
