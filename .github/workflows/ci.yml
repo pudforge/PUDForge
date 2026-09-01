@@ -183,8 +183,10 @@ jobs:
             'enough.',
             ''
           )
-          # Only one of these is ever true, so only one is ever said. A signed
-          # release does not warn people about a problem it no longer has.
+          # Only one of these is ever true, so only one is ever said. An
+          # unsigned release used to carry a page about false positives here;
+          # it read as a warning label, so now it carries the hash and nothing
+          # else. docs/releasing.md keeps the explanation for whoever asks.
           $trust = if ($signed) {
             @(
               '### Checking the download',
@@ -198,26 +200,9 @@ jobs:
             )
           } else {
             @(
-              '### If your browser says the download is a virus',
+              '### Checking the download',
               '',
-              'It is a false positive. The exe is not code-signed, so every',
-              'release is a file the scanners have never seen before and that',
-              'carries no publisher name. Some of them answer that by guessing,',
-              'and the guess reaches you as "Virus detected" or as a SmartScreen',
-              'warning. A build is least trusted on the day it is published,',
-              'which is the day you are reading this.',
-              '',
-              'What there is to check instead:',
-              '',
-              $shaLine,
-              '- The source is all in this repository, and GitHub Actions built',
-              '  this file from it. Nothing was uploaded from a desktop.',
-              '- <https://www.virustotal.com/> gives you every other scanner on',
-              '  the same file, rather than the one that stopped you.',
-              '',
-              'Telling the vendor that made the call is what makes it stop for',
-              'the next person. Microsoft takes reports at',
-              '<https://www.microsoft.com/en-us/wdsi/filesubmission>.'
+              $shaLine
             )
           }
           $notes = ($standing + $trust) -join "`n"

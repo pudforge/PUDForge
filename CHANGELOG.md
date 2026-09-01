@@ -37,12 +37,17 @@ section therefore covers all the commits after the previous tag.
 `scripts/prep-release.ps1` collects those commits as a start. See
 `docs/releasing.md`.
 
-## 0.1.72
+## 0.1.73
 
 **Changed**
 
-- Check for Updates runs only from the Help menu. PUDForge does not check by
-  itself yet.
+- The release notes no longer carry the text about virus warnings.
+
+## 0.1.72
+
+**New**
+
+- You can update PUDForge from the Help menu.
 
 ## 0.1.71
 

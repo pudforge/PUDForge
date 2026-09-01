@@ -130,8 +130,8 @@ notes is taken after signing, because signing rewrites the file.
 **Signing is skipped, not failed, when it is not configured.** The API token is
 the one part that cannot live in the repository, so its absence is exactly what
 "not set up yet" looks like, and holding a release back over it would help
-nobody. The run says `NOT SIGNED` in the log and the release notes fall back to
-the paragraph about false positives. If a release goes out unsigned when it
+nobody. The run says `NOT SIGNED` in the log and the release notes carry the hash
+alone, without the signer. If a release goes out unsigned when it
 should not have, that line in the log is where it says so — an expired token
 looks the same as an unconfigured one.
 
