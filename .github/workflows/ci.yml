@@ -18,8 +18,14 @@ permissions:
 
 jobs:
   build:
-    name: windows-latest
-    runs-on: windows-latest
+    name: windows-2022
+    # Pinned, not latest. windows-latest moved to a compiler generation
+    # (MSVC 14.51) whose output Microsoft's machine-learning scanner had not
+    # learned yet: every release built there from 0.1.69 on came back
+    # Trojan:Win32/Wacatac.B!ml on VirusTotal, and the same 0.1.72 source
+    # built with the 14.4x toolset came back clean on all 71 engines. The
+    # code was never the difference. See docs/releasing.md.
+    runs-on: windows-2022
     # Lifted out of the secrets context so a step condition can ask whether
     # signing is configured at all: `if:` can read env and cannot read secrets.
     env:
@@ -32,6 +38,15 @@ jobs:
 
       - name: Build
         run: cmake --build build --config Release
+
+      # Every run keeps its exe for a week, release or not, so a build can be
+      # put in front of a scanner before it is a release rather than after.
+      - name: Keep the build
+        uses: actions/upload-artifact@v7
+        with:
+          name: PUDForge-build
+          path: build/Release/PUDForge.exe
+          retention-days: 7
 
       # Through CTest rather than the binary directly: each group is its own
       # job, so a failure names the group instead of burying it in one log.
