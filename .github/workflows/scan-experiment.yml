@@ -22,17 +22,19 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # Five of the same build: the verdict flipped between two builds of
+        # one source with one toolset, so the question is how often.
         include:
-          - name: v143
+          - name: v143-a
             configure: ""
-          - name: v142
-            configure: "-T v142"
-          - name: v143-O1
-            configure: '-DCMAKE_CXX_FLAGS_RELEASE="/O1 /Ob1 /DNDEBUG" -DCMAKE_C_FLAGS_RELEASE="/O1 /Ob1 /DNDEBUG"'
-          - name: v143-ltcg
-            configure: "-DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON"
-          - name: v142-O1
-            configure: '-T v142 -DCMAKE_CXX_FLAGS_RELEASE="/O1 /Ob1 /DNDEBUG" -DCMAKE_C_FLAGS_RELEASE="/O1 /Ob1 /DNDEBUG"'
+          - name: v143-b
+            configure: ""
+          - name: v143-c
+            configure: ""
+          - name: v143-d
+            configure: ""
+          - name: v143-e
+            configure: ""
     steps:
       - uses: actions/checkout@v5
       - name: Configure
@@ -59,7 +61,8 @@ jobs:
           update: false
           install: mingw-w64-x86_64-gcc mingw-w64-x86_64-cmake mingw-w64-x86_64-ninja
       - name: Configure
-        run: cmake -S src -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+        # MinGW's headers hide GetDpiForWindow behind a Windows 10 target.
+        run: cmake -S src -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS=-D_WIN32_WINNT=0x0A00
       - name: Build
         run: cmake --build build --target PUDForgeWin
       - uses: actions/upload-artifact@v7
