@@ -94,8 +94,31 @@ Unsigned, each release is a hash the world has never seen, carrying no
 publisher name, and browsers and scanners answer that by guessing. That is why
 people were told the download was a virus.
 
-Two things made it worse than the average unsigned binary, and both are worth
-knowing when reading a report:
+### What was measured
+
+The story below was the working theory. It was tested on 2 September 2026
+with `scripts/vt-check.ps1` and the `Scan experiment` workflow, and it is
+wrong. What VirusTotal's 71 engines said:
+
+| Build | What it carries | Verdict |
+|---|---|---|
+| v0.1.65 | no network code | clean |
+| v0.1.67 | Report an Issue: WINHTTP, a POST to workers.dev | clean |
+| v0.1.69 to v0.1.73 | report removed; updater from 0.1.71 | Microsoft only, `Trojan:Win32/Wacatac.B!ml` |
+| 0.1.72 built on a desktop, MSVC 14.41 | same source | clean |
+| 22 runner builds of one source: MSVC 14.29, 14.41, 14.44, /O1, /O2, LTCG, GCC | same source | 18 flagged by Microsoft only, 4 clean |
+
+Two runner builds differing in nothing but their four timestamp bytes went
+different ways, and a file's verdict is stable on rescan. So the verdict is a
+deterministic score sitting on a threshold, from Microsoft's static
+machine-learning engine alone; no other engine ever agreed, and the desktop's
+Defender with cloud lookups says both flagged and clean files are fine. No
+toolset, flag or feature of the program moves it. What moves it is a
+signature, which is what SignPath is for, and a false-positive report to
+Microsoft, which retrains the model on this program.
+
+Two things were thought to make it worse than the average unsigned binary,
+and neither turned out to matter:
 
 - **The exe now phones home.** v0.1.66 is the first build that imports
   `WINHTTP.dll` at all — ten new imports, every one of them network. Before it

@@ -19,12 +19,9 @@ permissions:
 jobs:
   build:
     name: windows-2022
-    # Pinned, not latest. windows-latest moved to a compiler generation
-    # (MSVC 14.51) whose output Microsoft's machine-learning scanner had not
-    # learned yet: every release built there from 0.1.69 on came back
-    # Trojan:Win32/Wacatac.B!ml on VirusTotal, and the same 0.1.72 source
-    # built with the 14.4x toolset came back clean on all 71 engines. The
-    # code was never the difference. See docs/releasing.md.
+    # Pinned rather than latest so the toolset is the one the desktop builds
+    # use. It is not a fix for the scanner verdict: docs/releasing.md has
+    # the measurements, and no toolset or flag moved it.
     runs-on: windows-2022
     # Lifted out of the secrets context so a step condition can ask whether
     # signing is configured at all: `if:` can read env and cannot read secrets.

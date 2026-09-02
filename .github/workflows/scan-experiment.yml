@@ -3,13 +3,15 @@ name: Scan experiment
 # Builds the client several different ways and keeps each exe, so they can be
 # put in front of VirusTotal side by side. Nothing here releases anything.
 #
-# Why: from 0.1.69 on, every release built on windows-latest came back
-# Trojan:Win32/Wacatac.B!ml from Microsoft's machine-learning engine and
-# nothing else, and the same source built on a desktop with MSVC 14.41 came
-# back clean on all 71 engines. Five repeats of the runner's own 14.44 build
-# were all flagged; a GCC build was clean. The verdict follows the code
-# generator, not the code. scripts/vt-check.ps1 is the other half of the
-# experiment.
+# Why: from 0.1.69 on, every release came back Trojan:Win32/Wacatac.B!ml
+# from Microsoft's machine-learning engine and nothing else. This built the
+# same source with MSVC 14.29, 14.41 and 14.44, at /O1, /O2 and with LTCG,
+# and with GCC, five times over for the default: 18 of 22 runner builds were
+# flagged, and two builds that differed only in their four timestamp bytes
+# went different ways. The verdict is a threshold, not a feature, and no
+# toolset or flag moves it. docs/releasing.md has the table. Kept so the
+# next question can be asked the same way; scripts/vt-check.ps1 is the
+# other half.
 on:
   workflow_dispatch:
   push:

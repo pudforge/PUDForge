@@ -210,12 +210,13 @@ if (WIN32)
       "on a Windows machine after changing either PNG.")
   endif()
 
-  # Report an Issue was the only thing in this client that opened a socket,
-  # and this compiled it out rather than hiding it: v0.1.66 was the first
-  # build to import WINHTTP.dll at all, and the first anybody was told was a
-  # virus. Check for Updates brought the import back in 0.1.71, so the
-  # experiment is over; what stays out is the POST with a `log` field and the
-  # workers.dev hostname, which docs/releasing.md measures as the worse half.
+  # Report an Issue was compiled out in 0.1.69 on the theory that its
+  # WINHTTP import and its POST to a workers.dev host were what got the exe
+  # called a virus. Measured afterwards, that was wrong: 0.1.67, which
+  # carries all of it, is clean on every engine, and the flag starts with
+  # 0.1.69. Check for Updates brought WINHTTP back in 0.1.71. What keeps
+  # this off is only that nobody has asked for it back; docs/releasing.md
+  # has the measurements.
   option(PF_ENABLE_REPORT "Build Help > Report an Issue, which posts over HTTPS" OFF)
 
   add_executable(PUDForgeWin WIN32
