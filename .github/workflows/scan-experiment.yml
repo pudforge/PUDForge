@@ -1,0 +1,69 @@
+name: Scan experiment
+
+# Builds the client several different ways and keeps each exe, so they can be
+# put in front of VirusTotal side by side. Nothing here releases anything.
+#
+# Why: from 0.1.69 on, every release built on windows-latest came back
+# Trojan:Win32/Wacatac.B!ml from Microsoft's machine-learning engine and
+# nothing else, and the same source built on a desktop with MSVC 14.41 came
+# back clean on all 71 engines. The verdict follows the code generator, not
+# the code, so the question is which generator the runner has that the model
+# has learned. scripts/vt-check.ps1 is the other half of the experiment.
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/scan-experiment.yml
+
+jobs:
+  msvc:
+    name: ${{ matrix.name }}
+    runs-on: windows-2022
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: v143
+            configure: ""
+          - name: v142
+            configure: "-T v142"
+          - name: v143-O1
+            configure: '-DCMAKE_CXX_FLAGS_RELEASE="/O1 /Ob1 /DNDEBUG" -DCMAKE_C_FLAGS_RELEASE="/O1 /Ob1 /DNDEBUG"'
+          - name: v143-ltcg
+            configure: "-DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON"
+          - name: v142-O1
+            configure: '-T v142 -DCMAKE_CXX_FLAGS_RELEASE="/O1 /Ob1 /DNDEBUG" -DCMAKE_C_FLAGS_RELEASE="/O1 /Ob1 /DNDEBUG"'
+    steps:
+      - uses: actions/checkout@v5
+      - name: Configure
+        run: cmake -S src -B build -DCMAKE_BUILD_TYPE=Release ${{ matrix.configure }}
+      - name: Build
+        run: cmake --build build --config Release --target PUDForgeWin
+      - uses: actions/upload-artifact@v7
+        with:
+          name: exp-${{ matrix.name }}
+          path: build/Release/PUDForge.exe
+          retention-days: 7
+
+  mingw:
+    name: mingw-gcc
+    runs-on: windows-2022
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: false
+          install: mingw-w64-x86_64-gcc mingw-w64-x86_64-cmake mingw-w64-x86_64-ninja
+      - name: Configure
+        run: cmake -S src -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build build --target PUDForgeWin
+      - uses: actions/upload-artifact@v7
+        with:
+          name: exp-mingw
+          path: build/PUDForge.exe
+          retention-days: 7
