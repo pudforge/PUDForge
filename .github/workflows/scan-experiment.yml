@@ -6,9 +6,10 @@ name: Scan experiment
 # Why: from 0.1.69 on, every release built on windows-latest came back
 # Trojan:Win32/Wacatac.B!ml from Microsoft's machine-learning engine and
 # nothing else, and the same source built on a desktop with MSVC 14.41 came
-# back clean on all 71 engines. The verdict follows the code generator, not
-# the code, so the question is which generator the runner has that the model
-# has learned. scripts/vt-check.ps1 is the other half of the experiment.
+# back clean on all 71 engines. Five repeats of the runner's own 14.44 build
+# were all flagged; a GCC build was clean. The verdict follows the code
+# generator, not the code. scripts/vt-check.ps1 is the other half of the
+# experiment.
 on:
   workflow_dispatch:
   push:
@@ -16,40 +17,50 @@ on:
       - .github/workflows/scan-experiment.yml
 
 jobs:
-  msvc:
-    name: ${{ matrix.name }}
+  msvc-1441:
+    name: msvc-14.41-${{ matrix.repeat }}
     runs-on: windows-2022
     strategy:
       fail-fast: false
       matrix:
-        # Five of the same build: the verdict flipped between two builds of
-        # one source with one toolset, so the question is how often.
-        include:
-          - name: v143-a
-            configure: ""
-          - name: v143-b
-            configure: ""
-          - name: v143-c
-            configure: ""
-          - name: v143-d
-            configure: ""
-          - name: v143-e
-            configure: ""
+        repeat: [a, b, c]
     steps:
       - uses: actions/checkout@v5
+      # The runner ships 14.44 and 14.29. 14.41 is the toolset the clean
+      # desktop build used, and the installer can add it in a few minutes.
+      - name: Install the 14.41 toolset
+        shell: pwsh
+        run: |
+          $setup = 'C:\Program Files (x86)\Microsoft Visual Studio\Installer\setup.exe'
+          $vs = (& 'C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe' -latest -property installationPath)
+          Start-Process -FilePath $setup -Wait -ArgumentList @(
+            'modify', '--installPath', "`"$vs`"",
+            '--add', 'Microsoft.VisualStudio.Component.VC.14.41.17.11.x86.x64',
+            '--quiet', '--norestart', '--nocache')
+          Get-ChildItem "$vs\VC\Tools\MSVC" | Select-Object -ExpandProperty Name
       - name: Configure
-        run: cmake -S src -B build -DCMAKE_BUILD_TYPE=Release ${{ matrix.configure }}
+        run: cmake -S src -B build -DCMAKE_BUILD_TYPE=Release -T version=14.41
       - name: Build
         run: cmake --build build --config Release --target PUDForgeWin
       - uses: actions/upload-artifact@v7
         with:
-          name: exp-${{ matrix.name }}
+          name: exp-msvc1441-${{ matrix.repeat }}
           path: build/Release/PUDForge.exe
           retention-days: 7
 
   mingw:
-    name: mingw-gcc
+    name: mingw-${{ matrix.name }}
     runs-on: windows-2022
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: O2
+            flags: "-D_WIN32_WINNT=0x0A00"
+            link: ""
+          - name: Os-stripped
+            flags: "-D_WIN32_WINNT=0x0A00 -Os"
+            link: "-s"
     defaults:
       run:
         shell: msys2 {0}
@@ -62,11 +73,11 @@ jobs:
           install: mingw-w64-x86_64-gcc mingw-w64-x86_64-cmake mingw-w64-x86_64-ninja
       - name: Configure
         # MinGW's headers hide GetDpiForWindow behind a Windows 10 target.
-        run: cmake -S src -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS=-D_WIN32_WINNT=0x0A00
+        run: cmake -S src -B build -G Ninja -DCMAKE_BUILD_TYPE=Release "-DCMAKE_CXX_FLAGS=${{ matrix.flags }}" "-DCMAKE_C_FLAGS=${{ matrix.flags }}" "-DCMAKE_EXE_LINKER_FLAGS=${{ matrix.link }}"
       - name: Build
         run: cmake --build build --target PUDForgeWin
       - uses: actions/upload-artifact@v7
         with:
-          name: exp-mingw
+          name: exp-mingw-${{ matrix.name }}
           path: build/PUDForge.exe
           retention-days: 7
