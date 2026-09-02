@@ -37,6 +37,12 @@ section therefore covers all the commits after the previous tag.
 `scripts/prep-release.ps1` collects those commits as a start. See
 `docs/releasing.md`.
 
+## 0.1.74
+
+**Changed**
+
+- The release notes tell you that Help, Check for Updates installs the release.
+
 ## 0.1.73
 
 **Changed**

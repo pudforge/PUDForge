@@ -193,6 +193,9 @@ jobs:
             'it is not here. Either Battle.net Edition or Warcraft II',
             'Remastered works, and dropping the exe into the game folder is',
             'enough.',
+            '',
+            'A copy you already have installs this release itself, from Help,',
+            'Check for Updates.',
             ''
           )
           # Only one of these is ever true, so only one is ever said. An
