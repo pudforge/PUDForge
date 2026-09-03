@@ -2570,7 +2570,14 @@ int pf_map_placement_check_ex(const pf_map* map, int x, int y, int type,
       m.unit_footprint(u.type, ow, oh);
       const bool apart = int(u.x) + ow <= x || x + fw <= int(u.x) ||
                          int(u.y) + oh <= y || y + fh <= int(u.y);
-      if (!apart) return PF_PLACE_OCCUPIED;
+      if (apart) continue;
+      // Not every shared tile is a stack. A flier crosses whatever is under
+      // it, and a marker is not a thing to stand on — the game places both
+      // that way, so neither waits on the stacking option. The map check has
+      // always agreed; this is the placement side of the same rule, which
+      // used to refuse a hall on a start location.
+      if (pf::units_may_share_tiles(u.type, type)) continue;
+      return PF_PLACE_OCCUPIED;
     }
   }
   if (!map->allow_edge_placement &&

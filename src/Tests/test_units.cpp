@@ -1122,6 +1122,37 @@ TEST(a_flier_may_share_a_tile_with_anything) {
 }
 
 /**
+ * And the placement gate says the same, without the stacking option.
+ *
+ * The two used to disagree: the check kept quiet about a flier over a unit
+ * and about a hall on a start location, while placement answered OCCUPIED for
+ * both — so an arrangement the editor tolerated on open was one it would not
+ * let you draw. A shared tile is only a stack when neither unit is entitled
+ * to be there.
+ */
+TEST(placement_allows_the_tiles_the_check_shares) {
+  const int kFootman = 0x00, kDragon = 0x2b, kTownHall = 0x4a;
+  const int kHumanStart = 0x5e, kCircleOfPower = 0x64;
+  pf_status st = PF_OK;
+  pf_map* map = pf_map_create(32, 32, PF_TILESET_FOREST, &st);
+  if (!map) { CHECK(false); return; }
+  CHECK_EQ(pf_map_allows_stacked_units(map), 0);   // the option stays off
+
+  CHECK(pf_map_add_unit(map, 10, 10, kFootman, 0, 0) >= 0);
+  CHECK_EQ(pf_map_placement_check_ex(map, 10, 10, kDragon, nullptr, 0), PF_PLACE_OK);
+  // Two footmen on one tile is still a stack, and still refused.
+  CHECK_EQ(pf_map_placement_check_ex(map, 10, 10, kFootman, nullptr, 0),
+           PF_PLACE_OCCUPIED);
+
+  // A marker is not a thing to stand on, in either order.
+  CHECK(pf_map_add_unit(map, 20, 20, kHumanStart, 0, 0) >= 0);
+  CHECK_EQ(pf_map_placement_check_ex(map, 20, 20, kTownHall, nullptr, 0), PF_PLACE_OK);
+  CHECK(pf_map_add_unit(map, 4, 4, kCircleOfPower, 15, 0) >= 0);
+  CHECK_EQ(pf_map_placement_check_ex(map, 4, 4, kFootman, nullptr, 0), PF_PLACE_OK);
+  pf_map_free(map);
+}
+
+/**
  * The unit block in the game's string table ends before the upgrades.
  *
  * 105 names for 110 units, so a lookup that does not stop at the boundary

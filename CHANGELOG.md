@@ -37,6 +37,13 @@ section therefore covers all the commits after the previous tag.
 `scripts/prep-release.ps1` collects those commits as a start. See
 `docs/releasing.md`.
 
+## 0.1.76
+
+**Fixed**
+
+- You can place a flying unit on a tile that holds a ground or sea unit.
+- You can place a unit on a start location or a Circle of Power.
+
 ## 0.1.75
 
 **Fixed**
