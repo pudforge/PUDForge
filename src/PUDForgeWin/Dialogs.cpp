@@ -1112,6 +1112,18 @@ bool IsFlagRow(int id) { return id >= kFlagRowBase; }
 int FlagRowCell(int id) { return (id - kFlagRowBase) / kFlagRowStride; }
 int FlagRowOption(int id) { return (id - kFlagRowBase) % kFlagRowStride; }
 
+/// `goldCost`, `lumberCost` and `oilCost` are one byte each in `UDTA`, which
+/// only reaches 255 — so the format keeps them in tens: a Footman's stored 60
+/// is 600 gold. Read raw, the form would show the file's own units instead of
+/// the game's, which is not a fact anybody editing a map wants to know.
+constexpr int kCostScale = 10;
+bool IsCostField(int field) {
+  const char* name = pf_udta_field_name(field);
+  if (!name) return false;
+  return std::string(name) == "goldCost" || std::string(name) == "lumberCost" ||
+         std::string(name) == "oilCost";
+}
+
 /// The rows the form shows for one unit: every field that covers it, labelled
 /// and given the kind of control it deserves.
 ///
@@ -1165,6 +1177,9 @@ std::vector<Form::Row> UnitFormRows(const UnitSheet& sheet, int unit) {
         const int bytes = pf_udta_field_width(at.field);
         row.low = 0;
         row.high = bytes >= 4 ? 0x7FFFFFFF : (int64_t(1) << (8 * bytes)) - 1;
+        // Shown and typed in the game's units; read/write in BuildUnitForm do
+        // the /10 that puts it back in the file's.
+        if (IsCostField(at.field)) row.high *= kCostScale;
         break;
       }
     }
@@ -1194,6 +1209,7 @@ void BuildUnitForm(HWND, UnitSheet* sheet) {
     }
     const UnitCell& at = sheet->cells[size_t(id)];
     const int64_t value = sheet->Value(at.field, sheet->at, at.component);
+    if (IsCostField(at.field)) return value * kCostScale;
     if (pf_udta_field_kind(at.field) != PF_UDTA_ENUM) return value;
     // A choice row wants the index of the option, not the option's value.
     for (int o = 0; o < pf_udta_field_option_count(at.field); o++) {
@@ -1218,7 +1234,12 @@ void BuildUnitForm(HWND, UnitSheet* sheet) {
       return true;
     }
     const UnitCell& at = sheet->cells[size_t(id)];
-    if (pf_udta_field_kind(at.field) == PF_UDTA_ENUM) {
+    if (IsCostField(at.field)) {
+      // Rounded rather than truncated: the byte only holds tens, so 649
+      // should land on 65 (650), not fall to 64 (640) the way a plain
+      // integer divide would.
+      value = (value + kCostScale / 2) / kCostScale;
+    } else if (pf_udta_field_kind(at.field) == PF_UDTA_ENUM) {
       int option = 0;
       if (value >= 0) pf_udta_field_option(at.field, int(value), &option);
       value = option;

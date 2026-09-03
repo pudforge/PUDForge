@@ -1088,6 +1088,40 @@ TEST(only_a_few_units_may_share_tiles) {
 }
 
 /**
+ * A flier standing over a ground unit is a map author's guard post, not a
+ * fault — the offer to clean up misplaced units used to delete it anyway,
+ * which is how a Dragon parked over a hall goes missing on the next open.
+ *
+ * The Daemon belongs here too, and not by courtesy: the retail table flags it
+ * `Fly` the same as the Dragon and the Gryphon Rider, spell-summoned and
+ * otherwise unlike them as it is.
+ */
+TEST(a_flier_may_share_a_tile_with_anything) {
+  const int kFootman = 0x00, kGryphonRider = 0x2a, kDragon = 0x2b, kDaemon = 0x38;
+  CHECK_EQ(pf::default_unit_domain(kDragon), pf::kDomainAir);
+  CHECK_EQ(pf::default_unit_domain(kDaemon), pf::kDomainAir);
+
+  CHECK(pf::units_may_share_tiles(kDragon, kFootman));
+  CHECK(pf::units_may_share_tiles(kFootman, kGryphonRider));
+  CHECK(pf::units_may_share_tiles(kDaemon, kFootman));
+  CHECK(pf::units_may_share_tiles(kDragon, kDaemon));   // two fliers together
+
+  // Two footmen on one tile are still a fault: the exemption is the flier's,
+  // not a general amnesty for overlap.
+  CHECK(!pf::units_may_share_tiles(kFootman, kFootman));
+
+  pf_status st = PF_OK;
+  pf_map* map = pf_map_create(32, 32, PF_TILESET_FOREST, &st);
+  if (!map) { CHECK(false); return; }
+  pf_map_set_allow_illegal_placement(map, 1);
+  CHECK(pf_map_add_unit(map, 10, 10, kFootman, 0, 0) >= 0);
+  CHECK(pf_map_add_unit(map, 10, 10, kDragon, 0, 0) >= 0);
+  pf_map_set_allow_illegal_placement(map, 0);
+  CHECK_EQ(pf_map_misplaced_units(map, PF_MISPLACED_OVERLAP, nullptr, 0), 0);
+  pf_map_free(map);
+}
+
+/**
  * The unit block in the game's string table ends before the upgrades.
  *
  * 105 names for 110 units, so a lookup that does not stop at the boundary

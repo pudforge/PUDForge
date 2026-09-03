@@ -37,6 +37,18 @@ section therefore covers all the commits after the previous tag.
 `scripts/prep-release.ps1` collects those commits as a start. See
 `docs/releasing.md`.
 
+## 0.1.75
+
+**Fixed**
+
+- Check Map no longer offers to remove a flying unit standing over another unit.
+- Check Map lists what it would remove, not just a count.
+- Gold Cost, Lumber Cost and Oil Cost on the Unit Data page show the real amount.
+
+**Changed**
+
+- Unit Type reads Land, Air or Sea.
+
 ## 0.1.74
 
 **Changed**

@@ -16,6 +16,8 @@
 #include <shellapi.h>
 #include <shobjidl.h>
 
+#include <algorithm>
+#include <map>
 #include <memory>
 #include <string>
 #include <vector>
@@ -309,6 +311,50 @@ enum StatusCell {
 constexpr UINT kMsgOfferCleanup = WM_APP + 1;
 /// The update check has an answer. LPARAM is the UpdateResult, ours to free.
 constexpr UINT kMsgUpdateChecked = WM_APP + 2;
+
+/// One screenful of bullets, past which a message box stops being readable
+/// and starts running off the bottom of the monitor. There are only 110 unit
+/// types in the game, so even every one of them misplaced is a bounded list —
+/// this is about the box staying on screen, not about a runaway count.
+constexpr size_t kMaxMisplacedLines = 8;
+
+/// What the cleanup offer below is actually about to remove, as one bulleted
+/// line per unit type — the count alone is how a Dragon standing guard over a
+/// hall goes missing without anybody having been told it would.
+///
+/// Ordered by how many rather than by id: the type there are few of is
+/// usually the one somebody placed on purpose and would want to notice, and
+/// it is also the type most likely to be cut off if the list runs long.
+std::wstring SummarizeMisplaced(pf_map* map, int checks) {
+  const int found = pf_map_misplaced_units(map, checks, nullptr, 0);
+  if (found <= 0) return L"";
+  const size_t total = size_t(found);
+  std::vector<int> found_indices(total);
+  pf_map_misplaced_units(map, checks, found_indices.data(), found);
+  std::map<int, int> by_type;
+  for (int index : found_indices) {
+    pf_unit unit{};
+    if (pf_map_unit(map, index, &unit) == PF_OK) by_type[unit.type]++;
+  }
+  std::vector<std::pair<int, int>> ordered(by_type.begin(), by_type.end());
+  std::sort(ordered.begin(), ordered.end(),
+            [](const auto& a, const auto& b) { return a.second > b.second; });
+  const size_t shown = std::min(ordered.size(), kMaxMisplacedLines);
+  std::wstring text;
+  for (size_t i = 0; i < shown; i++) {
+    const char* name = pf_unit_name(ordered[i].first);
+    text += Format(IDS_MISPLACED_LINE, ordered[i].second,
+                    FromUtf8(name ? name : "?").c_str());
+  }
+  if (shown < ordered.size()) {
+    int rest_units = 0;
+    for (size_t i = shown; i < ordered.size(); i++) rest_units += ordered[i].second;
+    const int rest_kinds = int(ordered.size() - shown);
+    text += Format(Plural(rest_kinds, IDS_MISPLACED_MORE_ONE, IDS_MISPLACED_MORE_MANY),
+                    rest_kinds, rest_units);
+  }
+  return text;
+}
 
 struct App : Host {
   HWND main = nullptr;
@@ -947,9 +993,10 @@ struct App : Host {
     const int checks = editor.MisplacementChecks();
     const int found = editor.MisplacedUnitCount();
     if (found <= 0) return;
+    const std::wstring list = SummarizeMisplaced(canvas.map(), checks);
     if (MessageBoxW(main,
                     Format(Plural(found, IDS_MISPLACED_ONE, IDS_MISPLACED_MANY),
-                           found).c_str(),
+                           found, list.c_str()).c_str(),
                     Str(IDS_CHECK_TITLE).c_str(),
                     MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2) != IDYES) {
       return;

@@ -536,6 +536,12 @@
 #define IDS_MISPLACED_MANY         1860
 #define IDS_MISPLACED_REMOVED_ONE  1861
 #define IDS_MISPLACED_REMOVED_MANY 1862
+/* One bullet in the list the offer above shows before asking: which types,
+   and how many of each, so Yes is not a guess. */
+#define IDS_MISPLACED_LINE         1916
+/* The list's closing line once there are more kinds than the dialog shows. */
+#define IDS_MISPLACED_MORE_ONE     1917
+#define IDS_MISPLACED_MORE_MANY    1918
 
 #define IDS_DECORATED_REMOVED_ONE  1856
 #define IDS_DECORATED_REMOVED_MANY 1857

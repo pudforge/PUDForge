@@ -92,10 +92,18 @@ BEGIN
   IDS_SEVERITY_WARNING  "Warning: "
   IDS_SEVERITY_NOTE     "Note: "
   /* On opening a map that holds units the game could not put on the board.
-     The count, then what to do about it; No is the default. It reuses
-     IDS_CHECK_TITLE, because it is the same check said at a different moment. */
-  IDS_MISPLACED_ONE     "%d unit in this map is somewhere the game cannot place it.\n\nRemove it?"
-  IDS_MISPLACED_MANY    "%d units in this map are somewhere the game cannot place them.\n\nRemove them?"
+     The count, the list of what that count is, then what to do about it; No
+     is the default. It reuses IDS_CHECK_TITLE, because it is the same check
+     said at a different moment. */
+  IDS_MISPLACED_ONE     "%d unit in this map is somewhere the game cannot place it:\n\n%sRemove it?"
+  IDS_MISPLACED_MANY    "%d units in this map are somewhere the game cannot place them:\n\n%sRemove them?"
+  /* One line of the list above, one kind of unit and how many. */
+  IDS_MISPLACED_LINE    "• %d %s\n"
+  /* The list's last line once it has more kinds than fit a screen — a map
+     built by another tool can have dozens. The lines above it are the
+     kinds there are most of, so this is naming the tail, not the whole. */
+  IDS_MISPLACED_MORE_ONE  "• and %d more kind (%d units)\n"
+  IDS_MISPLACED_MORE_MANY "• and %d more kinds (%d units)\n"
   IDS_MISPLACED_REMOVED_ONE  "%d misplaced unit removed"
   IDS_MISPLACED_REMOVED_MANY "%d misplaced units removed"
   /* The movement palette's last cell, and what the status bar says when it is

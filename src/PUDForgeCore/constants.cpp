@@ -438,7 +438,12 @@ const UdtaOption kMissileOptions[] = {
     {0x18, "Small Cannon"},  {0x1b, "Demon Fire"},      {0x1d, "None"},
 };
 
-const UdtaOption kUnitTypeOptions[] = {{0, "Land"}, {1, "Fly"}, {2, "Naval"}};
+// "Air" to match the Units menu's own grouping (IDS_MENU_KIND_AIR) and
+// kAiNames' "Air attack", rather than this field's old "Fly". "Sea" rather
+// than the menu's "Water", to match kAiNames' "Sea attack" instead — the two
+// already disagree with each other, and this field was a third spelling of
+// the same idea.
+const UdtaOption kUnitTypeOptions[] = {{0, "Land"}, {1, "Air"}, {2, "Sea"}};
 
 const UdtaOption kMouseOptions[] = {
     {0, "None"},     {1, "Attack"},   {2, "Move"},

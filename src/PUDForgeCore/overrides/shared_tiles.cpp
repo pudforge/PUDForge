@@ -4,6 +4,11 @@
 // the map check keeps quiet about. It is short on purpose: a pair listed here
 // is one the game itself puts on top of each other.
 //
+// **A flier over anything** is the one exception decided by domain rather than
+// by unit id, because it is the placement check's own rule and not a fact
+// about any particular pair: a flier's footprint answers to no terrain, so it
+// does not answer to whatever is standing on that terrain either.
+//
 // **Start locations** are markers rather than things. A town hall or a worker
 // sits on one on nearly every map — 17 times across the five in
 // `test/fixtures`, and on every shipped multiplayer map.
@@ -42,7 +47,13 @@ bool is_shareable(int unit_id) {
 }  // namespace
 
 bool units_may_share_tiles(int a, int b) {
-  return is_shareable(a) || is_shareable(b);
+  if (is_shareable(a) || is_shareable(b)) return true;
+  // A flier crosses anything the terrain can hold — see the placement check's
+  // own "Fliers cross anything" — and the game does not stop it crossing
+  // another unit either. A dragon or a gryphon rider standing guard directly
+  // over a hall is how a map author places one; the check should not offer to
+  // delete it as though it were two footmen on the same tile.
+  return default_unit_domain(a) == kDomainAir || default_unit_domain(b) == kDomainAir;
 }
 
 }  // namespace pf
