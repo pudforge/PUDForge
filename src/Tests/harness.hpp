@@ -121,6 +121,14 @@ bool have_corpus();
 bool have_art();
 void skip(const char* why);
 
+/// Where the Remastered artwork is, or empty. A junction at
+/// reference/war2_hd, pointing at the install's x86/Data/Art/hd.
+std::string hd_art_dir();
+
+/// Every file under a directory with one extension, sorted. `extension`
+/// includes the dot and is matched lowercased.
+std::vector<std::string> files_under(const std::string& dir, const char* extension);
+
 /// True when a path holds a Git LFS pointer rather than the real file.
 ///
 /// A checkout without LFS leaves small text stand-ins in place of the corpus

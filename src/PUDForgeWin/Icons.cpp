@@ -177,12 +177,30 @@ void IconCache::Open(GameData* game, const pf_tileset_art* art, int tileset) {
   game_ = game;
   art_ = art;
   tileset_ = tileset;
-  if (game_ && art_) sheet_ = game_->OpenPortraits(tileset);
+  if (game_ && art_) sheet_ = game_->OpenPortraits(tileset, kNeutralOwner);
+}
+
+pf_sprite* IconCache::SheetFor(int owner) {
+  if (!game_) return sheet_;
+  // Only the Remastered icons differ between players, because those carry
+  // their colour in the pixels. The game's own sheet is palette-indexed and
+  // tinted as it is drawn, so the one sheet answers for everybody; asking per
+  // owner there decoded the same file again for every player on the map.
+  if (!game_->icons_vary_by_owner() || owner == kNeutralOwner) return sheet_;
+  auto found = owner_sheets_.find(owner);
+  if (found != owner_sheets_.end()) return found->second ? found->second : sheet_;
+  pf_sprite* own = game_->OpenPortraits(tileset_, owner);
+  owner_sheets_.emplace(owner, own);
+  return own ? own : sheet_;
 }
 
 void IconCache::Close() {
   if (sheet_) pf_sprite_free(sheet_);
   sheet_ = nullptr;
+  for (auto& entry : owner_sheets_) {
+    if (entry.second) pf_sprite_free(entry.second);
+  }
+  owner_sheets_.clear();
   frames_.clear();
   units_.clear();
   sprites_.clear();
@@ -194,10 +212,11 @@ const Icon& IconCache::Frame(int frame) {
   auto found = frames_.find(frame);
   if (found != frames_.end()) return found->second;
   Icon icon;
-  if (sheet_ && frame < pf_sprite_frame_count(sheet_)) {
+  pf_sprite* sheet = SheetFor(kNeutralOwner);
+  if (sheet && frame < pf_sprite_frame_count(sheet)) {
     int w = 0, h = 0;
     std::vector<uint32_t> px;
-    if (Rasterise(sheet_, frame, art_, kNeutralOwner, w, h, px)) {
+    if (Rasterise(sheet, frame, art_, kNeutralOwner, w, h, px)) {
       icon = MiddleSquare(w, h, px);
     }
   }
@@ -225,11 +244,13 @@ const Icon& IconCache::Unit(int unit_id, int owner) {
     if (owner == kNeutralOwner) {
       const Icon& icon = Frame(frame);
       if (!icon.empty()) return units_.emplace(key, icon).first->second;
-    } else if (sheet_ && frame < pf_sprite_frame_count(sheet_)) {
-      int w = 0, h = 0;
-      std::vector<uint32_t> px;
-      if (Rasterise(sheet_, frame, art_, owner, w, h, px)) {
-        return units_.emplace(key, MiddleSquare(w, h, px)).first->second;
+    } else if (pf_sprite* sheet = SheetFor(owner)) {
+      if (frame < pf_sprite_frame_count(sheet)) {
+        int w = 0, h = 0;
+        std::vector<uint32_t> px;
+        if (Rasterise(sheet, frame, art_, owner, w, h, px)) {
+          return units_.emplace(key, MiddleSquare(w, h, px)).first->second;
+        }
       }
     }
   }
@@ -251,12 +272,16 @@ const Icon& IconCache::Sprite(int unit_id, int owner) {
   // repaint of the ghost that wanted it.
   Icon icon;
   if (game_ && art_) {
-    if (pf_sprite* sprite = game_->OpenUnitSprite(unit_id, tileset_)) {
+    // The owner goes in, not just to Rasterise: the game's own sprites are
+    // tinted through the palette when they are drawn, but the Remastered ones
+    // carry their colour in the pixels and are built per owner.
+    if (pf_sprite* sprite = game_->OpenUnitSprite(unit_id, tileset_, owner)) {
       int w = 0, h = 0;
       std::vector<uint32_t> px;
       if (Rasterise(sprite, 0, art_, owner, w, h, px)) {
         icon.w = w;
         icon.h = h;
+        icon.tile_px = pf_sprite_tile_px(sprite);
         icon.px = std::move(px);
       }
       pf_sprite_free(sprite);

@@ -396,6 +396,10 @@
 /* 693 was "Check for updates when PUDForge starts", retired with the
    start-up check. Left unused until one comes back. */
 
+/// Draw from the Warcraft II Remastered artwork rather than the game's own
+/// sprites. Only in a build with PF_ENABLE_HD_ART; see docs/hd_art.md.
+#define IDC_OPT_HD_ART        694
+
 /* 700 was the keyboard shortcut list box, retired with its dialog. */
 
 #define IDC_NEW_TILESET       710

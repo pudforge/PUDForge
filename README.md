@@ -19,6 +19,8 @@ to stop it, and each one publishes the SHA-256 of the file GitHub Actions built;
   what the GitHub release notes are made of.
 - [`docs/releasing.md`](docs/releasing.md) - how a release is cut, which is a
   push to `master` with a new version in `version.h`.
+- [`docs/hd_art.md`](docs/hd_art.md) - the Remastered artwork module: what it
+  would cost, what has been measured, and what is left. Off by default.
 
 ## Building
 

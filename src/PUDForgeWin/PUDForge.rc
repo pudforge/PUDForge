@@ -789,7 +789,14 @@ END
  * them — and they outgrew it: a menu shows one at a time and says nothing
  * about which belong together.
  */
+// Taller by one group in a build that has the Remastered artwork in it, which
+// is also why the buttons below are written twice: a dialog template cannot
+// move a control conditionally, only carry two versions of the line.
+#ifdef PF_ENABLE_HD_ART
+IDD_OPTIONS DIALOGEX 0, 0, 250, 280
+#else
 IDD_OPTIONS DIALOGEX 0, 0, 250, 254
+#endif
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "Options"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
@@ -822,11 +829,25 @@ BEGIN
   // here. See Editor::offer_unused_units.
   AUTOCHECKBOX    "Offer un&used and special units (may crash the game)", IDC_OPT_UNUSED_UNITS, 16, 212, 218, 10
 
+#ifdef PF_ENABLE_HD_ART
+  // A tick rather than a choice of size, because a size is a promise this
+  // cannot yet keep: the renderer composes at one tile size, so the artwork is
+  // drawn at the size it draws everything. See docs/hd_art.md.
+  GROUPBOX        "Artwork", -1, 8, 234, 234, 26
+  AUTOCHECKBOX    "Use Warcraft II &Remastered artwork", IDC_OPT_HD_ART, 16, 248, 218, 10
+
+  // Away from OK and Cancel, on the other side of the row: it is the one
+  // button on this page that discards something.
+  PUSHBUTTON      "&Reset Everything…", IDC_OPT_RESET, 8, 260, 80, 14
+  DEFPUSHBUTTON   "OK", IDOK, 138, 260, 50, 14
+  PUSHBUTTON      "Cancel", IDCANCEL, 192, 260, 50, 14
+#else
   // Away from OK and Cancel, on the other side of the row: it is the one
   // button on this page that discards something.
   PUSHBUTTON      "&Reset Everything…", IDC_OPT_RESET, 8, 234, 80, 14
   DEFPUSHBUTTON   "OK", IDOK, 138, 234, 50, 14
   PUSHBUTTON      "Cancel", IDCANCEL, 192, 234, 50, 14
+#endif
 END
 
 /*

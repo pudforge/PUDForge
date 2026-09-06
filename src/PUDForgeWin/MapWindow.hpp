@@ -274,6 +274,13 @@ class MapWindow {
   int patch_x0_ = 0, patch_y0_ = 0, patch_x1_ = -1, patch_y1_ = -1;
   int composed_x0_ = -1, composed_y0_ = -1, composed_cols_ = 0, composed_rows_ = 0;
   int composed_zoom_ = -1;
+  /// Pixels a tile the last compose used. 32 unless the Remastered artwork is
+  /// loaded, when it is whatever that was cut at — composing at the artwork's
+  /// own size is the whole point of having it.
+  int composed_tile_px_ = 32;
+
+  /// The size to compose at now: the tileset's HD tiles if it has any.
+  int ComposeTilePx() const;
   /// Which layer the last composition was drawn with.
   ///
   /// Part of the cache key rather than something a caller marks, because the

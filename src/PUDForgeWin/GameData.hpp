@@ -78,9 +78,70 @@ class GameData {
   int AddMissingSprites(const pf_map* map, pf_sprite_set* set);
 
   /// The command-button icon sheet for a tileset, or null. Caller frees.
-  pf_sprite* OpenPortraits(int tileset);
+  ///
+  /// `owner` only matters for the Remastered artwork, which carries its team
+  /// colour in the pixels; the game's own sheet is tinted later through the
+  /// palette and answers the same whoever asks.
+  pf_sprite* OpenPortraits(int tileset, int owner = 0);
   /// One unit's sprite, with the forest fallback. Caller frees.
-  pf_sprite* OpenUnitSprite(int unit_id, int tileset);
+  ///
+  /// Where the Remastered artwork is in use this answers from that instead,
+  /// which is the single place the two kinds of art meet: everything above
+  /// asks for a sprite and does not care which it got.
+  /// `owner` decides the team colour when the Remastered artwork is in use;
+  /// the game's own sprites are tinted later, at the palette.
+  pf_sprite* OpenUnitSprite(int unit_id, int tileset, int owner = 0);
+
+#ifdef PF_ENABLE_HD_ART
+  /// Take up the Remastered artwork at this tile size, importing it the first
+  /// time and reading the cache after that. `tile_px` of 0 puts it away again.
+  ///
+  /// False when the install has no HD artwork, when the import found nothing,
+  /// or when it was turned off — in every case the classic sprites carry on,
+  /// which is why nothing above this has to handle a failure.
+  bool UseHdArt(int tile_px);
+
+  /// Everything the import needs, gathered on the thread that owns the game
+  /// data so the worker can touch none of it.
+  struct HdRequest {
+    std::wstring hd_dir;
+    std::wstring cache_path;
+    std::string stamp;
+    int tile_px = 0;
+    int icon_w = 0;
+    int icon_h = 0;
+  };
+
+  /// Fill a request, or answer false when this install has no HD artwork.
+  bool PrepareHdRequest(int tile_px, HdRequest& out);
+
+  /// Do the reading and decoding. Static and takes only the request, because
+  /// it runs on a worker thread: nothing it touches is shared with the one
+  /// drawing. Null when there is nothing to draw from.
+  static pf_hd_cache* BuildHdCache(const HdRequest& request);
+
+  /// Take a built cache. On the thread that draws, once the worker is done.
+  void AdoptHdCache(pf_hd_cache* cache, int tile_px);
+  bool hd_ready() const { return hd_ready_; }
+  /// Draw this tileset's terrain from the Remastered artwork, if it is in use
+  /// and the cache holds that tileset. The art is left alone otherwise.
+  bool ApplyHdTerrain(pf_tileset_art* art, int tileset);
+  /// How long the last import took, in seconds, for the line that reports it.
+  double hd_import_seconds() const { return hd_seconds_; }
+#endif
+
+  /// Whether a command icon depends on whose unit it is.
+  ///
+  /// Only the Remastered icons do. The game's own sheet is palette-indexed and
+  /// tinted as it is drawn, so one sheet answers for every player — and this
+  /// is false outright in a build without the module.
+  bool icons_vary_by_owner() const {
+#ifdef PF_ENABLE_HD_ART
+    return hd_ready_;
+#else
+    return false;
+#endif
+  }
 
   /// One file out of the archives, by its path inside them. Empty when the game
   /// is not to hand or the archives do not carry it.
@@ -114,6 +175,22 @@ class GameData {
  private:
   bool Search();
   void Remember() const;
+
+#ifdef PF_ENABLE_HD_ART
+  /// Where the built cache is kept, under the user's profile: it is derived
+  /// from their install and belongs with their data, not ours.
+  std::wstring HdCachePath(int tile_px) const;
+  /// What the cache was built from, so a patched game rebuilds rather than
+  /// draws last year's art. Size and write time of the largest atlas.
+  std::wstring HdStamp(const std::wstring& hd_dir) const;
+
+  /// The imported artwork, or null. Held through the ABI like everything
+  /// else the core owns: the cache is C++ inside and opaque out here.
+  pf_hd_cache* hd_cache_ = nullptr;
+  bool hd_ready_ = false;
+  int hd_tile_px_ = 0;
+  double hd_seconds_ = 0;
+#endif
 
   std::wstring folder_;
   pf_data_source* source_ = nullptr;

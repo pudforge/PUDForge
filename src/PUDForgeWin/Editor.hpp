@@ -148,6 +148,23 @@ class Editor {
   int unit_filter = PF_UNITS_ALL;       ///< pf_unit_filter
   int overlay = PF_OVERLAY_NONE;        ///< pf_overlay, as the View menu set it
 
+#ifdef PF_ENABLE_HD_ART
+  /// Tile size the Remastered artwork is cached at, or 0 for the game's own
+  /// sprites. Not a switch: the number is the whole choice, because it buys
+  /// sharpness with memory and there is no answer that is right for everyone.
+  /// 64 keeps a map crisp to 200% for about 69 MB; 96 reaches 300% for 154.
+  ///
+  /// Only ever 0, 64 or 96 — HdArtTilePx() clamps whatever was restored.
+  int hd_art_tile_px = 0;
+
+  /// The restored setting, made safe. A number from an older build, a hand-
+  /// edited registry or a future release lands on the nearest rung we know.
+  static int ClampHdArtTilePx(int px) {
+    if (px >= 96) return 96;
+    return px >= 64 ? 64 : 0;
+  }
+#endif
+
   /// The layer the canvas should actually draw.
   ///
   /// Movement mode shows its own layer whatever the View menu says, because
@@ -684,6 +701,19 @@ class Editor {
   /// Paste with the fragment's top-left at a tile, as one undo step.
   /// @return units placed, or -1 with last_refusal set
   int PasteAt(int x, int y);
+  /// Hand the pending fragment to a player, before it lands.
+  ///
+  /// The same reading the placement tool gives a number key — "who is the next
+  /// unit for" — asked of a paste, which is the strongest form of "next": the
+  /// units are already picked and only their owner is still open. Races follow
+  /// the way they do everywhere else, so a Footman copied out of a human base
+  /// arrives as a Grunt in an orc player's hands.
+  ///
+  /// Nothing is written to the map: like a turn, this changes what the paste
+  /// would drop. Answers how many units changed, so a caller can stay quiet
+  /// about a fragment of terrain.
+  int RetargetClipboard(int owner);
+
   /// Mirror, flip or rotate the pending fragment. Nothing is written to the
   /// map until it is pasted, so this is free to try.
   bool FlipClipboard();

@@ -29,4 +29,16 @@ std::vector<uint8_t> zlib_compress(const uint8_t* data, size_t length);
 uint32_t crc32(const uint8_t* data, size_t length, uint32_t seed = 0);
 uint32_t adler32(const uint8_t* data, size_t length);
 
+/// Decode a PNG into the same packed RGBA `encode_png` takes, writing the
+/// dimensions to `width` and `height` when they are given. Empty when the
+/// bytes are not a PNG this understands: 8 bits a channel, not interlaced.
+/// See png_decode.cpp for why the two halves live in separate files.
+std::vector<uint32_t> decode_png(const uint8_t* bytes, size_t length,
+                                 int* width = nullptr, int* height = nullptr);
+
+/// The inverse of `zlib_compress`, and general where that one is not: it reads
+/// dynamic Huffman codes, which is what everything but our own encoder emits.
+/// Exposed for tests, and empty when the stream does not decode.
+std::vector<uint8_t> zlib_decompress(const uint8_t* data, size_t length);
+
 }  // namespace pf

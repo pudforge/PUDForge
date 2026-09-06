@@ -445,7 +445,7 @@ TEST(a_resource_says_which_one_it_is_and_what_it_starts_with) {
   CHECK_EQ(pf_resource_value(40000), 16);
   CHECK_EQ(pf_resource_value(20000), 8);
   CHECK_EQ(pf_resource_value(0), 0);
-  for (int value = 0; value <= 0xFFFF; value += 977) {
+  for (int value = 0; value <= 0xFF; value += 7) {
     CHECK_EQ(pf_resource_value(pf_resource_amount(value)), value);
   }
 
@@ -457,10 +457,13 @@ TEST(a_resource_says_which_one_it_is_and_what_it_starts_with) {
   CHECK_EQ(pf_resource_value(1250), 1);     // exactly half a step, up
   CHECK_EQ(pf_resource_value(1249), 0);
 
-  // Neither end can leave the field: the value is sixteen bits, and a negative
-  // amount is not a thing a mine can hold.
+  // Neither end can leave the field: the game reads the amount out of the
+  // record's low byte alone, so 255 steps is the ceiling however much somebody
+  // types, and a negative amount is not a thing a mine can hold. Storing 0x100
+  // would reach the game as 0 - a mine asked for four million gold, empty.
   CHECK_EQ(pf_resource_value(-1), 0);
-  CHECK_EQ(pf_resource_value(int64_t(1) << 40), 0xFFFF);
+  CHECK_EQ(pf_resource_value(int64_t(1) << 40), 0xFF);
+  CHECK_EQ(pf_resource_amount(pf_resource_value(1000000)), int64_t(637500));
 
   // And what the editor fills a freshly placed one with.
   CHECK_EQ(pf_unit_default_value(0x5c), 16);   // 40,000 gold
@@ -1149,6 +1152,155 @@ TEST(placement_allows_the_tiles_the_check_shares) {
   CHECK_EQ(pf_map_placement_check_ex(map, 20, 20, kTownHall, nullptr, 0), PF_PLACE_OK);
   CHECK(pf_map_add_unit(map, 4, 4, kCircleOfPower, 15, 0) >= 0);
   CHECK_EQ(pf_map_placement_check_ex(map, 4, 4, kFootman, nullptr, 0), PF_PLACE_OK);
+  pf_map_free(map);
+}
+
+/**
+ * The mine clearance is about the pair, not about which went down first.
+ *
+ * Only the hall was ever asked, so a mine could be dropped against a standing
+ * hall to build the arrangement the hall itself would have been refused.
+ */
+TEST(mine_clearance_holds_in_both_directions) {
+  const int kMine = 0x5c, kTownHall = 0x4a;
+  const int clear = pf::mine_clearance_tiles();
+  pf_status st = PF_OK;
+
+  // A hall beside a mine, which is the direction that always worked.
+  for (int gap = 0; gap <= clear; gap++) {
+    pf_map* map = pf_map_create(32, 32, PF_TILESET_FOREST, &st);
+    if (!map) { CHECK(false); return; }
+    int mw = 1, mh = 1;
+    pf_map_unit_footprint(map, kMine, &mw, &mh);
+    CHECK(pf_map_add_unit(map, 4, 4, kMine, 15, 2400) >= 0);
+    const int want = gap < clear ? PF_PLACE_TOO_NEAR_MINE : PF_PLACE_OK;
+    CHECK_EQ(pf_map_placement_check_ex(map, 4 + mw + gap, 4, kTownHall, nullptr, 0),
+             want);
+    pf_map_free(map);
+  }
+
+  // And a mine beside a hall, which did not.
+  for (int gap = 0; gap <= clear; gap++) {
+    pf_map* map = pf_map_create(32, 32, PF_TILESET_FOREST, &st);
+    if (!map) { CHECK(false); return; }
+    int hw = 1, hh = 1;
+    pf_map_unit_footprint(map, kTownHall, &hw, &hh);
+    CHECK(pf_map_add_unit(map, 4, 4, kTownHall, 0, 0) >= 0);
+    const int want = gap < clear ? PF_PLACE_TOO_NEAR_MINE : PF_PLACE_OK;
+    CHECK_EQ(pf_map_placement_check_ex(map, 4 + hw + gap, 4, kMine, nullptr, 0),
+             want);
+    pf_map_free(map);
+  }
+
+  // One fault is still one line in the report, and it names the hall.
+  pf_map* map = pf_map_create(32, 32, PF_TILESET_FOREST, &st);
+  if (!map) { CHECK(false); return; }
+  pf_map_set_allow_illegal_placement(map, 1);
+  CHECK(pf_map_add_unit(map, 4, 4, kMine, 15, 2400) >= 0);
+  CHECK(pf_map_add_unit(map, 8, 4, kTownHall, 0, 0) >= 0);
+  pf_map_set_allow_illegal_placement(map, 0);
+  int crowded = 0;
+  const int found = pf_map_validate(map, nullptr, 0);
+  std::vector<pf_issue> issues(size_t(found > 0 ? found : 0));
+  if (found > 0) pf_map_validate(map, issues.data(), found);
+  for (const pf_issue& issue : issues) {
+    if (issue.code == PF_ISSUE_HALL_CROWDS_MINE) crowded++;
+  }
+  CHECK_EQ(crowded, 1);
+  pf_map_free(map);
+}
+
+/**
+ * Oil keeps four tiles from the shipyard and the refinery, and none from the
+ * foundry.
+ *
+ * The exception is the finding rather than a gap in the evidence: maps written
+ * by the game's own editor hold oil at one, two and three tiles from a
+ * foundry, and never nearer than four from the other two. See
+ * overrides/oil_clearance.cpp.
+ */
+TEST(oil_keeps_its_distance_from_the_buildings_that_work_it) {
+  const int kOilPatch = 0x5d, kShipyard = 0x48, kRefinery = 0x54, kFoundry = 0x4e;
+  const int clear = pf::oil_clearance_tiles();
+  CHECK(pf::unit_is_oil(kOilPatch));
+  CHECK(pf::unit_needs_oil_clearance(kShipyard));
+  CHECK(pf::unit_needs_oil_clearance(kRefinery));
+  CHECK(!pf::unit_needs_oil_clearance(kFoundry));
+
+  pf_status st = PF_OK;
+  for (int building : {kShipyard, kRefinery, kFoundry}) {
+    for (int gap = 0; gap <= clear; gap++) {
+      pf_map* map = pf_map_create(64, 64, PF_TILESET_FOREST, &st);
+      if (!map) { CHECK(false); return; }
+      // Placed through the hatch, so only the clearance is under test here.
+      pf_map_set_allow_illegal_placement(map, 1);
+      CHECK(pf_map_add_unit(map, 20, 20, kOilPatch, 15, 24000) >= 0);
+      pf_map_set_allow_illegal_placement(map, 0);
+      int ow = 1, oh = 1;
+      pf_map_unit_footprint(map, kOilPatch, &ow, &oh);
+      const int code =
+          pf_map_placement_check(map, 20 + ow + gap, 20, building);
+      const bool refused = code == PF_PLACE_TOO_NEAR_OIL;
+      if (building == kFoundry) {
+        CHECK(!refused);                       // never, at any gap
+      } else {
+        CHECK_EQ(refused, gap < clear);
+      }
+      pf_map_free(map);
+    }
+  }
+
+  // And from the other side: oil dropped against a standing shipyard.
+  pf_map* map = pf_map_create(64, 64, PF_TILESET_FOREST, &st);
+  if (!map) { CHECK(false); return; }
+  pf_map_set_allow_illegal_placement(map, 1);
+  CHECK(pf_map_add_unit(map, 20, 20, kShipyard, 0, 0) >= 0);
+  pf_map_set_allow_illegal_placement(map, 0);
+  int bw = 1, bh = 1;
+  pf_map_unit_footprint(map, kShipyard, &bw, &bh);
+  // On oil's own grid — both odd — or the grid rule answers first, which it
+  // is entitled to do.
+  CHECK_EQ(pf_map_placement_check(map, 20 + bw, 21, kOilPatch),
+           PF_PLACE_TOO_NEAR_OIL);
+  pf_map_free(map);
+}
+
+/**
+ * A dock's middle is in the water.
+ *
+ * Touching water and coast is not enough on its own: a 3x3 shore building can
+ * do that with eight of its nine tiles inland. All 85 shore buildings in the
+ * corpus have water under the middle tile; see overrides/shore_centre.cpp.
+ */
+TEST(a_shore_building_keeps_its_middle_in_the_water) {
+  const int kShipyard = 0x48;
+  pf_status st = PF_OK;
+  pf_map* map = pf_map_create(32, 32, PF_TILESET_FOREST, &st);
+  if (!map) { CHECK(false); return; }
+  // A lake with a straight shoreline down the middle of the map.
+  for (int y = 0; y < 32; y++) {
+    for (int x = 16; x < 32; x++) pf_map_paint_terrain(map, x, y, PF_TERRAIN_WATER_DARK, 1);
+  }
+
+  int fw = 1, fh = 1;
+  pf_map_unit_footprint(map, kShipyard, &fw, &fh);
+  CHECK_EQ(fw, 3);
+
+  // Walked across the waterline: the placement is good only once the middle
+  // tile is water, and it stays good further out.
+  bool refused_inland = false, allowed_at_the_line = false;
+  for (int x = 12; x <= 20; x++) {
+    const int code = pf_map_placement_check_ex(map, x, 10, kShipyard, nullptr, 0);
+    const int centre = pf_tile_dominant_terrain(
+        uint16_t(pf_map_tile_at(map, x + fw / 2, 10 + fh / 2)));
+    const bool wet = centre == PF_TERRAIN_WATER_DARK || centre == PF_TERRAIN_WATER_LIGHT;
+    if (!wet && code == PF_PLACE_NEEDS_SHORE) refused_inland = true;
+    if (wet && code == PF_PLACE_OK) allowed_at_the_line = true;
+    // Whatever else it is, a dry middle is never accepted.
+    if (!wet) CHECK(code != PF_PLACE_OK);
+  }
+  CHECK(refused_inland);
+  CHECK(allowed_at_the_line);
   pf_map_free(map);
 }
 

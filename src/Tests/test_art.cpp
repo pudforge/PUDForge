@@ -4,6 +4,7 @@
 
 #include "harness.hpp"
 
+#include "hd_art.hpp"
 #include "png.hpp"
 
 TEST_GROUP("art")
@@ -979,4 +980,483 @@ TEST(png_rejects_nothing_to_encode) {
   CHECK(tiny != nullptr);
   CHECK(len > 8);
   pf_buffer_free(tiny);
+}
+
+/**
+ * The core's own decoder reads the core's own writer.
+ *
+ * The test above walks the container by hand to prove the encoder; this one
+ * is the round trip through decode_png, which is what a client importing
+ * artwork actually calls. Same pixels in and out, or the pair is no use.
+ */
+TEST(the_decoder_reads_what_the_encoder_wrote) {
+  const int w = 137, h = 91;
+  std::vector<uint32_t> pixels(size_t(w) * size_t(h));
+  for (int y = 0; y < h; y++) {
+    for (int x = 0; x < w; x++) {
+      // Flat runs, a gradient and a hard edge, for the same reason as above.
+      const uint32_t r = uint32_t(x * 255 / w);
+      const uint32_t g = uint32_t(y * 255 / h);
+      const uint32_t b = ((x / 8) + (y / 8)) % 2 ? 0xf0u : 0x10u;
+      const uint32_t a = x < w / 2 ? 0xffu : 0x80u;
+      pixels[size_t(y) * size_t(w) + size_t(x)] = r | (g << 8) | (b << 16) | (a << 24);
+    }
+  }
+  const std::vector<uint8_t> png = pf::encode_png(pixels.data(), w, h);
+  CHECK(!png.empty());
+
+  int got_w = 0, got_h = 0;
+  const std::vector<uint32_t> back = pf::decode_png(png.data(), png.size(), &got_w, &got_h);
+  CHECK_EQ(got_w, w);
+  CHECK_EQ(got_h, h);
+  CHECK_EQ(back.size(), pixels.size());
+  if (back.size() != pixels.size()) return;
+  int wrong = 0;
+  for (size_t i = 0; i < pixels.size(); i++) wrong += back[i] != pixels[i];
+  CHECK_EQ(wrong, 0);
+
+  // One pixel, which is where an off-by-one in the row filters shows up.
+  const uint32_t single = 0x8040201fu;
+  const std::vector<uint8_t> one_png = pf::encode_png(&single, 1, 1);
+  const std::vector<uint32_t> one_back = pf::decode_png(one_png.data(), one_png.size());
+  CHECK_EQ(one_back.size(), size_t(1));
+  if (one_back.size() == 1) CHECK_EQ(one_back[0], single);
+}
+
+/**
+ * And a PNG this project did not write.
+ *
+ * Our encoder only ever emits fixed Huffman codes, so a round trip through it
+ * never exercises the dynamic codes that every other encoder produces — which
+ * is most of what an inflate has to do. The icon sheets are checked in, so
+ * this runs on a bare clone with no game and no corpus.
+ */
+TEST(the_decoder_reads_pngs_from_other_tools) {
+  struct Sheet { const char* path; int w; int h; };
+  const Sheet kSheets[] = {
+      {"/src/PUDForgeWin/ui-icons.png", 160, 160},
+      {"/src/PUDForgeWin/app-icon-src.png", 64, 32},
+  };
+  for (const Sheet& sheet : kSheets) {
+    std::vector<uint8_t> bytes;
+    if (!pf::read_file(pft::g_root + sheet.path, bytes)) {
+      pft::skip("no icon sheet");
+      return;
+    }
+    int w = 0, h = 0;
+    const std::vector<uint32_t> pixels = pf::decode_png(bytes.data(), bytes.size(), &w, &h);
+    CHECK_EQ(w, sheet.w);
+    CHECK_EQ(h, sheet.h);
+    CHECK_EQ(pixels.size(), size_t(sheet.w) * size_t(sheet.h));
+    if (pixels.size() != size_t(sheet.w) * size_t(sheet.h)) continue;
+
+    // Artwork, so it has to have both drawn and transparent pixels in it: an
+    // inflate that quietly produced zeros would pass a size check alone.
+    int opaque = 0, clear = 0;
+    for (uint32_t p : pixels) {
+      if ((p >> 24) == 0) clear++;
+      else if ((p >> 24) == 255) opaque++;
+    }
+    CHECK(opaque > 0);
+    CHECK(clear > 0);
+    std::printf("     %-28s %4d x %-4d %6d opaque, %6d clear\n", sheet.path, w, h,
+                opaque, clear);
+  }
+}
+
+/**
+ * The Remastered sidecar, read for the six fields that matter.
+ *
+ * The trap this is really about: a frame's value object has fields named `x`,
+ * `y`, `w` and `h`, and so do the two nested boxes inside it. A reader that
+ * searches for a name without respecting nesting finds whichever comes first,
+ * which is how a sprite ends up cut from the wrong rectangle.
+ */
+TEST(an_atlas_sidecar_gives_up_its_frames) {
+  static const char kSidecar[] =
+      "{\"frames\": {\n"
+      "  \"grunt_0\": { \"frame\": {\"x\":1,\"y\":2,\"w\":10,\"h\":20},\n"
+      "                 \"rotated\": false, \"trimmed\": true,\n"
+      "                 \"spriteSourceSize\": {\"x\":3,\"y\":4,\"w\":10,\"h\":20},\n"
+      "                 \"sourceSize\": {\"w\":72,\"h\":72} },\n"
+      "  \"grunt_10\": { \"frame\": {\"x\":30,\"y\":40,\"w\":5,\"h\":6},\n"
+      "                  \"rotated\": true, \"trimmed\": true,\n"
+      "                  \"spriteSourceSize\": {\"x\":0,\"y\":0,\"w\":5,\"h\":6},\n"
+      "                  \"sourceSize\": {\"w\":72,\"h\":72} },\n"
+      "  \"grunt_2\": { \"frame\": {\"x\":7,\"y\":8,\"w\":9,\"h\":9},\n"
+      "                 \"rotated\": false, \"trimmed\": false,\n"
+      "                 \"spriteSourceSize\": {\"x\":0,\"y\":0,\"w\":9,\"h\":9},\n"
+      "                 \"sourceSize\": {\"w\":72,\"h\":72} },\n"
+      "  \"peon_0\": { \"frame\": {\"x\":50,\"y\":60,\"w\":4,\"h\":4},\n"
+      "                \"rotated\": false, \"trimmed\": false,\n"
+      "                \"spriteSourceSize\": {\"x\":0,\"y\":0,\"w\":4,\"h\":4},\n"
+      "                \"sourceSize\": {\"w\":72,\"h\":72} }\n"
+      "}, \"meta\": { \"app\": \"texturepacker\", \"format\": \"RGBA8888\",\n"
+      "              \"size\": {\"w\":512,\"h\":256}, \"scale\": \"1\" }}";
+
+  pf::HdAtlas atlas;
+  CHECK(pf::parse_hd_atlas(kSidecar, sizeof(kSidecar) - 1, atlas));
+  CHECK_EQ(atlas.width, 512);
+  CHECK_EQ(atlas.height, 256);
+  CHECK_EQ(int(atlas.frames.size()), 4);
+
+  // The outer rectangle, not either of the nested ones that repeat its names.
+  const pf::HdFrame* first = nullptr;
+  for (const pf::HdFrame& f : atlas.frames) if (f.key == "grunt_0") first = &f;
+  CHECK(first != nullptr);
+  if (first) {
+    CHECK_EQ(first->x, 1);
+    CHECK_EQ(first->y, 2);
+    CHECK_EQ(first->w, 10);
+    CHECK_EQ(first->h, 20);
+    CHECK_EQ(first->offset_x, 3);
+    CHECK_EQ(first->offset_y, 4);
+    CHECK_EQ(first->source_w, 72);
+    CHECK(!first->rotated);
+  }
+
+  // A sprite is its frames in frame order, and 10 sorts after 2 rather than
+  // between 0 and 2 the way a string compare would put it.
+  const std::vector<const pf::HdFrame*> grunt = atlas.sprite("grunt");
+  CHECK_EQ(int(grunt.size()), 3);
+  if (grunt.size() == 3) {
+    CHECK(grunt[0]->key == "grunt_0");
+    CHECK(grunt[1]->key == "grunt_2");
+    CHECK(grunt[2]->key == "grunt_10");
+    CHECK(grunt[2]->rotated);
+  }
+  // And a stem is a whole name: "grunt" must not answer for "grunt_hero".
+  CHECK_EQ(int(atlas.sprite("peon").size()), 1);
+  CHECK_EQ(int(atlas.sprite("run").size()), 0);
+  CHECK(!pf::parse_hd_atlas("{\"meta\":{}}", 11, atlas));
+}
+
+/**
+ * Cutting a frame out: put back where it was trimmed from, then shrunk.
+ *
+ * The alpha half of this is the one that bites. Averaging colour across
+ * transparent pixels without premultiplying pulls every soft edge towards
+ * black, which shows up as a dark fringe round each sprite — the same trap
+ * make-ui-icons.ps1 documents from the encoding side.
+ */
+TEST(a_cut_frame_keeps_its_place_and_its_edges) {
+  const int aw = 16, ah = 16;
+  std::vector<uint32_t> atlas(size_t(aw) * size_t(ah), 0);
+  // Four opaque red pixels at (2,2), on an otherwise empty sheet.
+  for (int y = 2; y < 4; y++) {
+    for (int x = 2; x < 4; x++) atlas[size_t(y) * aw + size_t(x)] = 0xff0000ffu;
+  }
+  pf::HdFrame frame;
+  frame.key = "test_0";
+  frame.x = 2; frame.y = 2; frame.w = 2; frame.h = 2;
+  frame.offset_x = 4; frame.offset_y = 6;
+  frame.source_w = 8; frame.source_h = 8;
+
+  // At the artwork's own scale it comes back un-trimmed and unscaled.
+  int w = 0, h = 0;
+  std::vector<uint32_t> cut =
+      pf::cut_hd_frame(atlas.data(), aw, ah, frame, pf::kHdPixelsPerTile, &w, &h);
+  CHECK_EQ(w, 8);
+  CHECK_EQ(h, 8);
+  if (w == 8 && h == 8) {
+    CHECK_EQ(cut[size_t(6) * 8 + 4], 0xff0000ffu);   // where the offset puts it
+    CHECK_EQ(cut[0], 0u);                            // and nothing anywhere else
+  }
+
+  // At half the tile size the whole source box halves with it, padding and
+  // all, so frames still line up with each other.
+  cut = pf::cut_hd_frame(atlas.data(), aw, ah, frame, pf::kHdPixelsPerTile / 2, &w, &h);
+  CHECK_EQ(w, 4);
+  CHECK_EQ(h, 4);
+
+  // The fringe test: one opaque white pixel among three transparent ones,
+  // averaged down to a single pixel. Premultiplied that is white at a quarter
+  // alpha; averaged straight it is a quarter-grey, which is the bug.
+  std::vector<uint32_t> corner(4, 0x00000000u);
+  corner[0] = 0xffffffffu;
+  pf::HdFrame quad;
+  quad.key = "q_0";
+  quad.x = 0; quad.y = 0; quad.w = 2; quad.h = 2;
+  quad.source_w = 2; quad.source_h = 2;
+  const std::vector<uint32_t> one =
+      pf::cut_hd_frame(corner.data(), 2, 2, quad, pf::kHdPixelsPerTile / 2, &w, &h);
+  CHECK_EQ(w, 1);
+  CHECK_EQ(h, 1);
+  if (one.size() == 1) {
+    CHECK_EQ(one[0] & 0xffu, 0xffu);            // red channel still full
+    CHECK_EQ((one[0] >> 8) & 0xffu, 0xffu);     // green
+    CHECK_EQ((one[0] >> 16) & 0xffu, 0xffu);    // blue
+    CHECK_EQ((one[0] >> 24) & 0xffu, 63u);      // and a quarter of the alpha
+  }
+}
+
+/**
+ * Every sidecar the installed game ships, read end to end.
+ *
+ * The hand-written one above pins the shape; this pins that the shape is
+ * actually what TexturePacker wrote, across all of them, with every rectangle
+ * inside the sheet it claims to be cut from.
+ */
+TEST(the_installed_atlases_all_parse) {
+  const std::string hd = pft::hd_art_dir();
+  if (hd.empty()) { pft::skip("no Remastered artwork"); return; }
+
+  int sidecars = 0;
+  long frames = 0, outside = 0;
+  for (const std::string& path : pft::files_under(hd, ".json")) {
+    std::vector<uint8_t> bytes;
+    if (!pf::read_file(path, bytes) || bytes.empty()) continue;
+    pf::HdAtlas atlas;
+    if (!pf::parse_hd_atlas(reinterpret_cast<const char*>(bytes.data()), bytes.size(),
+                            atlas)) {
+      continue;   // waterMasks and the like carry no frames
+    }
+    sidecars++;
+    frames += long(atlas.frames.size());
+    for (const pf::HdFrame& f : atlas.frames) {
+      const bool fits = f.x >= 0 && f.y >= 0 && f.w > 0 && f.h > 0 &&
+                        f.x + (f.rotated ? f.h : f.w) <= atlas.width &&
+                        f.y + (f.rotated ? f.w : f.h) <= atlas.height;
+      if (!fits) outside++;
+    }
+  }
+  std::printf("     %d sidecars, %ld frames, %ld outside their sheet\n", sidecars,
+              frames, outside);
+  CHECK(sidecars > 0);
+  CHECK(frames > 0);
+  CHECK_EQ(outside, 0);
+}
+
+/**
+ * A sprite made of pixels draws like any other.
+ *
+ * This is the seam the whole module rests on: the Remastered artwork becomes
+ * an ordinary `pf_sprite`, so the sprite set, the renderer and every caller of
+ * pf_sprite_draw carry on unchanged rather than growing a second path.
+ */
+TEST(a_sprite_can_be_pixels_instead_of_a_grp) {
+  const int w = 4, h = 3, frames = 2;
+  std::vector<uint32_t> pixels(size_t(w) * size_t(h) * size_t(frames), 0);
+  for (int f = 0; f < frames; f++) {
+    for (int i = 0; i < w * h; i++) {
+      // Frame 0 solid red, frame 1 solid blue, both fully opaque except one
+      // transparent pixel that must be left alone when drawn.
+      const uint32_t colour = f == 0 ? 0xff0000ffu : 0xffff0000u;
+      pixels[size_t(f) * size_t(w * h) + size_t(i)] = i == 5 ? 0u : colour;
+    }
+  }
+
+  pf_status st = PF_OK;
+  pf_sprite* sprite =
+      pf_sprite_open_rgba(pixels.data(), w, h, frames, PF_TILE_PX, &st);
+  CHECK(sprite != nullptr);
+  CHECK_EQ(st, PF_OK);
+  if (!sprite) return;
+  CHECK_EQ(pf_sprite_width(sprite), w);
+  CHECK_EQ(pf_sprite_height(sprite), h);
+  CHECK_EQ(pf_sprite_frame_count(sprite), frames);
+
+  // Drawn with no tileset art at all: a sprite that is already pixels needs no
+  // palette, which is the point.
+  std::vector<uint32_t> out(size_t(w) * size_t(h), 0xdeadbeefu);
+  CHECK_EQ(pf_sprite_draw(sprite, 1, 0, nullptr, out.data()), PF_OK);
+  CHECK_EQ(out[0], 0xffff0000u);
+  CHECK_EQ(out[5], 0xdeadbeefu);        // the transparent pixel, untouched
+  CHECK_EQ(pf_sprite_draw(sprite, 0, 0, nullptr, out.data()), PF_OK);
+  CHECK_EQ(out[0], 0xff0000ffu);
+  CHECK(pf_sprite_draw(sprite, frames, 0, nullptr, out.data()) != PF_OK);
+
+  // And it goes into a sprite set like any other, which is what the renderer
+  // is handed.
+  pf_sprite_set* set = pf_sprite_set_create();
+  CHECK(set != nullptr);
+  if (set) {
+    CHECK_EQ(pf_sprite_set_add(set, 0x00, 0, sprite), PF_OK);   // takes ownership
+    CHECK(pf_sprite_set_has(set, 0x00, 0));
+    CHECK(!pf_sprite_set_has(set, 0x01, 0));
+    pf_sprite_set_free(set);
+  }
+
+  // The sizes that are not a sprite.
+  CHECK(pf_sprite_open_rgba(nullptr, w, h, frames, PF_TILE_PX, &st) == nullptr);
+  CHECK(pf_sprite_open_rgba(pixels.data(), 0, h, frames, PF_TILE_PX, &st) == nullptr);
+  CHECK(pf_sprite_open_rgba(pixels.data(), w, h, 0, PF_TILE_PX, &st) == nullptr);
+}
+
+/**
+ * The HD terrain atlas skips the blanks, and by exactly as many as it should.
+ *
+ * A tileset opens with 16 blank megatiles and the atlas holds 16 fewer frames
+ * than the tileset has megatiles, in all four. So a megatile's frame is its
+ * index less 16, and the blanks have none — which is the whole mapping, but
+ * only while that 16 keeps holding, so it is asserted against the artwork
+ * rather than trusted.
+ */
+TEST(hd_terrain_frames_line_up_with_the_megatiles) {
+  // The arithmetic first, which needs no game.
+  CHECK_EQ(pf::hd_terrain_frame(0, 356), -1);      // a blank at the front
+  CHECK_EQ(pf::hd_terrain_frame(15, 356), -1);
+  CHECK_EQ(pf::hd_terrain_frame(16, 356), 0);      // the first drawn one
+  CHECK_EQ(pf::hd_terrain_frame(371, 356), 355);   // and the last
+  CHECK_EQ(pf::hd_terrain_frame(372, 356), -1);    // past the end
+  CHECK_EQ(pf::hd_terrain_frame(-1, 356), -1);
+
+  const std::string hd = pft::hd_art_dir();
+  if (hd.empty() || !pft::have_art()) {
+    pft::skip("no HD artwork or no tilesets");
+    return;
+  }
+
+  struct Set { const char* name; int id; const char* atlas; };
+  const Set kSets[] = {{"forest", PF_TILESET_FOREST, "bgs_Forest"},
+                       {"winter", PF_TILESET_WINTER, "bgs_Ice"},
+                       {"wasteland", PF_TILESET_WASTELAND, "bgs_Swamp"},
+                       {"swamp", PF_TILESET_SWAMP, "bgs_XSwamp"}};
+  int checked = 0;
+  for (const Set& set : kSets) {
+    std::vector<uint8_t> bytes;
+    if (!pf::read_file(hd + "/bgs/" + set.atlas + ".json", bytes)) continue;
+    pf::HdAtlas atlas;
+    if (!pf::parse_hd_atlas(reinterpret_cast<const char*>(bytes.data()), bytes.size(),
+                            atlas)) continue;
+    pf_status st = PF_OK;
+    pf_tileset_art* art = pf_tileset_art_open(pft::g_bgs_dir.c_str(), set.id, &st);
+    if (!art) continue;
+    const int megatiles = pf_tileset_art_megatile_count(art);
+
+    int leading_blank = 0;
+    while (leading_blank < megatiles && pf_tileset_art_is_blank(art, leading_blank)) {
+      leading_blank++;
+    }
+    std::printf("     %-10s %3d megatiles, %3d frames, %d blank at the front\n",
+                set.name, megatiles, int(atlas.frames.size()), leading_blank);
+    CHECK_EQ(leading_blank, pf::kHdTerrainSkipped);
+    CHECK_EQ(megatiles - int(atlas.frames.size()), pf::kHdTerrainSkipped);
+    // And every drawn megatile has a frame, the last one included.
+    CHECK_EQ(pf::hd_terrain_frame(pf::kHdTerrainSkipped, int(atlas.frames.size())), 0);
+    CHECK(pf::hd_terrain_frame(megatiles - 1, int(atlas.frames.size())) >= 0);
+    // The tiles are square and the size the scale rule is built on.
+    if (!atlas.frames.empty()) {
+      CHECK_EQ(atlas.frames[0].source_w, pf::kHdPixelsPerTile);
+      CHECK_EQ(atlas.frames[0].source_h, pf::kHdPixelsPerTile);
+    }
+    pf_tileset_art_free(art);
+    checked++;
+  }
+  if (!checked) pft::skip("no tileset pairs to compare");
+}
+
+/**
+ * What an import would actually fetch.
+ *
+ * The whole case for the module is that this list is small: the atlases hold
+ * about thirty thousand frames and an editor draws idle poses, so if this ever
+ * starts returning thousands the memory budget in docs/hd_art.md is wrong.
+ */
+TEST(the_import_list_is_the_small_one) {
+  const std::vector<pf::HdWanted> wanted = pf::hd_wanted_sprites();
+  CHECK(!wanted.empty());
+
+  long frames = 0;
+  int most = 0;
+  for (const pf::HdWanted& w : wanted) {
+    CHECK(!w.stem.empty());
+    CHECK(!w.race.empty());
+    CHECK(w.frames >= 1);
+    // Five facings is what the artwork holds; a sprite wanting more than that
+    // is this list having grown a second meaning.
+    CHECK(w.frames <= 5);
+    frames += w.frames;
+    most = std::max(most, w.frames);
+    // The stem is a file name, not a path: the race was split off it.
+    CHECK(w.stem.find('/') == std::string::npos);
+  }
+  std::printf("     %zu sprites, %ld frames, at most %d facings\n", wanted.size(),
+              frames, most);
+  CHECK(frames < 1000);
+
+  // One entry per sprite. A Footman and an Attack Peasant share human/peon,
+  // so the list is shorter than the unit table it came from.
+  CHECK(int(wanted.size()) < pf::kUnitCount);
+  for (size_t i = 0; i < wanted.size(); i++) {
+    for (size_t j = i + 1; j < wanted.size(); j++) {
+      CHECK(!(wanted[i].race == wanted[j].race && wanted[i].stem == wanted[j].stem));
+    }
+  }
+}
+
+/**
+ * The cache survives a trip through bytes, and refuses one it should not use.
+ */
+TEST(the_cache_round_trips_and_knows_when_it_is_stale) {
+  pf::HdCache cache;
+  cache.tile_px = 64;
+  cache.stamp = "build-1.2.3";
+  for (int unit = 0; unit < 3; unit++) {
+    pf::HdCachedSprite sprite;
+    // The two the Footman and the Peasant actually draw, plus one that is
+    // nobody's, so find() has something to miss on.
+    sprite.race = unit == 1 ? "orc" : "human";
+    sprite.stem = unit == 0 ? "grunt" : unit == 1 ? "grunt" : "nosuchsprite";
+    sprite.width = 3 + unit;
+    sprite.height = 2 + unit;
+    sprite.frames = 1 + unit;
+    sprite.pixels.assign(size_t(sprite.width) * size_t(sprite.height) * size_t(sprite.frames),
+                         0u);
+    for (size_t i = 0; i < sprite.pixels.size(); i++) {
+      sprite.pixels[i] = uint32_t(i * 2654435761u) | 0xff000000u;
+    }
+    cache.sprites.push_back(std::move(sprite));
+  }
+
+  const std::vector<uint8_t> bytes = pf::write_hd_cache(cache);
+  CHECK(bytes.size() > 20);
+
+  pf::HdCache back;
+  CHECK(pf::read_hd_cache(bytes.data(), bytes.size(), 64, "build-1.2.3", back));
+  CHECK_EQ(back.tile_px, 64);
+  CHECK(back.stamp == "build-1.2.3");
+  CHECK_EQ(int(back.sprites.size()), 3);
+  for (size_t i = 0; i < cache.sprites.size() && i < back.sprites.size(); i++) {
+    CHECK(back.sprites[i].race == cache.sprites[i].race);
+    CHECK(back.sprites[i].stem == cache.sprites[i].stem);
+    CHECK_EQ(back.sprites[i].width, cache.sprites[i].width);
+    CHECK_EQ(back.sprites[i].frames, cache.sprites[i].frames);
+    CHECK(back.sprites[i].pixels == cache.sprites[i].pixels);
+  }
+  // Looked up by unit, through the same table the classic path uses: unit 0
+  // is the Footman, which draws human/grunt, and unit 1 the Grunt.
+  CHECK(back.find(0x00) != nullptr);
+  CHECK(back.find(0x01) != nullptr);
+  if (back.find(0x00) && back.find(0x01)) {
+    CHECK(back.find(0x00)->race == "human");
+    CHECK(back.find(0x01)->race == "orc");
+  }
+  CHECK(back.find(999) == nullptr);
+  CHECK(back.find(-1) == nullptr);
+
+  // Another tile size, or another game build, is a rebuild rather than art.
+  pf::HdCache rejected;
+  CHECK(!pf::read_hd_cache(bytes.data(), bytes.size(), 96, "build-1.2.3", rejected));
+  CHECK(!pf::read_hd_cache(bytes.data(), bytes.size(), 64, "build-9.9.9", rejected));
+
+  // And a file cut short is refused rather than read as an enormous one.
+  CHECK(!pf::read_hd_cache(bytes.data(), bytes.size() / 2, 64, "build-1.2.3", rejected));
+  CHECK(!pf::read_hd_cache(bytes.data(), 4, 64, "build-1.2.3", rejected));
+}
+
+TEST(the_decoder_refuses_what_it_cannot_read) {
+  CHECK(pf::decode_png(nullptr, 0).empty());
+  const std::vector<uint8_t> rubbish(64, 0x5a);
+  CHECK(pf::decode_png(rubbish.data(), rubbish.size()).empty());
+
+  // A real PNG cut short: the signature and header survive, the pixels do not.
+  const uint32_t one = 0x11223344u;
+  std::vector<uint8_t> png = pf::encode_png(&one, 1, 1);
+  CHECK(!png.empty());
+  png.resize(png.size() / 2);
+  CHECK(pf::decode_png(png.data(), png.size()).empty());
+
+  // And a zlib stream that is not one.
+  CHECK(pf::zlib_decompress(rubbish.data(), rubbish.size()).empty());
 }

@@ -140,6 +140,10 @@ BEGIN
   IDS_GIVEN_TO_ONE      "%d unit given to %ls"
   IDS_GIVEN_TO_MANY     "%d units given to %ls"
   IDS_PLACING_FOR       "Placing for %ls"
+  /* A number key while a paste is armed: the fragment changes hands before it
+     lands, so the line says how many units went and to whom. */
+  IDS_PASTING_FOR_ONE   "%d pasted unit is for %ls"
+  IDS_PASTING_FOR_MANY  "%d pasted units are for %ls"
   /* A fallback name for a player slot, numbered from 1. */
   IDS_PLAYER_N          "Player %d"
 

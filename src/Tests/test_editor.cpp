@@ -987,6 +987,55 @@ TEST(cut_removes_the_units_it_captured) {
   pf_map_free(map);
 }
 
+/**
+ * A number key while a paste is armed hands the fragment over before it lands.
+ *
+ * The units are already chosen and only their owner is still open, so the key
+ * means the fragment rather than the selection or the next unit placed. The
+ * map is not touched until the paste is: retargeting and then cancelling
+ * leaves nothing behind.
+ */
+TEST(an_armed_paste_changes_hands_before_it_lands) {
+  pf_map* map = blank();
+  Editor ed(map);
+  ed.placing_type = 0;                       // a Footman
+  ed.placing_owner = 0;
+  CHECK(ed.PlaceUnit(10, 10) >= 0);
+  CHECK_EQ(ed.Copy(Editor::Grab::kUnits, {10, 10, 4, 4}), 1);
+  ed.BeginPaste();
+  CHECK(ed.pasting());
+
+  const int before = pf_map_unit_count(map);
+  const int revision = ed.clipboard_revision();
+  CHECK_EQ(ed.RetargetClipboard(3), 1);
+  CHECK(ed.clipboard_revision() != revision);  // the preview is stale
+  CHECK_EQ(pf_map_unit_count(map), before);    // and the map is untouched
+
+  pf_unit held{};
+  CHECK_EQ(pf_clipboard_unit(ed.clipboard(), 0, &held), PF_OK);
+  CHECK_EQ(held.owner, 3);
+
+  // Asking again for the owner it already has changes nothing.
+  CHECK_EQ(ed.RetargetClipboard(3), 0);
+
+  // It is the fragment that moved, not the map's own unit.
+  pf_unit original{};
+  CHECK_EQ(pf_map_unit(map, 0, &original), PF_OK);
+  CHECK_EQ(original.owner, 0);
+
+  // And the paste lands for the player the key named.
+  CHECK_EQ(ed.PasteAt(30, 30), 1);
+  bool landed = false;
+  for (int i = 0; i < pf_map_unit_count(map); i++) {
+    pf_unit u{};
+    if (pf_map_unit(map, i, &u) == PF_OK && u.x == 30 && u.y == 30) {
+      landed = u.owner == 3;
+    }
+  }
+  CHECK(landed);
+  pf_map_free(map);
+}
+
 TEST(paste_puts_the_fragment_where_it_is_asked) {
   pf_map* map = blank();
   Editor ed(map);

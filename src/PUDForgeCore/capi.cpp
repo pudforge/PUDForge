@@ -19,6 +19,7 @@
 #include <string>
 
 #include "art.hpp"
+#include "hd_art.hpp"
 #include "ai_script.hpp"
 #include "constants.hpp"
 #include "mpq.hpp"
@@ -468,7 +469,10 @@ int pf_resource_value(int64_t amount) {
   // Half a step up before dividing, so 41,000 lands on 40,000 and 41,300 on
   // 42,500 rather than everything truncating downwards.
   const int64_t steps = (amount + 1250) / 2500;
-  return int(steps > 0xFFFF ? 0xFFFF : steps);
+  // One byte, not two: the game's `UNIT` handler loads the record's value as a
+  // byte and never reads the one above it, so 0x100 arrives as 0 and a mine
+  // asked for four million gold would come up empty.
+  return int(steps > 0xFF ? 0xFF : steps);
 }
 
 int pf_unit_default_value(int unit_id) {
@@ -2411,6 +2415,29 @@ int pf_map_placement_check(const pf_map* map, int x, int y, int type) {
     return sq == pf::tile_movement(m.tiles()[i]) ? -1 : int(sq);
   };
 
+  // Oil keeps its distance from the shipyard and the refinery that work it —
+  // four tiles, measured; see overrides/oil_clearance.cpp. Asked here rather
+  // than inside one of the branches below because the pair straddles them: the
+  // building is a shore building and the oil is a water unit, and the rule is
+  // about the pair rather than about whichever is placed second.
+  {
+    const bool placing_worker = pf::unit_needs_oil_clearance(type);
+    const bool placing_oil = pf::unit_is_oil(type);
+    if (placing_worker || placing_oil) {
+      const int clear = pf::oil_clearance_tiles();
+      for (const pf::Unit& u : m.units()) {
+        const bool counterpart = placing_worker ? pf::unit_is_oil(u.type)
+                                                : pf::unit_needs_oil_clearance(u.type);
+        if (!counterpart) continue;
+        int ow = 1, oh = 1;
+        m.unit_footprint(u.type, ow, oh);
+        const int dx = std::max(x - (u.x + ow), u.x - (x + fw));
+        const int dy = std::max(y - (u.y + oh), u.y - (y + fh));
+        if (std::max(dx, dy) < clear) return PF_PLACE_TOO_NEAR_OIL;
+      }
+    }
+  }
+
   const pf::UnitDomain domain = pf::default_unit_domain(type);
   const uint32_t flags = pf_unit_flags(type);
   // Only land buildings. Oil patches and platforms carry the building flag too
@@ -2454,6 +2481,15 @@ int pf_map_placement_check(const pf_map* map, int x, int y, int type) {
     }
     if (any_blocked) return PF_PLACE_BLOCKED;
     if (!any_water || !any_coast) return PF_PLACE_NEEDS_SHORE;
+    // And the middle of it is in the water, which is what stops the building
+    // being dropped a tile inland with only its edge wet. Measured over the
+    // corpus; see overrides/shore_centre.cpp. Skipped where the middle tile is
+    // painted, for the same reason the rest of this branch skips those.
+    const int cx = x + fw / 2, cy = y + fh / 2;
+    if (painted(cx, cy) < 0 &&
+        !pf::shore_centre_terrain_ok(pf::dominant_terrain(m.tile_at(cx, cy)))) {
+      return PF_PLACE_NEEDS_SHORE;
+    }
     return PF_PLACE_OK;
   }
 
@@ -2482,14 +2518,26 @@ int pf_map_placement_check(const pf_map* map, int x, int y, int type) {
     // A hall against a mine cannot be worked: the peasants need a lane to walk
     // in and out of. Three tiles of clearance, measured; see
     // overrides/hall_clearance.cpp.
-    if (pf::unit_needs_mine_clearance(type)) {
+    //
+    // Asked in both directions. The rule is about the pair and not about
+    // whichever of the two is placed second, and checking only the hall let a
+    // mine be dropped against a standing hall to make the arrangement the
+    // hall itself would have been refused.
+    const bool placing_hall = pf::unit_needs_mine_clearance(type);
+    const bool placing_mine = (flags >> 22) & 1;
+    if (placing_hall || placing_mine) {
       const int clear = pf::mine_clearance_tiles();
       for (const pf::Unit& u : m.units()) {
-        if (!((pf_unit_flags(u.type) >> 22) & 1)) continue;   // gold mines only
+        const bool other_is_mine = (pf_unit_flags(u.type) >> 22) & 1;
+        const bool counterpart = placing_hall
+                                     ? other_is_mine
+                                     : pf::unit_needs_mine_clearance(u.type);
+        if (!counterpart) continue;
         int mw = 1, mh = 1;
         m.unit_footprint(u.type, mw, mh);
-        // Gap between the two boxes, in tiles. Negative when they overlap, so
-        // the comparison covers overlapping placements too.
+        // Gap between the two boxes, in tiles, straight or diagonal alike.
+        // Negative when they overlap, so the comparison covers overlapping
+        // placements too.
         const int dx = std::max(x - (u.x + mw), u.x - (x + fw2));
         const int dy = std::max(y - (u.y + mh), u.y - (y + fh2));
         if (std::max(dx, dy) < clear) return PF_PLACE_TOO_NEAR_MINE;
@@ -2795,6 +2843,18 @@ pf_status pf_clipboard_unit(const pf_clipboard* clip, int index, pf_unit* out) {
   out->type = e.unit.type;
   out->owner = e.unit.owner;
   out->value = e.unit.value;
+  return PF_OK;
+}
+
+pf_status pf_clipboard_set_unit(pf_clipboard* clip, int index, int type,
+                                int owner) {
+  if (!clip) return PF_ERR_INVALID_ARG;
+  if (index < 0 || size_t(index) >= clip->units.size()) return PF_ERR_OUT_OF_RANGE;
+  if (type < 0 || type >= pf::kUnitCount) return PF_ERR_INVALID_ARG;
+  if (owner < 0 || owner >= pf::kPlayerCount) return PF_ERR_INVALID_ARG;
+  auto& e = clip->units[size_t(index)];
+  e.unit.type = uint8_t(type);
+  e.unit.owner = uint8_t(owner);
   return PF_OK;
 }
 
@@ -3169,7 +3229,11 @@ int pf_map_validate(const pf_map* map, pf_issue* out, int capacity) {
     }
     // An error rather than a warning: the game refuses the placement, so the
     // building is simply not there and the map plays wrong.
-    if (code == PF_PLACE_TOO_NEAR_MINE) {
+    //
+    // Reported against the hall alone, though placement now refuses the pair
+    // from either side: the mine was there first on every real map, and one
+    // fault should not be two lines in the report.
+    if (code == PF_PLACE_TOO_NEAR_MINE && pf::unit_needs_mine_clearance(u.type)) {
       std::snprintf(text, sizeof(text),
                     "%s needs %d tiles of clearance from the gold mine",
                     pf_unit_name(u.type) ? pf_unit_name(u.type) : "unit",
@@ -3576,6 +3640,554 @@ pf_sprite* pf_sprite_open_memory(const uint8_t* data, size_t len, pf_status* sta
   return handle;
 }
 
+int pf_sprite_tile_px(const pf_sprite* sprite) {
+  return sprite ? sprite->sprite->tile_px() : PF_TILE_PX;
+}
+
+pf_sprite* pf_sprite_open_rgba(const uint32_t* pixels, int width, int height,
+                               int frames, int tile_px, pf_status* status) {
+  if (!pixels || width <= 0 || height <= 0 || frames <= 0 || tile_px <= 0) {
+    set_status(status, PF_ERR_INVALID_ARG);
+    return nullptr;
+  }
+  const size_t count = size_t(width) * size_t(height) * size_t(frames);
+  pf::Sprite* sprite =
+      pf::Sprite::open_rgba(std::vector<uint32_t>(pixels, pixels + count), width,
+                            height, frames, tile_px);
+  if (!sprite) { set_status(status, PF_ERR_MALFORMED); return nullptr; }
+  set_status(status, PF_OK);
+  auto* handle = new pf_sprite();
+  handle->sprite.reset(sprite);
+  return handle;
+}
+
+// --------------------------------------------------- Remastered artwork
+
+struct pf_hd_cache {
+  pf::HdCache cache;
+  /// Whether each sprite came from an atlas named for its own race. A sheet
+  /// that names neither race can fill a gap, but a matching one replaces it:
+  /// "grunt" is in both the human and the orc sheets and means a different
+  /// unit in each.
+  std::vector<bool> race_matched;
+};
+
+pf_hd_cache* pf_hd_cache_create(int tile_px, const char* stamp) {
+  if (tile_px <= 0) return nullptr;
+  auto* handle = new pf_hd_cache();
+  handle->cache.tile_px = tile_px;
+  handle->cache.stamp = stamp ? stamp : "";
+  return handle;
+}
+
+void pf_hd_cache_free(pf_hd_cache* cache) { delete cache; }
+
+int pf_hd_cache_add_atlas(pf_hd_cache* cache, const char* name,
+                          const char* sidecar_json, size_t json_len,
+                          const uint8_t* png, size_t png_len) {
+  if (!cache || !sidecar_json) return -1;
+  pf::HdAtlas atlas;
+  if (!pf::parse_hd_atlas(sidecar_json, json_len, atlas)) return -1;
+
+  // Which sprites this sheet could answer for, before it is decoded: a sheet
+  // holding none of them is not worth the seconds.
+  std::string lower = name ? name : "";
+  for (char& c : lower) c = char(tolower(static_cast<unsigned char>(c)));
+  const bool names_human = lower.find("human") != std::string::npos;
+  const bool names_orc = lower.find("orc") != std::string::npos;
+
+  struct Job { const pf::HdWanted* want; bool matched; };
+  std::vector<Job> jobs;
+  static const std::vector<pf::HdWanted> kWanted = pf::hd_wanted_sprites();
+  for (const pf::HdWanted& want : kWanted) {
+    const bool matched = lower.find(want.race) != std::string::npos;
+    // A sheet named for the other race is not this sprite's, whatever it
+    // holds under the same name.
+    if (!matched && (names_human || names_orc)) continue;
+    if (atlas.sprite(want.stem).empty()) continue;
+
+    // Already held, and not by something worse than this sheet.
+    bool skip = false;
+    for (size_t i = 0; i < cache->cache.sprites.size(); i++) {
+      const pf::HdCachedSprite& have = cache->cache.sprites[i];
+      if (have.race != want.race || have.stem != want.stem) continue;
+      skip = !matched || cache->race_matched[i];
+      break;
+    }
+    if (skip) continue;
+    jobs.push_back({&want, matched});
+  }
+  if (jobs.empty()) return 0;
+  // Asked rather than told: no sheet, so answer what one would be worth.
+  if (!png || png_len == 0) return int(jobs.size());
+
+  int aw = 0, ah = 0;
+  const std::vector<uint32_t> pixels = pf::decode_png(png, png_len, &aw, &ah);
+  if (pixels.empty()) return -1;
+
+  int added = 0;
+  for (const Job& job : jobs) {
+    const std::vector<const pf::HdFrame*> frames = atlas.sprite(job.want->stem);
+    pf::HdCachedSprite sprite;
+    sprite.race = job.want->race;
+    sprite.stem = job.want->stem;
+    sprite.frames = int(frames.size()) < job.want->frames ? int(frames.size())
+                                                          : job.want->frames;
+    for (int f = 0; f < sprite.frames; f++) {
+      int w = 0, h = 0;
+      const std::vector<uint32_t> cut = pf::cut_hd_frame(
+          pixels.data(), aw, ah, *frames[size_t(f)], cache->cache.tile_px, &w, &h);
+      if (cut.empty()) { sprite.frames = f; break; }
+      if (sprite.width == 0) { sprite.width = w; sprite.height = h; }
+      // Every frame of a sprite is the same size or the facings do not line
+      // up; one that is not ends the sprite rather than skewing it.
+      if (w != sprite.width || h != sprite.height) { sprite.frames = f; break; }
+      sprite.pixels.insert(sprite.pixels.end(), cut.begin(), cut.end());
+    }
+    if (sprite.frames <= 0) continue;
+
+    bool replaced = false;
+    for (size_t i = 0; i < cache->cache.sprites.size(); i++) {
+      if (cache->cache.sprites[i].race != sprite.race) continue;
+      if (cache->cache.sprites[i].stem != sprite.stem) continue;
+      cache->cache.sprites[i] = std::move(sprite);
+      cache->race_matched[i] = job.matched;
+      replaced = true;
+      break;
+    }
+    if (!replaced) {
+      cache->cache.sprites.push_back(std::move(sprite));
+      cache->race_matched.push_back(job.matched);
+    }
+    added++;
+  }
+  return added;
+}
+
+int pf_hd_cache_add_terrain(pf_hd_cache* cache, int tileset, const char* sidecar_json,
+                            size_t json_len, const uint8_t* png, size_t png_len) {
+  if (!cache || !sidecar_json) return -1;
+  pf::HdAtlas atlas;
+  if (!pf::parse_hd_atlas(sidecar_json, json_len, atlas)) return -1;
+  if (atlas.frames.empty()) return 0;
+  for (const pf::HdCachedTiles& held : cache->cache.tilesets) {
+    if (held.tileset == tileset) return 0;      // already have this one
+  }
+  if (!png || png_len == 0) return int(atlas.frames.size());
+
+  // In frame order. The keys are "forest_0" upward and a string sort would put
+  // 10 between 1 and 2, which is the same trap the sprite lookup has.
+  std::vector<const pf::HdFrame*> frames;
+  frames.reserve(atlas.frames.size());
+  for (const pf::HdFrame& f : atlas.frames) frames.push_back(&f);
+  std::sort(frames.begin(), frames.end(), [](const pf::HdFrame* a, const pf::HdFrame* b) {
+    const size_t ua = a->key.rfind('_'), ub = b->key.rfind('_');
+    const long na = ua == std::string::npos ? 0 : std::strtol(a->key.c_str() + ua + 1, nullptr, 10);
+    const long nb = ub == std::string::npos ? 0 : std::strtol(b->key.c_str() + ub + 1, nullptr, 10);
+    return na < nb;
+  });
+
+  int aw = 0, ah = 0;
+  const std::vector<uint32_t> pixels = pf::decode_png(png, png_len, &aw, &ah);
+  if (pixels.empty()) return -1;
+
+  const int size = cache->cache.tile_px;
+  pf::HdCachedTiles tiles;
+  tiles.tileset = tileset;
+  tiles.size = size;
+  tiles.count = int(frames.size()) + pf::kHdTerrainSkipped;
+  // The leading blanks are left transparent rather than skipped, so a megatile
+  // index means the same thing here as it does everywhere else.
+  tiles.pixels.assign(size_t(tiles.count) * size_t(size) * size_t(size), 0);
+
+  int taken = 0;
+  for (size_t i = 0; i < frames.size(); i++) {
+    int w = 0, h = 0;
+    const std::vector<uint32_t> cut =
+        pf::cut_hd_frame(pixels.data(), aw, ah, *frames[i], size, &w, &h);
+    if (w != size || h != size || cut.size() != size_t(size) * size_t(size)) continue;
+    const size_t at = (i + pf::kHdTerrainSkipped) * size_t(size) * size_t(size);
+    std::copy(cut.begin(), cut.end(), tiles.pixels.begin() + long(at));
+    taken++;
+  }
+  if (!taken) return 0;
+  cache->cache.tilesets.push_back(std::move(tiles));
+  return taken;
+}
+
+int pf_tileset_art_use_hd(pf_tileset_art* art, const pf_hd_cache* cache, int tileset) {
+  if (!art || !cache) return 0;
+  const pf::HdCachedTiles* tiles = cache->cache.tiles(tileset);
+  if (!tiles || tiles->pixels.empty()) return 0;
+  art->art->use_hd_tiles(tiles->pixels, tiles->size, tiles->count);
+  return art->art->has_hd_tiles() ? tiles->count : 0;
+}
+
+namespace {
+
+/// Where the icon sheets are kept in the cache. Not a race and not a unit, so
+/// they borrow the sprite list under a name no `.grp` uses, one per tileset.
+constexpr const char* kPortraitRace = "hud";
+
+/// What the icon atlas calls each tileset. Its keys are "<tileset>_<n>", and
+/// the last two do not pair the way their names suggest - the same ordering
+/// the terrain sheets use.
+const char* portrait_stem(int tileset) {
+  switch (tileset) {
+    case PF_TILESET_FOREST: return "forest";
+    case PF_TILESET_WINTER: return "ice";
+    case PF_TILESET_WASTELAND: return "swamp";
+    case PF_TILESET_SWAMP: return "xswamp";
+    default: return nullptr;
+  }
+}
+
+/// The frames of one tileset's run, by the number in the key rather than by
+/// the order they were packed: a unit's icon is a frame number, so the sheet
+/// has to keep that numbering. `suffix` is empty for the icons and "_team"
+/// for their masks.
+std::vector<const pf::HdFrame*> portrait_run(const pf::HdAtlas& atlas,
+                                             const std::string& stem,
+                                             const std::string& suffix) {
+  std::vector<const pf::HdFrame*> by_index;
+  const std::string prefix = stem + "_";
+  for (const pf::HdFrame& f : atlas.frames) {
+    if (f.key.size() <= prefix.size() + suffix.size()) continue;
+    if (f.key.compare(0, prefix.size(), prefix) != 0) continue;
+    if (!suffix.empty() &&
+        f.key.compare(f.key.size() - suffix.size(), suffix.size(), suffix) != 0) {
+      continue;
+    }
+    const std::string digits =
+        f.key.substr(prefix.size(), f.key.size() - prefix.size() - suffix.size());
+    bool numeric = !digits.empty();
+    for (char c : digits) numeric = numeric && isdigit(static_cast<unsigned char>(c)) != 0;
+    if (!numeric) continue;
+    const long index = std::strtol(digits.c_str(), nullptr, 10);
+    if (index < 0 || index > 4096) continue;
+    if (size_t(index) >= by_index.size()) by_index.resize(size_t(index) + 1, nullptr);
+    by_index[size_t(index)] = &f;
+  }
+  return by_index;
+}
+
+/// Cut a run into one sheet of equal boxes, each frame centred in its box. A
+/// gap in the run stays an empty frame rather than shifting every icon after
+/// it, for the same reason.
+std::vector<uint32_t> portrait_sheet(const std::vector<const pf::HdFrame*>& run,
+                                     const std::vector<uint32_t>& pixels, int aw, int ah,
+                                     int box_w, int box_h, int& taken) {
+  std::vector<uint32_t> out(run.size() * size_t(box_w) * size_t(box_h), 0);
+  taken = 0;
+  for (size_t i = 0; i < run.size(); i++) {
+    if (!run[i]) continue;
+    int w = 0, h = 0;
+    const std::vector<uint32_t> cut =
+        pf::cut_hd_frame_fit(pixels.data(), aw, ah, *run[i], box_w, box_h, &w, &h);
+    if (cut.empty() || w <= 0 || h <= 0) continue;
+    const int ox = (box_w - w) / 2, oy = (box_h - h) / 2;
+    uint32_t* dst = out.data() + i * size_t(box_w) * size_t(box_h);
+    for (int y = 0; y < h; y++) {
+      for (int x = 0; x < w; x++) {
+        dst[size_t(oy + y) * size_t(box_w) + size_t(ox + x)] =
+            cut[size_t(y) * size_t(w) + size_t(x)];
+      }
+    }
+    taken++;
+  }
+  return out;
+}
+
+/// One team-coloured pixel: the player's hue at the pixel's own brightness.
+///
+/// Brightness as the brightest channel and not as luma, so the player the
+/// artwork was drawn for comes back unchanged - see pf_hd_cache_sprite, which
+/// colours units the same way.
+uint32_t team_pixel(uint32_t pixel, uint32_t strength, uint32_t pr, uint32_t pg,
+                    uint32_t pb) {
+  const uint32_t sr = pixel & 0xff, sg = (pixel >> 8) & 0xff, sb = (pixel >> 16) & 0xff;
+  const uint32_t value = std::max(sr, std::max(sg, sb));
+  const uint32_t top = std::max(1u, std::max(pr, std::max(pg, pb)));
+  const auto shade = [value, top](uint32_t channel) {
+    return std::min(255u, channel * value / top);
+  };
+  const auto mix = [strength](uint32_t from, uint32_t to) {
+    return (from * (255 - strength) + to * strength) / 255;
+  };
+  return (pixel & 0xff000000u) | (mix(sb, shade(pb)) << 16) |
+         (mix(sg, shade(pg)) << 8) | mix(sr, shade(pr));
+}
+
+}  // namespace
+
+int pf_hd_cache_add_portraits(pf_hd_cache* cache, int tileset, const char* sidecar_json,
+                              size_t json_len, const uint8_t* png, size_t png_len,
+                              int box_w, int box_h) {
+  if (!cache || !sidecar_json || box_w <= 0 || box_h <= 0) return -1;
+  const char* stem = portrait_stem(tileset);
+  if (!stem) return -1;
+  pf::HdAtlas atlas;
+  if (!pf::parse_hd_atlas(sidecar_json, json_len, atlas)) return -1;
+  for (const pf::HdCachedSprite& held : cache->cache.sprites) {
+    if (held.race == kPortraitRace && held.stem == stem) return 0;
+  }
+  const std::vector<const pf::HdFrame*> run = portrait_run(atlas, stem, "");
+  if (run.empty()) return 0;
+  if (!png || png_len == 0) return int(run.size());
+
+  int aw = 0, ah = 0;
+  const std::vector<uint32_t> pixels = pf::decode_png(png, png_len, &aw, &ah);
+  if (pixels.empty()) return -1;
+
+  pf::HdCachedSprite sheet;
+  sheet.race = kPortraitRace;
+  sheet.stem = stem;
+  sheet.width = box_w;
+  sheet.height = box_h;
+  sheet.frames = int(run.size());
+  int taken = 0;
+  sheet.pixels = portrait_sheet(run, pixels, aw, ah, box_w, box_h, taken);
+  if (!taken) return 0;
+  cache->cache.sprites.push_back(std::move(sheet));
+  cache->race_matched.push_back(true);
+  return taken;
+}
+
+int pf_hd_cache_add_portrait_masks(pf_hd_cache* cache, int tileset,
+                                   const char* sidecar_json, size_t json_len,
+                                   const uint8_t* png, size_t png_len, int box_w,
+                                   int box_h) {
+  if (!cache || !sidecar_json || box_w <= 0 || box_h <= 0) return -1;
+  const char* stem = portrait_stem(tileset);
+  if (!stem) return -1;
+  pf::HdCachedSprite* sheet = nullptr;
+  for (pf::HdCachedSprite& held : cache->cache.sprites) {
+    if (held.race == kPortraitRace && held.stem == stem) sheet = &held;
+  }
+  if (!sheet || !sheet->mask.empty()) return 0;      // no icons yet, or done
+
+  pf::HdAtlas atlas;
+  if (!pf::parse_hd_atlas(sidecar_json, json_len, atlas)) return -1;
+  std::vector<const pf::HdFrame*> run = portrait_run(atlas, stem, "_team");
+  if (run.empty()) return 0;
+  if (!png || png_len == 0) return int(run.size());
+  // Only as many as there are icons: a mask past the last one colours nothing,
+  // and the sheet has to stay the shape the pixels are.
+  run.resize(size_t(sheet->frames), nullptr);
+
+  int aw = 0, ah = 0;
+  const std::vector<uint32_t> pixels = pf::decode_png(png, png_len, &aw, &ah);
+  if (pixels.empty()) return -1;
+  int taken = 0;
+  std::vector<uint32_t> mask = portrait_sheet(run, pixels, aw, ah, box_w, box_h, taken);
+  if (!taken || mask.size() != sheet->pixels.size()) return 0;
+  sheet->mask = std::move(mask);
+  return taken;
+}
+
+pf_sprite* pf_hd_cache_portraits(const pf_hd_cache* cache, int tileset, int owner,
+                                 pf_status* status) {
+  if (!cache) { set_status(status, PF_ERR_INVALID_ARG); return nullptr; }
+  const char* stem = portrait_stem(tileset);
+  if (!stem) { set_status(status, PF_ERR_INVALID_ARG); return nullptr; }
+  for (const pf::HdCachedSprite& held : cache->cache.sprites) {
+    if (held.race != kPortraitRace || held.stem != stem) continue;
+    // An icon is not a map tile, so it never scales with one: it is drawn at
+    // the size the panel asked the import to fit it to.
+    if (held.mask.size() != held.pixels.size()) {
+      return pf_sprite_open_rgba(held.pixels.data(), held.width, held.height,
+                                 held.frames, PF_TILE_PX, status);
+    }
+    const uint32_t colour = pf_player_color(owner);
+    const uint32_t pr = (colour >> 16) & 0xff, pg = (colour >> 8) & 0xff,
+                   pb = colour & 0xff;
+    std::vector<uint32_t> tinted(held.pixels);
+    for (size_t i = 0; i < tinted.size(); i++) {
+      const uint32_t m = held.mask[i];
+      if (!(m >> 24) || !(m & 0xff)) continue;
+      tinted[i] = team_pixel(tinted[i], m & 0xff, pr, pg, pb);
+    }
+    return pf_sprite_open_rgba(tinted.data(), held.width, held.height, held.frames,
+                               PF_TILE_PX, status);
+  }
+  set_status(status, PF_ERR_OUT_OF_RANGE);
+  return nullptr;
+}
+
+int pf_tileset_art_hd_size(const pf_tileset_art* art) {
+  return art ? art->art->hd_tile_size() : 0;
+}
+
+int pf_hd_cache_add_masks(pf_hd_cache* cache, const char* name,
+                          const char* sidecar_json, size_t json_len,
+                          const uint8_t* png, size_t png_len) {
+  if (!cache || !sidecar_json) return -1;
+  pf::HdAtlas atlas;
+  if (!pf::parse_hd_atlas(sidecar_json, json_len, atlas)) return -1;
+
+  // A mask sheet belongs to the same race as the sprite sheet beside it, and
+  // its frames are the sprite keys with "_team" on the end.
+  std::string lower = name ? name : "";
+  for (char& c : lower) c = char(tolower(static_cast<unsigned char>(c)));
+  const bool names_human = lower.find("human") != std::string::npos;
+  const bool names_orc = lower.find("orc") != std::string::npos;
+
+  std::vector<pf::HdCachedSprite*> jobs;
+  for (pf::HdCachedSprite& sprite : cache->cache.sprites) {
+    if (!sprite.mask.empty()) continue;                    // already has one
+    const bool matched = lower.find(sprite.race) != std::string::npos;
+    if (!matched && (names_human || names_orc)) continue;
+    if (atlas.sprite(sprite.stem + "_0_team").empty() &&
+        atlas.sprite(sprite.stem).empty()) {
+      // The keys carry the suffix, so ask for the stem the suffix is on.
+      bool any = false;
+      for (const pf::HdFrame& f : atlas.frames) {
+        if (f.key.rfind(sprite.stem + "_", 0) == 0 &&
+            f.key.size() > 5 && f.key.compare(f.key.size() - 5, 5, "_team") == 0) {
+          any = true;
+          break;
+        }
+      }
+      if (!any) continue;
+    }
+    jobs.push_back(&sprite);
+  }
+  if (jobs.empty()) return 0;
+  if (!png || png_len == 0) return int(jobs.size());
+
+  int aw = 0, ah = 0;
+  const std::vector<uint32_t> pixels = pf::decode_png(png, png_len, &aw, &ah);
+  if (pixels.empty()) return -1;
+
+  int given = 0;
+  for (pf::HdCachedSprite* sprite : jobs) {
+    // The frames of this sprite, in frame order, found by the "<stem>_<n>_team"
+    // key the mask sheets use.
+    std::vector<const pf::HdFrame*> frames;
+    for (const pf::HdFrame& f : atlas.frames) {
+      if (f.key.rfind(sprite->stem + "_", 0) != 0) continue;
+      if (f.key.size() <= 5 || f.key.compare(f.key.size() - 5, 5, "_team") != 0) continue;
+      frames.push_back(&f);
+    }
+    if (frames.empty()) continue;
+    std::sort(frames.begin(), frames.end(), [](const pf::HdFrame* a, const pf::HdFrame* b) {
+      const auto number = [](const std::string& key) {
+        const size_t end = key.rfind("_team");
+        const size_t start = key.rfind('_', end ? end - 1 : 0);
+        return start == std::string::npos ? 0L
+                                          : std::strtol(key.c_str() + start + 1, nullptr, 10);
+      };
+      return number(a->key) < number(b->key);
+    });
+
+    std::vector<uint32_t> mask(sprite->pixels.size(), 0);
+    int filled = 0;
+    for (int f = 0; f < sprite->frames && size_t(f) < frames.size(); f++) {
+      int w = 0, h = 0;
+      const std::vector<uint32_t> cut = pf::cut_hd_frame(
+          pixels.data(), aw, ah, *frames[size_t(f)], cache->cache.tile_px, &w, &h);
+      // The mask has to line up with the sprite pixel for pixel or it colours
+      // the wrong parts; one that does not is dropped rather than guessed at.
+      if (w != sprite->width || h != sprite->height) continue;
+      std::copy(cut.begin(), cut.end(),
+                mask.begin() + long(size_t(f) * size_t(w) * size_t(h)));
+      filled++;
+    }
+    if (!filled) continue;
+    sprite->mask = std::move(mask);
+    given++;
+  }
+  return given;
+}
+
+int pf_hd_cache_sprite_count(const pf_hd_cache* cache) {
+  return cache ? int(cache->cache.sprites.size()) : 0;
+}
+
+pf_sprite* pf_hd_cache_sprite(const pf_hd_cache* cache, int unit_id, int owner,
+                              pf_status* status) {
+  if (!cache) { set_status(status, PF_ERR_INVALID_ARG); return nullptr; }
+  const pf::HdCachedSprite* held = cache->cache.find(unit_id);
+  // Not an error worth a code of its own: a unit the cache has no HD art
+  // for is one the caller draws from the game's own sprites instead.
+  if (!held) { set_status(status, PF_ERR_OUT_OF_RANGE); return nullptr; }
+  if (held->mask.empty() || held->mask.size() != held->pixels.size()) {
+    return pf_sprite_open_rgba(held->pixels.data(), held->width, held->height,
+                               held->frames, cache->cache.tile_px, status);
+  }
+
+  // The owner's colour where the mask says. The artwork is rendered in one
+  // player's colours throughout, so without this every unit on the map belongs
+  // to that player by sight.
+  //
+  // The shading comes from the sprite and only the hue from the player: the
+  // mask is all but flat white over the area it covers, so taking the shading
+  // from *it* paints a building as one solid slab and loses every edge the
+  // artist drew. The mask says where, and how much.
+  const uint32_t colour = pf_player_color(owner);
+  const uint32_t pr = (colour >> 16) & 0xff, pg = (colour >> 8) & 0xff, pb = colour & 0xff;
+  std::vector<uint32_t> tinted(held->pixels);
+  for (size_t i = 0; i < tinted.size(); i++) {
+    const uint32_t m = held->mask[i];
+    if (!(m >> 24)) continue;                       // not a team-coloured pixel
+    const uint32_t strength = m & 0xff;             // greyscale, so any channel
+    if (!strength) continue;
+    const uint32_t p = tinted[i];
+    const uint32_t sr = p & 0xff, sg = (p >> 8) & 0xff, sb = (p >> 16) & 0xff;
+    // Brightness as the brightest channel, not as luma.
+    //
+    // The artwork's team area is painted in one player's colour, and a
+    // saturated colour has a low luma — red 200,20,20 lumas to about 70.
+    // Scaling by that darkened every team pixel to near black, which is what
+    // it looked like. Measured against the player colour's own brightest
+    // channel instead, so the player it was drawn for comes back unchanged
+    // and every other player is the same shading in another hue.
+    const uint32_t value = std::max(sr, std::max(sg, sb));
+    const uint32_t top = std::max(1u, std::max(pr, std::max(pg, pb)));
+    const auto shade = [value, top](uint32_t channel) {
+      return std::min(255u, channel * value / top);
+    };
+    const uint32_t tr = shade(pr), tg = shade(pg), tb = shade(pb);
+    // Mixed by how strongly the mask claims the pixel, so a soft edge stays
+    // soft rather than turning into a step.
+    const auto mix = [strength](uint32_t from, uint32_t to) {
+      return (from * (255 - strength) + to * strength) / 255;
+    };
+    tinted[i] = (p & 0xff000000u) | (mix(sb, tb) << 16) | (mix(sg, tg) << 8) |
+                mix(sr, tr);
+  }
+  return pf_sprite_open_rgba(tinted.data(), held->width, held->height, held->frames,
+                             cache->cache.tile_px, status);
+}
+
+uint8_t* pf_hd_cache_save(const pf_hd_cache* cache, size_t* out_len) {
+  if (out_len) *out_len = 0;
+  if (!cache || cache->cache.sprites.empty()) return nullptr;
+  const std::vector<uint8_t> bytes = pf::write_hd_cache(cache->cache);
+  if (bytes.empty()) return nullptr;
+  auto* out = static_cast<uint8_t*>(std::malloc(bytes.size()));
+  if (!out) return nullptr;
+  std::memcpy(out, bytes.data(), bytes.size());
+  if (out_len) *out_len = bytes.size();
+  return out;
+}
+
+pf_hd_cache* pf_hd_cache_load(const uint8_t* bytes, size_t length, int want_tile_px,
+                              const char* want_stamp, pf_status* status) {
+  if (!bytes) { set_status(status, PF_ERR_INVALID_ARG); return nullptr; }
+  auto handle = std::unique_ptr<pf_hd_cache>(new pf_hd_cache());
+  if (!pf::read_hd_cache(bytes, length, want_tile_px, want_stamp ? want_stamp : "",
+                         handle->cache)) {
+    set_status(status, PF_ERR_MALFORMED);
+    return nullptr;
+  }
+  // Everything read back is as good as what wrote it; the race preference
+  // only matters while an import is choosing between sheets.
+  handle->race_matched.assign(handle->cache.sprites.size(), true);
+  set_status(status, PF_OK);
+  return handle.release();
+}
+
 /** Relative path, without extension, of the .grp a unit uses on a tileset. */
 int pf_sprite_path(int unit_id, int tileset, char* out, int cap) {
   const std::string path = pf::sprite_path_for(unit_id, tileset);
@@ -3681,20 +4293,21 @@ uint32_t hsv_packed(double h, double s, double v) {
   return 0xff000000u | (to8(b + m) << 16) | (to8(g + m) << 8) | to8(r + m);
 }
 
-void fill_tile_px(uint32_t* out, int stride, int ox, int oy, uint32_t colour) {
-  for (int y = 0; y < pf::kTilePx; y++) {
+void fill_tile_px(uint32_t* out, int stride, int ox, int oy, int tile, uint32_t colour) {
+  for (int y = 0; y < tile; y++) {
     uint32_t* row = out + size_t(oy + y) * size_t(stride) + size_t(ox);
-    for (int x = 0; x < pf::kTilePx; x++) row[x] = colour;
+    for (int x = 0; x < tile; x++) row[x] = colour;
   }
 }
 
 /// Hollow player-coloured box, so a unit with no artwork is still visible.
 void outline_unit_px(uint32_t* out, int width, int height, const pf::Unit& u,
-                     int fw, int fh, int x0, int y0, uint32_t override_colour) {
+                     int fw, int fh, int x0, int y0, int tile,
+                     uint32_t override_colour) {
   const uint32_t colour = override_colour ? override_colour : pack_rgb(pf_player_color(u.owner));
-  const int ox = (int(u.x) - x0) * pf::kTilePx;
-  const int oy = (int(u.y) - y0) * pf::kTilePx;
-  const int w = fw * pf::kTilePx, h = fh * pf::kTilePx;
+  const int ox = (int(u.x) - x0) * tile;
+  const int oy = (int(u.y) - y0) * tile;
+  const int w = fw * tile, h = fh * tile;
   for (int y = 0; y < h; y++) {
     const int dy = oy + y;
     if (dy < 0 || dy >= height) continue;
@@ -3905,7 +4518,10 @@ uint8_t* pf_png_encode(const uint32_t* rgba, int width, int height,
 int pf_map_compose_region(const pf_map* map, const pf_render_options* o,
                           uint32_t* out, size_t capacity) {
   if (!map || !o || o->cols <= 0 || o->rows <= 0) return -1;
-  const int width = o->cols * pf::kTilePx, height = o->rows * pf::kTilePx;
+  // What a tile is composed at. Zero means the size the game draws, which is
+  // what every caller written before this field asked for.
+  const int tile = o->tile_px > 0 ? o->tile_px : pf::kTilePx;
+  const int width = o->cols * tile, height = o->rows * tile;
   const size_t pixels = size_t(width) * size_t(height);
   if (!out) return int(pixels);
   if (capacity < pixels) return -1;
@@ -3919,17 +4535,18 @@ int pf_map_compose_region(const pf_map* map, const pf_render_options* o,
   for (int row = 0; row < o->rows; row++) {
     for (int col = 0; col < o->cols; col++) {
       const int tx = o->x0 + col, ty = o->y0 + row;
-      const uint16_t tile = in_map(tx, ty) ? tiles[size_t(ty) * size_t(mw) + size_t(tx)] : 0;
-      const int mt = o->art ? pf_tileset_art_megatile_for(o->art, tile) : -1;
+      const uint16_t map_tile =
+          in_map(tx, ty) ? tiles[size_t(ty) * size_t(mw) + size_t(tx)] : 0;
+      const int mt = o->art ? pf_tileset_art_megatile_for(o->art, map_tile) : -1;
       if (mt >= 0) {
-        uint32_t* dst = out + size_t(row * pf::kTilePx) * size_t(width)
-                            + size_t(col * pf::kTilePx);
-        pf_tileset_art_draw(o->art, mt, dst, width);
+        // Through the sized draw, which uses artwork already at this size
+        // where there is some and scales the tileset's own otherwise.
+        o->art->art->draw_megatile_at(mt, tile, out, width, col * tile, row * tile);
       } else {
         // No artwork, or a tile this tileset cannot draw: the flat colour of
         // whatever terrain the tile mostly is.
-        fill_tile_px(out, width, col * pf::kTilePx, row * pf::kTilePx,
-                     pack_rgb(pf::terrain_flat_colour(pf_tile_dominant_terrain(tile),
+        fill_tile_px(out, width, col * tile, row * tile, tile,
+                     pack_rgb(pf::terrain_flat_colour(pf_tile_dominant_terrain(map_tile),
                                                       m.tileset())));
       }
     }
@@ -3964,10 +4581,10 @@ int pf_map_compose_region(const pf_map* map, const pf_render_options* o,
         const uint32_t v = 256u - w;
         const uint32_t trb = (tint & 0x00ff00ffu) * w;
         const uint32_t tg = (tint & 0x0000ff00u) * w;
-        const int ox = col * pf::kTilePx, oy = row * pf::kTilePx;
-        for (int y = 0; y < pf::kTilePx; y++) {
+        const int ox = col * tile, oy = row * tile;
+        for (int y = 0; y < tile; y++) {
           uint32_t* dst = out + size_t(oy + y) * size_t(width) + size_t(ox);
-          for (int x = 0; x < pf::kTilePx; x++) {
+          for (int x = 0; x < tile; x++) {
             const uint32_t p = dst[x];
             dst[x] = 0xff000000u |
                      (((((p & 0x00ff00ffu) * v + trb) >> 8) & 0x00ff00ffu)) |
@@ -4005,7 +4622,8 @@ int pf_map_compose_region(const pf_map* map, const pf_render_options* o,
       int fw = 1, fh = 1;
       m.unit_footprint(u->type, fw, fh);
       if (o->mark_special && draw_is_special(u->type)) {
-        outline_unit_px(out, width, height, *u, fw, fh, o->x0, o->y0, 0xff00ffffu);
+        outline_unit_px(out, width, height, *u, fw, fh, o->x0, o->y0, tile,
+                        0xff00ffffu);
       }
 
       pf_sprite* sprite = nullptr;
@@ -4015,7 +4633,7 @@ int pf_map_compose_region(const pf_map* map, const pf_render_options* o,
       }
       if (!sprite || !o->art) {
         if (o->placeholders) {
-          outline_unit_px(out, width, height, *u, fw, fh, o->x0, o->y0, 0);
+          outline_unit_px(out, width, height, *u, fw, fh, o->x0, o->y0, tile, 0);
         }
         continue;
       }
@@ -4034,16 +4652,26 @@ int pf_map_compose_region(const pf_map* map, const pf_render_options* o,
       frame.assign(size_t(sw) * size_t(sh), 0);
       if (pf_sprite_draw(sprite, index, u->owner, o->art, frame.data()) != PF_OK) continue;
 
+      // How far this sprite's own pixels are from the tile being composed. A
+      // sprite drawn for this size lands one for one; anything else is scaled
+      // by whole pixels, which is blocky and never blurry.
+      const int drawn_at = sprite->sprite->tile_px();
+      const int dw = drawn_at == tile ? sw : int(int64_t(sw) * tile / drawn_at);
+      const int dh = drawn_at == tile ? sh : int(int64_t(sh) * tile / drawn_at);
+      if (dw <= 0 || dh <= 0) continue;
+
       // Centred on the footprint: a 3x3 mine's artwork is not 96 px square.
-      const int ox = (int(u->x) - o->x0) * pf::kTilePx + ((fw * pf::kTilePx - sw) >> 1);
-      const int oy = (int(u->y) - o->y0) * pf::kTilePx + ((fh * pf::kTilePx - sh) >> 1);
-      for (int y = 0; y < sh; y++) {
+      const int ox = (int(u->x) - o->x0) * tile + ((fw * tile - dw) >> 1);
+      const int oy = (int(u->y) - o->y0) * tile + ((fh * tile - dh) >> 1);
+      for (int y = 0; y < dh; y++) {
         const int dy = oy + y;
         if (dy < 0 || dy >= height) continue;
-        for (int x = 0; x < sw; x++) {
+        const int sy = dh == sh ? y : int(int64_t(y) * sh / dh);
+        for (int x = 0; x < dw; x++) {
           const int dx = ox + x;
           if (dx < 0 || dx >= width) continue;
-          const uint32_t p = frame[size_t(y) * size_t(sw) + size_t(x)];
+          const int sx = dw == sw ? x : int(int64_t(x) * sw / dw);
+          const uint32_t p = frame[size_t(sy) * size_t(sw) + size_t(sx)];
           if (p != 0) out[size_t(dy) * size_t(width) + size_t(dx)] = p;
         }
       }
@@ -4054,7 +4682,7 @@ int pf_map_compose_region(const pf_map* map, const pf_render_options* o,
   if (o->grid) {
     constexpr uint32_t kLine = 0x60ffffffu;
     for (int col = 0; col <= o->cols; col++) {
-      const int x = std::min(col * pf::kTilePx, width - 1);
+      const int x = std::min(col * tile, width - 1);
       const double a = ((o->x0 + col) % kGridEvery == 0) ? 0.6 : 0.28;
       for (int y = 0; y < height; y++) {
         uint32_t& p = out[size_t(y) * size_t(width) + size_t(x)];
@@ -4062,7 +4690,7 @@ int pf_map_compose_region(const pf_map* map, const pf_render_options* o,
       }
     }
     for (int row = 0; row <= o->rows; row++) {
-      const int y = std::min(row * pf::kTilePx, height - 1);
+      const int y = std::min(row * tile, height - 1);
       const double a = ((o->y0 + row) % kGridEvery == 0) ? 0.6 : 0.28;
       for (int x = 0; x < width; x++) {
         uint32_t& p = out[size_t(y) * size_t(width) + size_t(x)];
@@ -4116,7 +4744,14 @@ int pf_map_compose_minimap(const pf_map* map, const pf_tileset_art* art,
 
 pf_status pf_sprite_draw(const pf_sprite* sprite, int frame, int owner,
                          const pf_tileset_art* art, uint32_t* out) {
-  if (!sprite || !art || !out) return PF_ERR_INVALID_ARG;
+  if (!sprite || !out) return PF_ERR_INVALID_ARG;
+  // A sprite that is already pixels carries its own colour, so it needs
+  // neither the tileset's palette nor the owner's swap — and a caller drawing
+  // one has no reason to have opened a tileset at all.
+  if (sprite->sprite->is_rgba()) {
+    return sprite->sprite->draw_frame(frame, nullptr, out) ? PF_OK : PF_ERR_OUT_OF_RANGE;
+  }
+  if (!art) return PF_ERR_INVALID_ARG;
   uint32_t palette[256];
   pf::apply_player_color(art->art->palette(), pf_player_color(owner), palette);
   return sprite->sprite->draw_frame(frame, palette, out) ? PF_OK : PF_ERR_OUT_OF_RANGE;

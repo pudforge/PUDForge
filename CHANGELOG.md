@@ -37,6 +37,19 @@ section therefore covers all the commits after the previous tag.
 `scripts/prep-release.ps1` collects those commits as a start. See
 `docs/releasing.md`.
 
+## 0.1.77
+
+**New**
+
+- Press a number key while you paste to put the units on that player.
+
+**Fixed**
+
+- A shore building must have its middle tile on water.
+- A gold mine must be 3 tiles from a town hall, and a town hall 3 tiles from a
+  gold mine.
+- Oil must be 4 tiles from a shipyard or a refinery.
+
 ## 0.1.76
 
 **Fixed**

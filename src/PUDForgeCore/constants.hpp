@@ -96,6 +96,13 @@ uint32_t movement_colour(int value);
 
 /// Whether a unit must keep clear of gold mines. See overrides/hall_clearance.cpp.
 bool unit_needs_mine_clearance(int unit_id);
+
+/// Whether this building has to keep its distance from oil, and how far.
+/// The shipyard and the refinery do and the foundry does not; see
+/// overrides/oil_clearance.cpp.
+bool unit_is_oil(int unit_id);
+bool unit_needs_oil_clearance(int unit_id);
+int oil_clearance_tiles(void);
 /// How many tiles of clearance it needs. See overrides/hall_clearance.cpp.
 int mine_clearance_tiles();
 
@@ -257,6 +264,10 @@ int unit_placement_phase(int unit_id);
 /// The units that table names, for the tests that check it.
 int oversize_unit_count();
 int oversize_unit_id(int index);
+
+/// Whether the tile under the middle of a shore building may be this terrain.
+/// A dock's middle is in the water; see overrides/shore_centre.cpp.
+bool shore_centre_terrain_ok(int terrain);
 
 /// Whether two units standing on the same tiles is an arrangement the game
 /// intends rather than a fault. See overrides/shared_tiles.cpp; a gold mine is

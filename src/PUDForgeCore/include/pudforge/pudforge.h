@@ -261,10 +261,11 @@ PF_API int64_t pf_resource_amount(int value);
 /**
  * The stored `value` that holds an amount, which is the inverse of the above.
  *
- * Rounded to the nearest 2,500 and clamped to what the field can hold, because
- * an editor lets somebody type a number and the format has no way to keep
- * 41,000 gold. Here rather than in a client for the reason the multiplier is:
- * a client dividing by 2,500 itself is a second copy of the format's rule.
+ * Rounded to the nearest 2,500 and clamped to 255 steps - 637,500 - because an
+ * editor lets somebody type a number and the format has no way to keep 41,000
+ * gold. The ceiling is the game's: it reads the amount out of the record's low
+ * byte alone. Here rather than in a client for the reason the multiplier is: a
+ * client dividing by 2,500 itself is a second copy of the format's rule.
  */
 PF_API int pf_resource_value(int64_t amount);
 
@@ -1326,7 +1327,10 @@ typedef enum pf_placement {
   /** A ship or flying unit on an odd tile. They cover 2x2 and the game's own
    *  editor lays them on a 2x2 grid, so the tiles between are not placements
    *  it ever made. Lifted by pf_map_set_allow_illegal_placement. */
-  PF_PLACE_OFF_GRID = 10
+  PF_PLACE_OFF_GRID = 10,
+  /** Oil crowding a shipyard or a refinery, which want four tiles of it.
+   *  Not the foundry, which no tanker visits; see overrides/oil_clearance.cpp. */
+  PF_PLACE_TOO_NEAR_OIL = 11
 } pf_placement;
 
 typedef enum pf_domain {
@@ -1483,6 +1487,19 @@ PF_API int pf_map_tile_for_corners(pf_map *map, const uint8_t *corners,
  * Lets a client show where each would land before committing to a paste.
  */
 PF_API pf_status pf_clipboard_unit(const pf_clipboard *clip, int index, pf_unit *out);
+
+/**
+ * Give one of the fragment's units a different type and owner, leaving where
+ * it sits alone. Nothing is written to any map: like the turns below, this
+ * changes what a paste *would* drop, which is what lets a client hand a
+ * pending paste to another player before it lands.
+ *
+ * The type is the caller's to decide. Whether a Footman becomes a Grunt in an
+ * orc player's hands is a question about the map's races and about what the
+ * client is showing, and the fragment knows neither.
+ */
+PF_API pf_status pf_clipboard_set_unit(pf_clipboard *clip, int index, int type,
+                                       int owner);
 
 /** Mirror left-to-right. */
 PF_API pf_status pf_clipboard_flip(pf_clipboard *clip);
@@ -1803,6 +1820,166 @@ PF_API pf_sprite *pf_sprite_open(const char *dir, int unit_id, int tileset, pf_s
 PF_API pf_sprite *pf_sprite_open_memory(const uint8_t *data, size_t len, pf_status *status);
 
 /**
+ * A sprite from frames that are already pixels, rather than a `.grp`.
+ *
+ * `pixels` holds `frames` images of `width` by `height` packed RGBA, back to
+ * back. It is copied. This is how the Remastered artwork reaches the renderer:
+ * cut out of an atlas and scaled by the host, then handed over as a sprite
+ * like any other, so the sprite set and every drawing path stay unchanged.
+ *
+ * Such a sprite carries no palette, so `pf_sprite_draw` ignores the owner it
+ * is given: the colour is in the pixels already.
+ *
+ * `tile_px` is the map tile size the frames were drawn for, so a render at
+ * another tile size knows how far to scale them. Pass `PF_TILE_PX` for
+ * artwork drawn at the size the game draws.
+ */
+PF_API pf_sprite *pf_sprite_open_rgba(const uint32_t *pixels, int width, int height,
+                                      int frames, int tile_px, pf_status *status);
+
+/* --------------------------------------------------- Remastered artwork */
+
+/**
+ * The Remastered edition ships PNG atlases instead of the `.grp` archives the
+ * Battle.net edition uses. This is the import: the host finds the files and
+ * reads their bytes, the core parses the sidecars, decodes the sheets, cuts
+ * the frames an editor draws and holds them at the size it will draw them.
+ *
+ * The cache is worth keeping between runs — see `pf_hd_cache_save`. A host
+ * that has one calls `pf_hd_cache_load` and skips the import entirely.
+ */
+typedef struct pf_hd_cache pf_hd_cache;
+
+/**
+ * @param tile_px pixels a map tile is drawn at; the artwork is scaled to it
+ * @param stamp what this was built from, so a patched game rebuilds
+ */
+PF_API pf_hd_cache *pf_hd_cache_create(int tile_px, const char *stamp);
+PF_API void pf_hd_cache_free(pf_hd_cache *cache);
+
+/**
+ * Take whatever this atlas holds that the editor draws.
+ *
+ * `name` is the sidecar's file name, which is how a sprite gets the right
+ * race: "grunt" names the Footman in the human sheets and the Grunt in the orc
+ * ones, and nothing inside the file says which is which.
+ *
+ * Pass a null `png` to ask without decoding: the answer is how many sprites
+ * the sheet *would* give, which is what lets a host skip reading the sheets it
+ * has no use for. Most of them: five of the forty-two hold everything wanted.
+ *
+ * @return sprites added, or -1 when the sidecar or the sheet is unreadable
+ */
+PF_API int pf_hd_cache_add_atlas(pf_hd_cache *cache, const char *name,
+                                 const char *sidecar_json, size_t json_len,
+                                 const uint8_t *png, size_t png_len);
+
+/**
+ * Take the team-colour masks out of a `*_masks` sheet, for sprites already
+ * added. Its frames are the sprite keys with `_team` after them.
+ *
+ * Without this every unit draws in the colour the artwork was rendered in —
+ * which is one player's, so a map of eight looks like a map of one. A null
+ * `png` asks without decoding, as elsewhere.
+ *
+ * @return sprites given a mask, or -1 when the sidecar or sheet is unreadable
+ */
+PF_API int pf_hd_cache_add_masks(pf_hd_cache *cache, const char *name,
+                                 const char *sidecar_json, size_t json_len,
+                                 const uint8_t *png, size_t png_len);
+
+/** How many sprites it holds, which is how a caller knows an import worked. */
+PF_API int pf_hd_cache_sprite_count(const pf_hd_cache *cache);
+
+/**
+ * The sprite a unit draws, or null when the cache has none for it — which is
+ * the signal to fall back to the game's own artwork rather than draw nothing.
+ * Caller frees, the same as every other `pf_sprite`.
+ *
+ * `owner`'s colour is baked in through the team mask, so the result is that
+ * player's unit. A sprite set already keys on the owner, so each one drawn is
+ * built once.
+ */
+PF_API pf_sprite *pf_hd_cache_sprite(const pf_hd_cache *cache, int unit_id, int owner,
+                                     pf_status *status);
+
+/**
+ * Take a tileset's megatiles out of one of the `bgs_*` atlases.
+ *
+ * Indexed by megatile on the way in: the atlas holds only the drawn ones and
+ * every tileset opens with 16 blanks, so frame 0 is megatile 16. A null `png`
+ * asks without decoding, the same as adding sprites.
+ *
+ * @return megatiles taken, or -1 when the sidecar or the sheet is unreadable
+ */
+PF_API int pf_hd_cache_add_terrain(pf_hd_cache *cache, int tileset,
+                                   const char *sidecar_json, size_t json_len,
+                                   const uint8_t *png, size_t png_len);
+
+/**
+ * Draw a tileset's terrain from the cache instead of its own artwork.
+ *
+ * The tileset keeps answering everything else — which megatile a tile value
+ * means, the palette, the minimap averages — because the HD sheets carry none
+ * of that. False when the cache holds nothing for this tileset, which leaves
+ * the artwork as it was.
+ */
+PF_API int pf_tileset_art_use_hd(pf_tileset_art *art, const pf_hd_cache *cache,
+                                 int tileset);
+
+/**
+ * The tile size the Remastered tiles in here were cut for, or 0 for none.
+ *
+ * A caller composing a render asks this so it can compose at a size the
+ * artwork actually holds, rather than scaling it.
+ */
+PF_API int pf_tileset_art_hd_size(const pf_tileset_art *art);
+
+/**
+ * Take the command-button icons out of the HUD atlas, fitted to a box.
+ *
+ * The caller passes the size the classic sheet uses, because that is what
+ * every panel drawing an icon is laid out around — an icon is a fixed size on
+ * a panel rather than a size on the ground, so the tile scale says nothing
+ * about it. A null `png` asks without decoding.
+ *
+ * @return frames taken, or -1 when the sidecar or the sheet is unreadable
+ */
+PF_API int pf_hd_cache_add_portraits(pf_hd_cache *cache, int tileset,
+                                     const char *sidecar_json, size_t json_len,
+                                     const uint8_t *png, size_t png_len, int box_w,
+                                     int box_h);
+
+/**
+ * Team colour for the icons, out of `HUD/Portrait-mask`, whose frames are the
+ * icon keys with `_team` after them. Call it after the icons themselves.
+ */
+PF_API int pf_hd_cache_add_portrait_masks(pf_hd_cache *cache, int tileset,
+                                          const char *sidecar_json, size_t json_len,
+                                          const uint8_t *png, size_t png_len,
+                                          int box_w, int box_h);
+
+/**
+ * The icon sheet for a tileset, coloured for one owner, or null when the cache
+ * has none. Frame numbering is the game's own, so `pf_unit_icon` still says
+ * which frame a unit uses. Caller frees.
+ */
+PF_API pf_sprite *pf_hd_cache_portraits(const pf_hd_cache *cache, int tileset,
+                                        int owner, pf_status *status);
+
+/** Bytes to keep, freed with `pf_buffer_free`. Null when there is nothing. */
+PF_API uint8_t *pf_hd_cache_save(const pf_hd_cache *cache, size_t *out_len);
+
+/**
+ * Read one back. Null when the bytes are not a cache, or are one built at
+ * another tile size or from another game build — in every case the caller
+ * should import again rather than draw what it found.
+ */
+PF_API pf_hd_cache *pf_hd_cache_load(const uint8_t *bytes, size_t length,
+                                     int want_tile_px, const char *want_stamp,
+                                     pf_status *status);
+
+/**
  * Relative path (no extension) of the `.grp` a unit uses on a tileset, e.g.
  * "human/thall". Writes up to `cap` bytes including the terminator and returns
  * the full length; pass NULL/0 to query the length. Empty for unused slots.
@@ -1837,6 +2014,15 @@ PF_API void pf_sprite_free(pf_sprite *sprite);
 PF_API int pf_sprite_width(const pf_sprite *sprite);
 PF_API int pf_sprite_height(const pf_sprite *sprite);
 PF_API int pf_sprite_frame_count(const pf_sprite *sprite);
+
+/**
+ * The map tile size this sprite's pixels were drawn for.
+ *
+ * `PF_TILE_PX` for the game's own artwork. A caller scaling a sprite to the
+ * screen divides by this rather than by a constant, or artwork drawn for a
+ * bigger tile comes out proportionally too large.
+ */
+PF_API int pf_sprite_tile_px(const pf_sprite *sprite);
 
 /**
  * Tileset artwork straight from a data source, so the caller never has to know
@@ -2156,6 +2342,18 @@ typedef struct pf_render_options {
   int grid;                      /**< one-pixel tile grid, heavier every 8th */
   int mark_special;              /**< box resources and start locations      */
   int vary_facing;               /**< 0 makes every unit face the same way   */
+  /**
+   * Pixels a tile is composed at, or 0 for `PF_TILE_PX`.
+   *
+   * The render is this many pixels a tile square, so a caller wanting a
+   * sharper picture than stretching a 32 px one asks for a bigger tile and
+   * allocates the buffer `pf_map_compose_region` then reports. Artwork drawn
+   * for another size is scaled by whole pixels, so a bigger tile is only
+   * worth asking for where artwork of that size is loaded.
+   *
+   * Zero-initialised options therefore behave exactly as they always did.
+   */
+  int tile_px;
   int placeholders;              /**< outline units with no sprite loaded    */
 } pf_render_options;
 

@@ -236,6 +236,9 @@ GameData::~GameData() {
   // uninstalls it.
   if (strings_) pf_strings_free(strings_);
   if (source_) pf_data_source_free(source_);
+#ifdef PF_ENABLE_HD_ART
+  if (hd_cache_) pf_hd_cache_free(hd_cache_);
+#endif
 }
 
 void GameData::UseGameStrings() {
@@ -404,13 +407,11 @@ pf_sprite_set* GameData::OpenSprites(const pf_map* map, const pf_tileset_art* ar
     if (pf_map_unit(map, i, &unit) != PF_OK) continue;
     const int type = unit.type, owner = unit.owner;
     if (pf_sprite_set_has(set, type, owner)) continue;
-    pf_sprite* sprite = pf_sprite_open_source(source_, type, tileset, nullptr);
-    // Tileset variants often do not exist; the forest original is the fallback,
-    // the same order the core's own path loader uses.
-    if (!sprite && tileset != 0) {
-      sprite = pf_sprite_open_source(source_, type, 0, nullptr);
+    // Through the one loader, which is also where the Remastered artwork is
+    // chosen: this used to open sprites itself and would have missed it.
+    if (pf_sprite* sprite = OpenUnitSprite(type, tileset, owner)) {
+      pf_sprite_set_add(set, type, owner, sprite);
     }
-    if (sprite) pf_sprite_set_add(set, type, owner, sprite);
   }
   return set;
 }
@@ -423,7 +424,7 @@ int GameData::AddMissingSprites(const pf_map* map, pf_sprite_set* set) {
     pf_unit unit = {};
     if (pf_map_unit(map, i, &unit) != PF_OK) continue;
     if (pf_sprite_set_has(set, unit.type, unit.owner)) continue;
-    pf_sprite* sprite = OpenUnitSprite(unit.type, tileset);
+    pf_sprite* sprite = OpenUnitSprite(unit.type, tileset, unit.owner);
     if (sprite && pf_sprite_set_add(set, unit.type, unit.owner, sprite) == PF_OK) {
       added++;
     }
@@ -431,12 +432,292 @@ int GameData::AddMissingSprites(const pf_map* map, pf_sprite_set* set) {
   return added;
 }
 
+#ifdef PF_ENABLE_HD_ART
+
+// ------------------------------------------------- the Remastered artwork
+//
+// The host's half of the import: find the files, read their bytes, keep the
+// result. What the bytes mean is the core's, through pf_hd_cache_*.
+
+namespace {
+
+/// Every sidecar matching a pattern in a directory, with its sheet beside it.
+std::vector<std::wstring> SidecarsIn(const std::wstring& dir, const wchar_t* pattern) {
+  std::vector<std::wstring> out;
+  WIN32_FIND_DATAW found = {};
+  HANDLE search = FindFirstFileW((dir + L"\\" + pattern).c_str(), &found);
+  if (search == INVALID_HANDLE_VALUE) return out;
+  do {
+    if (found.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) continue;
+    out.push_back(dir + L"\\" + found.cFileName);
+  } while (FindNextFileW(search, &found));
+  FindClose(search);
+  return out;
+}
+
+bool ReadWholeFile(const std::wstring& path, std::vector<uint8_t>& out) {
+  HANDLE file = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr,
+                            OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+  if (file == INVALID_HANDLE_VALUE) return false;
+  LARGE_INTEGER size = {};
+  if (!GetFileSizeEx(file, &size) || size.QuadPart <= 0 ||
+      size.QuadPart > 512ll * 1024 * 1024) {
+    CloseHandle(file);
+    return false;
+  }
+  out.resize(size_t(size.QuadPart));
+  DWORD got = 0;
+  const bool ok = ReadFile(file, out.data(), DWORD(out.size()), &got, nullptr) &&
+                  got == out.size();
+  CloseHandle(file);
+  if (!ok) out.clear();
+  return ok;
+}
+
+bool WriteWholeFile(const std::wstring& path, const uint8_t* bytes, size_t length) {
+  HANDLE file = CreateFileW(path.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS,
+                            FILE_ATTRIBUTE_NORMAL, nullptr);
+  if (file == INVALID_HANDLE_VALUE) return false;
+  DWORD wrote = 0;
+  const bool ok = WriteFile(file, bytes, DWORD(length), &wrote, nullptr) &&
+                  wrote == length;
+  CloseHandle(file);
+  return ok;
+}
+
+}  // namespace
+
+std::wstring GameData::HdCachePath(int tile_px) const {
+  wchar_t* base = nullptr;
+  if (SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &base) != S_OK) return {};
+  std::wstring dir = base;
+  CoTaskMemFree(base);
+  dir += L"\\PUDForge";
+  CreateDirectoryW(dir.c_str(), nullptr);   // already there is the usual answer
+  return dir + L"\\hd-" + std::to_wstring(tile_px) + L".cache";
+}
+
+std::wstring GameData::HdStamp(const std::wstring& hd_dir) const {
+  // The biggest sheet answers for the set: a patch that changes the artwork
+  // changes this, and one that does not leaves the cache alone.
+  WIN32_FILE_ATTRIBUTE_DATA about = {};
+  const std::wstring probe = hd_dir + L"\\unit\\units_human_common_sprites.png";
+  if (!GetFileAttributesExW(probe.c_str(), GetFileExInfoStandard, &about)) return {};
+  wchar_t stamp[64] = {};
+  swprintf(stamp, 64, L"%08x%08x-%08x%08x", about.nFileSizeHigh, about.nFileSizeLow,
+           about.ftLastWriteTime.dwHighDateTime, about.ftLastWriteTime.dwLowDateTime);
+  return stamp;
+}
+
+pf_hd_cache* GameData::BuildHdCache(const HdRequest& request) {
+  // The kept one first, which is the whole point of having written it.
+  std::vector<uint8_t> held;
+  if (!request.cache_path.empty() && ReadWholeFile(request.cache_path, held)) {
+    if (pf_hd_cache* loaded = pf_hd_cache_load(held.data(), held.size(), request.tile_px,
+                                               request.stamp.c_str(), nullptr)) {
+      return loaded;
+    }
+  }
+
+  const std::wstring& hd_dir = request.hd_dir;
+  const std::vector<std::wstring> sidecars =
+      SidecarsIn(hd_dir + L"\\unit", L"*_sprites.json");
+  if (sidecars.empty()) return nullptr;
+
+  pf_hd_cache* cache = pf_hd_cache_create(request.tile_px, request.stamp.c_str());
+  if (!cache) return nullptr;
+  for (const std::wstring& sidecar : sidecars) {
+    std::wstring sheet = sidecar;
+    sheet.replace(sheet.size() - 5, 5, L".png");     // .json -> .png
+    std::vector<uint8_t> json, png;
+    if (!ReadWholeFile(sidecar, json)) continue;
+    // Ask before reading the sheet. Only five of the forty-two hold anything
+    // an editor draws, and a sheet is a quarter of a second and 235 MB.
+    if (pf_hd_cache_add_atlas(cache, ToUtf8(sidecar).c_str(),
+                              reinterpret_cast<const char*>(json.data()), json.size(),
+                              nullptr, 0) <= 0) {
+      continue;
+    }
+    if (!ReadWholeFile(sheet, png)) continue;
+    pf_hd_cache_add_atlas(cache, ToUtf8(sidecar).c_str(),
+                          reinterpret_cast<const char*>(json.data()), json.size(),
+                          png.data(), png.size());
+  }
+
+  // The team-colour masks, after the sprites, because they are matched to the
+  // sprites already taken. Without them every unit is the colour the artwork
+  // was rendered in.
+  for (const std::wstring& sidecar : SidecarsIn(hd_dir + L"\\unit", L"*_masks.json")) {
+    std::wstring sheet = sidecar;
+    sheet.replace(sheet.size() - 5, 5, L".png");
+    std::vector<uint8_t> json, png;
+    if (!ReadWholeFile(sidecar, json)) continue;
+    if (pf_hd_cache_add_masks(cache, ToUtf8(sidecar).c_str(),
+                              reinterpret_cast<const char*>(json.data()), json.size(),
+                              nullptr, 0) <= 0) {
+      continue;
+    }
+    if (!ReadWholeFile(sheet, png)) continue;
+    pf_hd_cache_add_masks(cache, ToUtf8(sidecar).c_str(),
+                          reinterpret_cast<const char*>(json.data()), json.size(),
+                          png.data(), png.size());
+  }
+
+  // The command-button icons. One sheet holds all four tilesets, keyed by
+  // tileset name, and its mask sheet beside it carries the team colour. Fitted
+  // to the classic sheet's frames because every panel that draws an icon is
+  // laid out around that size.
+  if (request.icon_w > 0 && request.icon_h > 0) {
+    const std::wstring face = hd_dir + L"\\HUD\\Portrait-face";
+    const std::wstring team = hd_dir + L"\\HUD\\Portrait-mask";
+    std::vector<uint8_t> face_json, face_png, team_json, team_png;
+    const bool have_face =
+        ReadWholeFile(face + L".json", face_json) && ReadWholeFile(face + L".png", face_png);
+    const bool have_team =
+        ReadWholeFile(team + L".json", team_json) && ReadWholeFile(team + L".png", team_png);
+    if (have_face) {
+      for (int tileset = PF_TILESET_FOREST; tileset <= PF_TILESET_SWAMP; tileset++) {
+        pf_hd_cache_add_portraits(cache, tileset,
+                                  reinterpret_cast<const char*>(face_json.data()),
+                                  face_json.size(), face_png.data(), face_png.size(),
+                                  request.icon_w, request.icon_h);
+        if (!have_team) continue;
+        pf_hd_cache_add_portrait_masks(cache, tileset,
+                                       reinterpret_cast<const char*>(team_json.data()),
+                                       team_json.size(), team_png.data(),
+                                       team_png.size(), request.icon_w, request.icon_h);
+      }
+    }
+  }
+
+  // The terrain sheets, one per tileset. Named for the artwork rather than for
+  // the tileset ids, and the last two do not pair the way their names suggest:
+  // bgs_Swamp is the wasteland and bgs_XSwamp is the swamp, which is what the
+  // megatile counts say.
+  struct TerrainSheet { const wchar_t* file; int tileset; };
+  static const TerrainSheet kTerrain[] = {
+      {L"bgs_Forest", PF_TILESET_FOREST},
+      {L"bgs_Ice", PF_TILESET_WINTER},
+      {L"bgs_Swamp", PF_TILESET_WASTELAND},
+      {L"bgs_XSwamp", PF_TILESET_SWAMP},
+  };
+  for (const TerrainSheet& set : kTerrain) {
+    const std::wstring base = hd_dir + L"\\bgs\\" + set.file;
+    std::vector<uint8_t> json, png;
+    if (!ReadWholeFile(base + L".json", json)) continue;
+    if (pf_hd_cache_add_terrain(cache, set.tileset,
+                                reinterpret_cast<const char*>(json.data()), json.size(),
+                                nullptr, 0) <= 0) {
+      continue;
+    }
+    if (!ReadWholeFile(base + L".png", png)) continue;
+    pf_hd_cache_add_terrain(cache, set.tileset,
+                            reinterpret_cast<const char*>(json.data()), json.size(),
+                            png.data(), png.size());
+  }
+
+  if (pf_hd_cache_sprite_count(cache) <= 0) {
+    pf_hd_cache_free(cache);
+    return nullptr;
+  }
+
+  // Kept for next time. A cache that cannot be written is not a failure: the
+  // artwork is in memory and the import simply happens again next run.
+  size_t length = 0;
+  if (uint8_t* bytes = pf_hd_cache_save(cache, &length)) {
+    if (!request.cache_path.empty()) WriteWholeFile(request.cache_path, bytes, length);
+    pf_buffer_free(bytes);
+  }
+  return cache;
+}
+
+bool GameData::ApplyHdTerrain(pf_tileset_art* art, int tileset) {
+  if (!hd_ready_ || !hd_cache_ || !art) return false;
+  return pf_tileset_art_use_hd(art, hd_cache_, tileset) > 0;
+}
+
+bool GameData::UseHdArt(int tile_px) {
+  // Already holding exactly this. LoadArtwork runs on every map open and the
+  // import is seconds long, so asking twice has to be free.
+  if (hd_ready_ && hd_tile_px_ == tile_px) return true;
+
+  if (hd_cache_) { pf_hd_cache_free(hd_cache_); hd_cache_ = nullptr; }
+  hd_ready_ = false;
+  hd_tile_px_ = 0;
+  hd_seconds_ = 0;
+  if (tile_px <= 0) return false;
+
+  HdRequest request;
+  if (!PrepareHdRequest(tile_px, request)) return false;
+  const DWORD started = GetTickCount();
+  pf_hd_cache* built = BuildHdCache(request);
+  hd_seconds_ = double(GetTickCount() - started) / 1000.0;
+  AdoptHdCache(built, request.tile_px);
+  return hd_ready_;
+}
+
+bool GameData::PrepareHdRequest(int tile_px, HdRequest& out) {
+  out = HdRequest();
+  if (tile_px <= 0 || folder_.empty()) return false;
+  // The size asked for. The renderer composes at whatever tile size it is
+  // given, so this is now a real choice rather than a wish.
+  out.tile_px = tile_px;
+
+  // Beside the data the rest of the artwork comes from, wherever that turned
+  // out to be — only Remastered has this at all.
+  for (const wchar_t* inside : kInside) {
+    const std::wstring candidate = folder_ + inside + L"\\Art\\hd";
+    if (GetFileAttributesW((candidate + L"\\unit").c_str()) != INVALID_FILE_ATTRIBUTES) {
+      out.hd_dir = candidate;
+      break;
+    }
+  }
+  if (out.hd_dir.empty()) return false;
+  out.cache_path = HdCachePath(out.tile_px);
+  out.stamp = ToUtf8(HdStamp(out.hd_dir));
+
+  // The icon size, read here rather than in the builder: it comes out of the
+  // archives this object owns, and a worker thread must not touch those.
+  char path[128] = {};
+  if (source_ && pf_portrait_path(PF_TILESET_FOREST, path, sizeof(path)) > 0) {
+    size_t length = 0;
+    if (uint8_t* bytes = pf_data_source_read(source_, path, &length)) {
+      if (pf_sprite* classic = pf_sprite_open_memory(bytes, length, nullptr)) {
+        out.icon_w = pf_sprite_width(classic);
+        out.icon_h = pf_sprite_height(classic);
+        pf_sprite_free(classic);
+      }
+      pf_buffer_free(bytes);
+    }
+  }
+  return true;
+}
+
+void GameData::AdoptHdCache(pf_hd_cache* cache, int tile_px) {
+  if (hd_cache_ && hd_cache_ != cache) pf_hd_cache_free(hd_cache_);
+  hd_cache_ = cache;
+  hd_ready_ = cache != nullptr && pf_hd_cache_sprite_count(cache) > 0;
+  hd_tile_px_ = hd_ready_ ? tile_px : 0;
+}
+
+#endif   // PF_ENABLE_HD_ART
+
 pf_ai_scripts* GameData::OpenAiScripts() {
   if (!source_) return nullptr;
   return pf_ai_scripts_open_source(source_, nullptr);
 }
 
-pf_sprite* GameData::OpenPortraits(int tileset) {
+pf_sprite* GameData::OpenPortraits(int tileset, int owner) {
+#ifdef PF_ENABLE_HD_ART
+  // The Remastered icons when they are in use. `HUD/Portrait-face` holds all
+  // four tilesets keyed by name, and a sheet is built per owner because these
+  // carry their colour in the pixels rather than in a palette.
+  if (hd_ready_ && hd_cache_) {
+    if (pf_sprite* hd = pf_hd_cache_portraits(hd_cache_, tileset, owner, nullptr)) {
+      return hd;
+    }
+  }
+#endif
   if (!source_) return nullptr;
   char path[128] = {};
   if (pf_portrait_path(tileset, path, sizeof(path)) <= 0) return nullptr;
@@ -448,7 +729,17 @@ pf_sprite* GameData::OpenPortraits(int tileset) {
   return sheet;
 }
 
-pf_sprite* GameData::OpenUnitSprite(int unit_id, int tileset) {
+pf_sprite* GameData::OpenUnitSprite(int unit_id, int tileset, int owner) {
+#ifdef PF_ENABLE_HD_ART
+  // The Remastered artwork first when it is in use. A unit it has nothing for
+  // falls through to the game's own sprite rather than drawing nothing, which
+  // is why the Circle of Power still appears.
+  if (hd_ready_ && hd_cache_) {
+    if (pf_sprite* hd = pf_hd_cache_sprite(hd_cache_, unit_id, owner, nullptr)) {
+      return hd;
+    }
+  }
+#endif
   if (!source_) return nullptr;
   pf_sprite* sprite = pf_sprite_open_source(source_, unit_id, tileset, nullptr);
   if (!sprite && tileset != 0) {

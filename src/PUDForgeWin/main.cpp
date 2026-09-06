@@ -18,6 +18,7 @@
 
 #include <algorithm>
 #include <map>
+#include <thread>
 #include <memory>
 #include <string>
 #include <vector>
@@ -311,6 +312,11 @@ enum StatusCell {
 constexpr UINT kMsgOfferCleanup = WM_APP + 1;
 /// The update check has an answer. LPARAM is the UpdateResult, ours to free.
 constexpr UINT kMsgUpdateChecked = WM_APP + 2;
+#ifdef PF_ENABLE_HD_ART
+/// The Remastered artwork has finished importing. LPARAM is the pf_hd_cache,
+/// ours to adopt or free.
+constexpr UINT kMsgHdArtReady = WM_APP + 3;
+#endif
 
 /// One screenful of bullets, past which a message box stops being readable
 /// and starts running off the bottom of the monitor. There are only 110 unit
@@ -924,6 +930,11 @@ struct App : Host {
     if (art) pf_tileset_art_free(art);
     const int tileset = pf_map_tileset(canvas.map());
     art = game.OpenTileset(tileset);
+#ifdef PF_ENABLE_HD_ART
+    // After the tileset is open, because the Remastered tiles are drawn
+    // *through* it: it still says which megatile a tile value means.
+    if (art) game.ApplyHdTerrain(art, tileset);
+#endif
 
     if (sprites) pf_sprite_set_free(sprites);
     sprites = art ? game.OpenSprites(canvas.map(), art) : nullptr;
@@ -939,6 +950,59 @@ struct App : Host {
     units_panel.SetArtwork(&icons, art, tileset);
     minimap.SetMap(canvas.map(), art);
   }
+
+#ifdef PF_ENABLE_HD_ART
+  /// Whether an import is already out. A second one would read the same files
+  /// to build the same cache and then fight the first over which is adopted.
+  bool hd_importing = false;
+
+  /// Match the artwork to the setting, importing in the background if need be.
+  ///
+  /// The import reads and decodes hundreds of megabytes, which is seconds — so
+  /// it happens on a worker and the editor carries on drawing the game's own
+  /// sprites until it lands. The worker is handed everything it needs by
+  /// value: it touches no archive and no member, because those belong to this
+  /// thread. See GameData::BuildHdCache.
+  void EnsureHdArt() {
+    if (!canvas.map()) return;
+    if (editor.hd_art_tile_px <= 0) {
+      // Turned off. Put the game's own artwork back, if it was not already.
+      if (!game.hd_ready()) return;
+      game.AdoptHdCache(nullptr, 0);
+      LoadArtwork();
+      canvas.Invalidate();
+      return;
+    }
+    if (game.hd_ready() || hd_importing) return;
+
+    GameData::HdRequest request;
+    if (!game.PrepareHdRequest(editor.hd_art_tile_px, request)) return;
+    hd_importing = true;
+    const HWND target = main;
+    std::thread([target, request]() {
+      pf_hd_cache* built = GameData::BuildHdCache(request);
+      // Posted rather than sent: this thread must not wait on the one drawing,
+      // and a window that has gone means nothing is left to tell.
+      if (!PostMessageW(target, kMsgHdArtReady, 0, LPARAM(built)) && built) {
+        pf_hd_cache_free(built);
+      }
+    }).detach();
+  }
+
+  /// The worker is done. Adopting is this thread's job because everything that
+  /// draws from the cache runs here.
+  void OnHdArtReady(pf_hd_cache* cache) {
+    hd_importing = false;
+    if (!cache) return;                       // no HD artwork; nothing changes
+    if (editor.hd_art_tile_px <= 0) {         // turned off while it worked
+      pf_hd_cache_free(cache);
+      return;
+    }
+    game.AdoptHdCache(cache, editor.hd_art_tile_px);
+    LoadArtwork();
+    canvas.Invalidate();
+  }
+#endif
 
   void AdoptMap(pf_map* map, const std::wstring& file) {
     path = file;
@@ -1274,6 +1338,22 @@ struct App : Host {
   void GiveSelectionTo(int owner) {
     const char* name = pf_player_name(owner);
     const std::wstring who = name ? FromUtf8(name) : Str(IDS_THAT_PLAYER);
+    // An armed paste answers first. The units are already chosen and the only
+    // thing still open is who they are for, which is a stronger reading of the
+    // key than either of the two below — and the alternative was giving them
+    // away one keystroke after they landed.
+    if (editor.pasting()) {
+      const int n = editor.RetargetClipboard(owner);
+      if (n > 0) {
+        OnStatus(Format(Plural(n, IDS_PASTING_FOR_ONE, IDS_PASTING_FOR_MANY), n,
+                        who.c_str()),
+                 false);
+        OnEditorChanged();
+        return;
+      }
+      // A fragment of terrain carries nobody, so the key means what it always
+      // meant and falls through.
+    }
     if (editor.tool() == Tool::kPlace || !editor.HasSelection()) {
       // With the placement tool in hand, or with nothing selected, the same key
       // means "who is the next unit for" — the reading the units panel already
@@ -1727,8 +1807,16 @@ struct App : Host {
 
       case IDM_TOOLS_OPTIONS: {
         bool reset = false;
+#ifdef PF_ENABLE_HD_ART
+        const int hd_before = editor.hd_art_tile_px;
+#endif
         const bool changed = ShowOptions(main, instance, editor, &unit_art,
                                          &vary_facing, &unit_sounds, &reset);
+#ifdef PF_ENABLE_HD_ART
+        // Which artwork is drawn is not a display toggle the panels can
+        // refresh: the sprites and the tileset both have to be opened again.
+        if (editor.hd_art_tile_px != hd_before) EnsureHdArt();
+#endif
         // The running window keeps the layout it has — moving everything under
         // somebody mid-edit is worse than waiting for the restart the dialog
         // told them about. What must not happen is writing it all back out on
@@ -2314,6 +2402,15 @@ LRESULT CALLBACK MainProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
       else delete reinterpret_cast<UpdateResult*>(lparam);
       return 0;
 
+#ifdef PF_ENABLE_HD_ART
+    case kMsgHdArtReady:
+      // Freed here when there is no app left to take it, for the same reason
+      // the update result is: the worker handed ownership over with the post.
+      if (app) app->OnHdArtReady(reinterpret_cast<pf_hd_cache*>(lparam));
+      else if (lparam) pf_hd_cache_free(reinterpret_cast<pf_hd_cache*>(lparam));
+      return 0;
+#endif
+
     case WM_DROPFILES: {
       if (!app) break;
       auto drop = reinterpret_cast<HDROP>(wparam);
@@ -2506,6 +2603,11 @@ int APIENTRY wWinMain(HINSTANCE instance, HINSTANCE, LPWSTR, int show) {
   // The size and the settings the last run was left with. Restored after the
   // map is open so the toggles land on a window that has something in it.
   app.RestoreSettings();
+#ifdef PF_ENABLE_HD_ART
+  // After the settings, because the setting is what decides it, and after the
+  // map, because the sprites it loads are the map's.
+  app.EnsureHdArt();
+#endif
 
   // After the game folder, not before: adopting it installs the game's own
   // string table, and this menu writes a hundred unit names into a resource

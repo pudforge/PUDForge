@@ -564,6 +564,9 @@ INT_PTR CALLBACK OptionsProc(HWND dialog, UINT message, WPARAM wparam, LPARAM lp
       set(IDC_OPT_MARK_SPECIAL, ed.mark_special_units);
       set(IDC_OPT_ALL_RACES, ed.show_all_races);
       set(IDC_OPT_UNUSED_UNITS, ed.offer_unused_units);
+#ifdef PF_ENABLE_HD_ART
+      set(IDC_OPT_HD_ART, ed.hd_art_tile_px > 0);
+#endif
       set(IDC_OPT_FACING, sheet->vary_facing && *sheet->vary_facing);
       set(IDC_OPT_SOUNDS, sheet->unit_sounds && *sheet->unit_sounds);
       HWND art = GetDlgItem(dialog, IDC_OPT_UNIT_ART);
@@ -591,6 +594,11 @@ INT_PTR CALLBACK OptionsProc(HWND dialog, UINT message, WPARAM wparam, LPARAM lp
         ed.mark_special_units = get(IDC_OPT_MARK_SPECIAL);
         ed.show_all_races = get(IDC_OPT_ALL_RACES);
         ed.offer_unused_units = get(IDC_OPT_UNUSED_UNITS);
+#ifdef PF_ENABLE_HD_ART
+        // 64 rather than 1 so the value keeps meaning a tile size, which is
+        // what it will be asked for once the renderer can compose at one.
+        ed.hd_art_tile_px = get(IDC_OPT_HD_ART) ? 64 : 0;
+#endif
         ed.ApplyPlacementOption();
         if (sheet->vary_facing) *sheet->vary_facing = get(IDC_OPT_FACING);
         if (sheet->unit_sounds) *sheet->unit_sounds = get(IDC_OPT_SOUNDS);

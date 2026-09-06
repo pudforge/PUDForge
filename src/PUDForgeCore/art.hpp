@@ -67,6 +67,32 @@ class TilesetArt {
   /// Rasterise a megatile as 32x32 packed RGBA into `out` at `stride` px/row.
   bool draw_megatile(int megatile, uint32_t* out, int stride, int ox = 0, int oy = 0) const;
 
+  /// The same, at `size` pixels a side.
+  ///
+  /// Drawn straight when artwork of that size is in — the Remastered tiles,
+  /// which are cut to whatever the cache was built at — and otherwise scaled
+  /// up from the tileset's own 32, which keeps a map drawable at any tile
+  /// size rather than only the ones the HD sheets cover.
+  bool draw_megatile_at(int megatile, int size, uint32_t* out, int stride, int ox,
+                        int oy) const;
+
+  /// The size the HD tiles in here were cut for, or 0 when there are none.
+  int hd_tile_size() const { return hd_tiles_.empty() ? 0 : hd_size_; }
+
+  /// Draw these pixels for megatiles instead of the tileset's own.
+  ///
+  /// The Remastered artwork, already cut and scaled. An overlay rather than a
+  /// second kind of TilesetArt because everything *else* this class answers —
+  /// which megatile a tile value means, the palette a sprite is tinted
+  /// through, the averages a minimap is drawn from — is structure the HD
+  /// sheets do not carry and the classic files do.
+  ///
+  /// `pixels` holds `count` images of `size` by `size`, by megatile index
+  /// rather than by atlas frame. Ignored unless `size` is kTilePx, which is
+  /// what the renderer composes at.
+  void use_hd_tiles(std::vector<uint32_t> pixels, int size, int count);
+  bool has_hd_tiles() const { return !hd_tiles_.empty(); }
+
   /// Mean colour of a megatile, for minimaps and zoomed-out views.
   uint32_t average(int megatile) const;
 
@@ -96,6 +122,9 @@ class TilesetArt {
   uint32_t palette_[256] = {};
   /// The palette as loaded. `palette_` is this with the water band rotated.
   uint32_t base_palette_[256] = {};
+  std::vector<uint32_t> hd_tiles_;   ///< set by use_hd_tiles
+  int hd_count_ = 0;
+  int hd_size_ = 0;
   int water_phase_ = 0;
   int megatile_count_ = 0;
   int minitile_count_ = 0;
@@ -111,13 +140,41 @@ class Sprite {
   /// Decode from bytes the caller already has, for hosts with no filesystem.
   static Sprite* open_bytes(std::vector<uint8_t> bytes);
 
+  /// Wrap frames that are already pixels, rather than a `.grp` to decode.
+  ///
+  /// The Remastered artwork arrives this way: cut out of a PNG atlas and
+  /// scaled long before anything asks to draw it. Making it a Sprite rather
+  /// than a second kind of thing is what lets the sprite set, the renderer
+  /// and every caller of draw_frame stay exactly as they are.
+  ///
+  /// `pixels` holds `frames` images of `width` by `height`, back to back.
+  /// `tile_px` is the tile size the frames were drawn for, so a renderer
+  /// composing at another one knows how far to scale them.
+  static Sprite* open_rgba(std::vector<uint32_t> pixels, int width, int height,
+                           int frames, int tile_px);
+
   int width() const { return width_; }
   int height() const { return height_; }
-  int frame_count() const { return int(frames_.size()); }
+  /// Frames, whichever backing this sprite has. A .grp counts its own frame
+  /// table; pixels count what open_rgba was handed.
+  int frame_count() const {
+    return rgba_.empty() ? int(frames_.size()) : rgba_frames_;
+  }
 
   /// Rasterise a frame into packed RGBA on the full canvas. Untouched pixels
   /// are left alone, so clear `out` first.
+  ///
+  /// `palette` is what a `.grp`'s indices mean and is ignored by a sprite that
+  /// is already pixels, which may pass null.
   bool draw_frame(int index, const uint32_t* palette, uint32_t* out) const;
+
+  /// Whether this sprite is pixels rather than palette indices, which decides
+  /// whether an owner's colour can be swapped into it.
+  bool is_rgba() const { return !rgba_.empty(); }
+
+  /// The tile size this sprite's pixels were drawn for. kTilePx for a `.grp`,
+  /// which is what the game drew them at.
+  int tile_px() const { return rgba_.empty() ? kTilePx : rgba_tile_px_; }
 
  private:
   struct Frame {
@@ -125,6 +182,9 @@ class Sprite {
     uint32_t offset;
   };
   std::vector<uint8_t> bytes_;
+  std::vector<uint32_t> rgba_;    ///< set instead of bytes_ by open_rgba
+  int rgba_frames_ = 0;
+  int rgba_tile_px_ = kTilePx;
   std::vector<Frame> frames_;
   int width_ = 0;
   int height_ = 0;

@@ -543,6 +543,10 @@
 #define IDS_MISPLACED_MORE_ONE     1917
 #define IDS_MISPLACED_MORE_MANY    1918
 
+/* A number key retargets an armed paste rather than the selection. */
+#define IDS_PASTING_FOR_ONE        1919
+#define IDS_PASTING_FOR_MANY       1920
+
 #define IDS_DECORATED_REMOVED_ONE  1856
 #define IDS_DECORATED_REMOVED_MANY 1857
 

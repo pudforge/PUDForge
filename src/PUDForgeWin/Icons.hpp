@@ -34,6 +34,10 @@ struct Icon {
   /// that is often the only way to tell two units apart.
   bool fill = false;
   std::vector<uint32_t> px;
+  /// The map tile size this artwork was drawn for, so a caller scaling it to
+  /// the screen divides by the right number. 32 for the game's own sprites,
+  /// larger for the Remastered artwork.
+  int tile_px = 32;
   bool empty() const { return px.empty(); }
 };
 
@@ -149,7 +153,16 @@ class IconCache {
   GameData* game_ = nullptr;
   const pf_tileset_art* art_ = nullptr;
   int tileset_ = -1;
+  /// The icon sheet an owner's icons are cut from.
+  ///
+  /// One sheet answered for every player while the icons came out of the
+  /// game's own artwork, which is palette-indexed and tinted as it is drawn.
+  /// The Remastered icons carry their colour in the pixels instead, so there
+  /// is a sheet per owner and it is built the first time that owner asks.
+  pf_sprite* SheetFor(int owner);
+
   pf_sprite* sheet_ = nullptr;
+  std::unordered_map<int, pf_sprite*> owner_sheets_;
   std::unordered_map<int, Icon> frames_;
   std::unordered_map<int, Icon> units_;
   std::unordered_map<int, Icon> sprites_;

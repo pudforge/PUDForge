@@ -414,8 +414,16 @@ bool MapWindow::ComposePatch() {
   return true;
 }
 
+int MapWindow::ComposeTilePx() const {
+  // The artwork decides. Composing at a size nothing is drawn for would only
+  // scale everything up and cost four times the pixels for no more detail.
+  const int hd = art_ ? pf_tileset_art_hd_size(art_) : 0;
+  return hd > 0 ? hd : PF_TILE_PX;
+}
+
 pf_render_options MapWindow::ComposeOptions(int x0, int y0, int cols, int rows) const {
   pf_render_options o = {};
+  o.tile_px = ComposeTilePx();
   o.x0 = x0;
   o.y0 = y0;
   o.cols = cols;
@@ -443,12 +451,16 @@ void MapWindow::Compose() {
   const int overlay = editor_ ? editor_->VisibleOverlay() : PF_OVERLAY_NONE;
   if (!dirty_ && revision == composed_revision_ && x0 == composed_x0_ &&
       y0 == composed_y0_ && cols == composed_cols_ && rows == composed_rows_ &&
-      view_.zoom == composed_zoom_ && overlay == composed_overlay_) {
+      view_.zoom == composed_zoom_ && overlay == composed_overlay_ &&
+      ComposeTilePx() == composed_tile_px_) {
     return;   // nothing moved and nothing changed
   }
   composed_overlay_ = overlay;
 
-  if (ComposePatch()) return;
+  // The patch path walks rows at the composed tile size and was written for
+  // one size only. Composing whole is a little slower and always right, which
+  // is the trade to make until the artwork stops moving.
+  if (ComposeTilePx() == PF_TILE_PX && ComposePatch()) return;
   patch_x1_ = patch_x0_ - 1;   // a full compose covers whatever it named
 
   pf_render_options o = ComposeOptions(x0, y0, cols, rows);
@@ -462,6 +474,7 @@ void MapWindow::Compose() {
   composed_cols_ = cols;
   composed_rows_ = rows;
   composed_zoom_ = view_.zoom;
+  composed_tile_px_ = o.tile_px > 0 ? o.tile_px : PF_TILE_PX;
   composed_revision_ = revision;
   dirty_ = false;
 }
@@ -514,8 +527,8 @@ void MapWindow::OnPaint() {
     return;
   }
 
-  const int src_w = composed_cols_ * 32;
-  const int src_h = composed_rows_ * 32;
+  const int src_w = composed_cols_ * composed_tile_px_;
+  const int src_h = composed_rows_ * composed_tile_px_;
   const int px = pf::view_tile_px(view_);
   int ox = 0, oy = 0;
   pf::view_origin(view_, composed_x0_, composed_y0_, ox, oy);
@@ -909,8 +922,12 @@ void MapWindow::DrawUnitGhost(HDC dc, int type, int owner, int ox, int oy,
 
   const int px = pf::view_tile_px(view_);
   const RECT foot = TileRectToScreen(ox, oy, fw, fh);
-  const int dw = std::max(1, sprite.w * px / kArtTilePx);
-  const int dh = std::max(1, sprite.h * px / kArtTilePx);
+  // Divided by the size this artwork was drawn for, not by a constant: the
+  // Remastered sprites are cut for a bigger tile, and dividing those by 32
+  // draws the ghost at twice the size of the unit it is proposing.
+  const int drawn_at = sprite.tile_px > 0 ? sprite.tile_px : kArtTilePx;
+  const int dw = std::max(1, sprite.w * px / drawn_at);
+  const int dh = std::max(1, sprite.h * px / drawn_at);
   BlitRgbaBlended(dc, foot.left + (fw * px - dw) / 2,
                   foot.top + (fh * px - dh) / 2, dw, dh, sprite.w, sprite.h,
                   sprite.px.data(), kGhostAlpha, ok ? 0 : kRefusedTintRgb,

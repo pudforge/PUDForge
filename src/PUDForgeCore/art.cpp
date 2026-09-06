@@ -135,8 +135,88 @@ void TilesetArt::set_water_phase(int phase) {
   }
 }
 
+void TilesetArt::use_hd_tiles(std::vector<uint32_t> pixels, int size, int count) {
+  // Any square size: the renderer says which one it wants when it draws, and
+  // scales from the tileset's own artwork when these do not match it.
+  if (size <= 0 || count <= 0 ||
+      pixels.size() != size_t(count) * size_t(size) * size_t(size)) {
+    hd_tiles_.clear();
+    hd_count_ = 0;
+    hd_size_ = 0;
+    return;
+  }
+  hd_tiles_ = std::move(pixels);
+  hd_count_ = count;
+  hd_size_ = size;
+}
+
+bool TilesetArt::draw_megatile_at(int megatile, int size, uint32_t* out, int stride,
+                                  int ox, int oy) const {
+  if (megatile < 0 || megatile >= megatile_count_ || !out || size <= 0) return false;
+
+  // Straight through when the artwork in hand is already this size.
+  if (megatile < hd_count_ && hd_size_ == size) {
+    const uint32_t* src =
+        hd_tiles_.data() + size_t(megatile) * size_t(size) * size_t(size);
+    bool drawn = false;
+    for (int y = 0; y < size; y++) {
+      for (int x = 0; x < size; x++) {
+        const uint32_t p = src[size_t(y) * size_t(size) + size_t(x)];
+        if (!(p >> 24)) continue;
+        out[size_t(oy + y) * size_t(stride) + size_t(ox + x)] = p;
+        drawn = true;
+      }
+    }
+    if (drawn) return true;
+  }
+  if (size == kTilePx) return draw_megatile(megatile, out, stride, ox, oy);
+
+  // Otherwise draw it at whatever size it is and scale by whole pixels. It is
+  // the classic artwork being asked for at a size it was never drawn at, so
+  // nearest is the honest answer: blocky, and never blurry.
+  const int from = (megatile < hd_count_ && hd_size_ > 0) ? hd_size_ : kTilePx;
+  std::vector<uint32_t> small(size_t(from) * size_t(from), 0);
+  if (from == kTilePx) {
+    if (!draw_megatile(megatile, small.data(), from, 0, 0)) return false;
+  } else {
+    const uint32_t* src =
+        hd_tiles_.data() + size_t(megatile) * size_t(from) * size_t(from);
+    std::copy(src, src + small.size(), small.begin());
+  }
+  for (int y = 0; y < size; y++) {
+    const int sy = int(int64_t(y) * from / size);
+    for (int x = 0; x < size; x++) {
+      const int sx = int(int64_t(x) * from / size);
+      const uint32_t p = small[size_t(sy) * size_t(from) + size_t(sx)];
+      if (!(p >> 24)) continue;
+      out[size_t(oy + y) * size_t(stride) + size_t(ox + x)] = p;
+    }
+  }
+  return true;
+}
+
 bool TilesetArt::draw_megatile(int megatile, uint32_t* out, int stride, int ox, int oy) const {
   if (megatile < 0 || megatile >= megatile_count_ || !out) return false;
+
+  // The Remastered tiles when they are in and cover this megatile. The blanks
+  // are not in them, and neither is anything past what the atlas held, so
+  // those still come from the tileset's own artwork below.
+  if (megatile < hd_count_ && hd_size_ == kTilePx) {
+    const uint32_t* src =
+        hd_tiles_.data() + size_t(megatile) * size_t(kTilePx) * size_t(kTilePx);
+    bool drawn = false;
+    for (int y = 0; y < kTilePx; y++) {
+      for (int x = 0; x < kTilePx; x++) {
+        const uint32_t p = src[size_t(y) * kTilePx + size_t(x)];
+        if (!(p >> 24)) continue;
+        out[size_t(oy + y) * size_t(stride) + size_t(ox + x)] = p;
+        drawn = true;
+      }
+    }
+    if (drawn) return true;
+    // An entirely transparent tile is one the atlas did not really hold; fall
+    // through rather than leave a hole in the map.
+  }
 
   for (int sub = 0; sub < kMegatileRefs; sub++) {
     // A `vx4` reference is the minitile index in the top 14 bits and a
@@ -260,8 +340,35 @@ Sprite* Sprite::open(const std::string& dir, int unit_id, int tileset) {
   return nullptr;
 }
 
+Sprite* Sprite::open_rgba(std::vector<uint32_t> pixels, int width, int height,
+                          int frames, int tile_px) {
+  if (width <= 0 || height <= 0 || frames <= 0 || tile_px <= 0) return nullptr;
+  if (pixels.size() != size_t(width) * size_t(height) * size_t(frames)) return nullptr;
+  auto* sprite = new Sprite();
+  sprite->width_ = width;
+  sprite->height_ = height;
+  sprite->rgba_frames_ = frames;
+  sprite->rgba_tile_px_ = tile_px;
+  sprite->rgba_ = std::move(pixels);
+  return sprite;
+}
+
 bool Sprite::draw_frame(int index, const uint32_t* palette, uint32_t* out) const {
-  if (index < 0 || size_t(index) >= frames_.size() || !palette || !out) return false;
+  if (!out) return false;
+  if (!rgba_.empty()) {
+    // Already pixels: the palette means nothing, and the frame is a copy.
+    if (index < 0 || index >= rgba_frames_) return false;
+    const size_t stride = size_t(width_) * size_t(height_);
+    const uint32_t* src = rgba_.data() + size_t(index) * stride;
+    // Transparent pixels are left alone rather than written, which is the
+    // same promise the .grp path makes: the caller may be drawing onto
+    // something it wants to keep.
+    for (size_t i = 0; i < stride; i++) {
+      if (src[i] >> 24) out[i] = src[i];
+    }
+    return true;
+  }
+  if (index < 0 || size_t(index) >= frames_.size() || !palette) return false;
   const Frame& f = frames_[size_t(index)];
   if (size_t(f.offset) + size_t(f.h) * 2 > bytes_.size()) return false;
 

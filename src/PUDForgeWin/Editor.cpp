@@ -20,6 +20,8 @@ const char* PlacementReason(int code) {
              "cannot work it";
     case PF_PLACE_OFF_GRID:
       return "sits on a two-tile grid, so it cannot start on an odd tile";
+    case PF_PLACE_TOO_NEAR_OIL:
+      return "needs four tiles of clearance from oil";
     default: return "cannot stand there";
   }
 }
@@ -202,6 +204,15 @@ const std::vector<Editor::Option>& Editor::SavedOptions() {
       {"MarkSpecial", 0,
        [](const Editor& e) { return int(e.mark_special_units); },
        [](Editor& e, int v) { e.mark_special_units = v != 0; }},
+
+#ifdef PF_ENABLE_HD_ART
+      // Which artwork the canvas draws, as the tile size it is cached at. Not
+      // a tick: 0, 64 and 96 are off, 200% and 300%, and the number is what
+      // the memory is spent on. Clamped on the way in, so a value from
+      // another build cannot ask for a cache size nothing can make.
+      {"HdArtTilePx", 0, [](const Editor& e) { return e.hd_art_tile_px; },
+       [](Editor& e, int v) { e.hd_art_tile_px = Editor::ClampHdArtTilePx(v); }},
+#endif
 
       // What the palette offers.
       {"ShowAllRaces", 0, [](const Editor& e) { return int(e.show_all_races); },
@@ -885,6 +896,24 @@ int Editor::PasteAt(int x, int y) {
 
 // Each bumps the revision: a preview that rasterised the fragment is now
 // showing the shape it used to be.
+
+int Editor::RetargetClipboard(int owner) {
+  if (!clipboard_ || !pf_player_is_supported(owner)) return 0;
+  int changed = 0;
+  for (int i = 0, n = pf_clipboard_unit_count(clipboard_); i < n; i++) {
+    pf_unit unit{};
+    if (pf_clipboard_unit(clipboard_, i, &unit) != PF_OK) continue;
+    // The position-free half of the rule. TypeForOwner's terrain check needs
+    // to know which tile the unit lands on, and a fragment under the pointer
+    // has not answered that yet — the same reason RetargetPlacingType asks
+    // only CounterpartFor.
+    const int becomes = CounterpartFor(unit.type, owner);
+    if (becomes == unit.type && unit.owner == owner) continue;
+    if (pf_clipboard_set_unit(clipboard_, i, becomes, owner) == PF_OK) changed++;
+  }
+  if (changed) clipboard_revision_++;
+  return changed;
+}
 
 bool Editor::FlipClipboard() {
   if (!clipboard_ || pf_clipboard_flip(clipboard_) != PF_OK) return false;

@@ -33,6 +33,7 @@ bool g_corpus_is_shipped = false;
 std::vector<std::string> g_shipped;
 std::string g_bgs_dir;
 std::string g_unit_dir;
+std::string g_hd_dir;
 
 bool is_shipped(const std::string& path) {
   // Every path the harness holds is generic — forward slashes on Windows too,
@@ -85,6 +86,31 @@ void collect_puds(const std::string& dir, std::vector<std::string>& out) {
     out.push_back(path);
   }
 }
+
+/// Every file under `dir` with this extension, sorted.
+///
+/// Same u8string care as collect_puds above: a path that will not fit the
+/// ANSI code page throws out of path::string(), and the artwork trees are
+/// somebody's install rather than ours to name.
+std::vector<std::string> files_under(const std::string& dir, const char* extension) {
+  std::vector<std::string> out;
+  std::error_code ec;
+  const std::filesystem::path root = std::filesystem::u8path(dir);
+  if (!std::filesystem::is_directory(root, ec)) return out;
+  for (std::filesystem::recursive_directory_iterator it(root, ec), end; it != end;
+       it.increment(ec)) {
+    if (ec) break;
+    if (!it->is_regular_file(ec)) continue;
+    std::string ext = it->path().extension().u8string();
+    for (char& c : ext) c = char(tolower(static_cast<unsigned char>(c)));
+    if (ext != extension) continue;
+    out.push_back(it->path().generic_u8string());
+  }
+  std::sort(out.begin(), out.end());
+  return out;
+}
+
+std::string hd_art_dir() { return g_hd_dir; }
 
 const uint8_t* find_section(const std::vector<uint8_t>& pud, const char* tag,
                             size_t* out_len) {
@@ -153,6 +179,14 @@ void discover(const std::string& root) {
       g_bgs_dir = bgs;
     }
   }
+  // The Remastered artwork, which is PNG atlases rather than the archives
+  // above. Pointed at the same way the corpus is - a junction under
+  // reference/ - so the suite never reaches into Program Files itself and
+  // skips cleanly on a machine that has only the Battle.net edition.
+  // See docs/hd_art.md.
+  const std::string hd = root + "/reference/war2_hd";
+  if (file_exists(hd + "/unit")) g_hd_dir = hd;
+
   const std::string units = root + "/reference/war2_ref/mpq/War2Dat/art/unit/";
   if (file_exists(units + "human/thall.grp") && !is_lfs_pointer(units + "human/thall.grp"))
     g_unit_dir = units;

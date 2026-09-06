@@ -66,9 +66,13 @@ add_library(pudforge STATIC
   PUDForgeCore/overrides/ai_opcodes.cpp
   PUDForgeCore/overrides/unit_footprints.cpp
   PUDForgeCore/overrides/shared_tiles.cpp
+  PUDForgeCore/overrides/shore_centre.cpp
+  PUDForgeCore/overrides/oil_clearance.cpp
   PUDForgeCore/ai_script.cpp
   PUDForgeCore/noise.cpp
   PUDForgeCore/png.cpp
+  PUDForgeCore/png_decode.cpp
+  PUDForgeCore/hd_art.cpp
   PUDForgeCore/capi.cpp
 )
 target_include_directories(pudforge
@@ -219,6 +223,15 @@ if (WIN32)
   # has the measurements.
   option(PF_ENABLE_REPORT "Build Help > Report an Issue, which posts over HTTPS" OFF)
 
+  # The Remastered edition ships its artwork as PNG atlases rather than the
+  # .grp files the Battle.net edition keeps in archives, and reading them is a
+  # module still being built: an import pass, a cache, and a second path
+  # through the drawing code. Off until it is finished, so a release carries
+  # neither the half of it that works nor the setting that offers it. The
+  # decoder it rests on is in the core and builds either way, because a PNG
+  # reader is worth having whatever happens to this.
+  option(PF_ENABLE_HD_ART "Build the Warcraft II Remastered artwork module" OFF)
+
   add_executable(PUDForgeWin WIN32
     PUDForgeWin/main.cpp
     PUDForgeWin/Capture.cpp
@@ -276,6 +289,9 @@ if (WIN32)
   # The source, the library and the definition move together: the definition
   # reaches the resource compiler too, which is what drops the menu item, the
   # dialog and its strings, so an off build carries none of the words either.
+  if (PF_ENABLE_HD_ART)
+    target_compile_definitions(PUDForgeWin PRIVATE PF_ENABLE_HD_ART=1)
+  endif()
   if (PF_ENABLE_REPORT)
     target_sources(PUDForgeWin PRIVATE PUDForgeWin/Report.cpp)
     target_link_libraries(PUDForgeWin PRIVATE winhttp)
