@@ -130,6 +130,20 @@ class GameData {
   double hd_import_seconds() const { return hd_seconds_; }
 #endif
 
+  /// Whether this install has the Remastered artwork to draw from at all.
+  ///
+  /// The setting is offered only where something is behind it. Most installs
+  /// are War2Combat with no Remastered tree beside them, and a tick that
+  /// silently changes nothing is worse than no tick.
+  bool hd_art_available() {
+#ifdef PF_ENABLE_HD_ART
+    HdRequest probe;
+    return PrepareHdRequest(64, probe);
+#else
+    return false;
+#endif
+  }
+
   /// Whether a command icon depends on whose unit it is.
   ///
   /// Only the Remastered icons do. The game's own sheet is palette-indexed and

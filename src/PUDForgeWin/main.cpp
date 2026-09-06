@@ -1811,7 +1811,8 @@ struct App : Host {
         const int hd_before = editor.hd_art_tile_px;
 #endif
         const bool changed = ShowOptions(main, instance, editor, &unit_art,
-                                         &vary_facing, &unit_sounds, &reset);
+                                         &vary_facing, &unit_sounds, &reset,
+                                         game.hd_art_available());
 #ifdef PF_ENABLE_HD_ART
         // Which artwork is drawn is not a display toggle the panels can
         // refresh: the sprites and the tileset both have to be opened again.

@@ -41,6 +41,7 @@ section therefore covers all the commits after the previous tag.
 
 **New**
 
+- Use the Warcraft II Remastered artwork. Options, Artwork.
 - Press a number key while you paste to put the units on that player.
 
 **Fixed**

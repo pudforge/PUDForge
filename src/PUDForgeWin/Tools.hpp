@@ -58,8 +58,11 @@ bool ShowExportPng(HWND owner, HINSTANCE instance, Editor& editor,
 /// remembered setting be forgotten. The caller has to stop saving on exit, which
 /// only it can do.
 /// @return whether anything changed
+/// `hd_available` greys the Remastered artwork tick where the install has no
+/// Remastered tree to read, which is most of them.
 bool ShowOptions(HWND owner, HINSTANCE instance, Editor& editor, int* unit_art,
-                 bool* vary_facing, bool* unit_sounds, bool* reset);
+                 bool* vary_facing, bool* unit_sounds, bool* reset,
+                 bool hd_available = false);
 
 /// Whether the client has been reset this session, so nothing it remembers is
 /// written back out.

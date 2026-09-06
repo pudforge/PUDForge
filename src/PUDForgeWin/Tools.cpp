@@ -527,6 +527,7 @@ INT_PTR CALLBACK PngProc(HWND dialog, UINT message, WPARAM wparam, LPARAM lparam
 
 struct OptionSheet {
   Editor* editor = nullptr;
+  bool hd_available = false;
   int* unit_art = nullptr;
   bool* vary_facing = nullptr;
   bool* unit_sounds = nullptr;
@@ -565,7 +566,11 @@ INT_PTR CALLBACK OptionsProc(HWND dialog, UINT message, WPARAM wparam, LPARAM lp
       set(IDC_OPT_ALL_RACES, ed.show_all_races);
       set(IDC_OPT_UNUSED_UNITS, ed.offer_unused_units);
 #ifdef PF_ENABLE_HD_ART
-      set(IDC_OPT_HD_ART, ed.hd_art_tile_px > 0);
+      set(IDC_OPT_HD_ART, ed.hd_art_tile_px > 0 && sheet->hd_available);
+      // Greyed rather than hidden: the reason the artwork is unavailable is
+      // that the install has no Remastered tree, and a tick that is visibly
+      // there but off says that where a missing one says nothing.
+      EnableWindow(GetDlgItem(dialog, IDC_OPT_HD_ART), sheet->hd_available);
 #endif
       set(IDC_OPT_FACING, sheet->vary_facing && *sheet->vary_facing);
       set(IDC_OPT_SOUNDS, sheet->unit_sounds && *sheet->unit_sounds);
@@ -1478,9 +1483,11 @@ bool ShowGameSetup(HWND owner, HINSTANCE instance, GameData& game, bool required
 }
 
 bool ShowOptions(HWND owner, HINSTANCE instance, Editor& editor, int* unit_art,
-                 bool* vary_facing, bool* unit_sounds, bool* reset) {
+                 bool* vary_facing, bool* unit_sounds, bool* reset,
+                 bool hd_available) {
   OptionSheet sheet;
   sheet.editor = &editor;
+  sheet.hd_available = hd_available;
   sheet.unit_art = unit_art;
   sheet.vary_facing = vary_facing;
   sheet.unit_sounds = unit_sounds;

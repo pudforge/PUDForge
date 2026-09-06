@@ -30,8 +30,11 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      # The Remastered artwork module is in the shipped build. It reads the
+      # user's own install and is off until they turn it on, so a machine
+      # without Remastered gets the client it always had.
       - name: Configure
-        run: cmake -S src -B build -DCMAKE_BUILD_TYPE=Release
+        run: cmake -S src -B build -DCMAKE_BUILD_TYPE=Release -DPF_ENABLE_HD_ART=ON
 
       - name: Build
         run: cmake --build build --config Release
