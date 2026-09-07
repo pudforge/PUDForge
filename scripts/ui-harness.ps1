@@ -156,6 +156,17 @@ function Start-PfEditor {
     Start-Sleep -Milliseconds 40
   }
   if ($main -eq [IntPtr]::Zero) { throw "No PUDForgeMain window after $TimeoutSeconds s." }
+  # The window exists before it is laid out, and a canvas of no area captures
+  # as "window has no area". Waiting for the canvas to have size is waiting
+  # for the client to be ready to be driven, which is what a caller means.
+  if ($Map) {
+    while ($sw.Elapsed.TotalSeconds -lt $TimeoutSeconds) {
+      $canvas = Get-PfChildren $main |
+        Where-Object { $_.Class -eq 'PUDForgeMap' -and $_.W -gt 0 -and $_.H -gt 0 }
+      if ($canvas) { break }
+      Start-Sleep -Milliseconds 50
+    }
+  }
   [pscustomobject]@{
     Process = $proc
     Main    = $main
@@ -189,6 +200,21 @@ function Get-PfChildren {
 .SYNOPSIS
   The map canvas. Everything that paints a map is drawn on this one child.
 #>
+<#
+.SYNOPSIS
+  The visible property form on a tabbed sheet.
+.DESCRIPTION
+  Every page's form is a child of the sheet whether or not it is on top, so
+  the one to read is the one that is showing.
+#>
+function Get-PfForm {
+  param([Parameter(Mandatory)][IntPtr]$Window)
+  $hit = Get-PfChildren $Window |
+    Where-Object { $_.Class -eq 'PUDForgeForm' -and $_.Visible } | Select-Object -First 1
+  if (-not $hit) { throw "No visible PUDForgeForm on this sheet." }
+  $hit.Handle
+}
+
 function Get-PfCanvas {
   param([Parameter(Mandatory)]$App)
   $hit = Get-PfChildren $App.Main | Where-Object { $_.Class -eq 'PUDForgeMap' } | Select-Object -First 1
@@ -385,6 +411,63 @@ function Get-PfText {
   $buf = New-Object Text.StringBuilder 2048
   [void][PfWin]::SendMessage($Window, [uint32]$script:WM.GETTEXT, [IntPtr]2048, $buf)
   $buf.ToString()
+}
+
+<#
+.SYNOPSIS
+  Read an edit control's value across a process, which WM_GETTEXT will not do.
+.DESCRIPTION
+  An Edit in another process answers WM_GETTEXT with an empty string here, so
+  this asks UI Automation instead, which is built for reading another process
+  and needs no focus. Static and Button text comes back fine from
+  GetWindowText, so this is only for fields the user types in.
+#>
+function Get-PfValue {
+  param([Parameter(Mandatory)][IntPtr]$Window)
+  Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes -ErrorAction SilentlyContinue
+  $el = [Windows.Automation.AutomationElement]::FromHandle($Window)
+  if (-not $el) { return $null }
+  $pattern = $null
+  if ($el.TryGetCurrentPattern([Windows.Automation.ValuePattern]::Pattern, [ref]$pattern)) {
+    return $pattern.Current.Value
+  }
+  # A combo box answers through its selection rather than a value.
+  if ($el.TryGetCurrentPattern([Windows.Automation.SelectionPattern]::Pattern, [ref]$pattern)) {
+    $sel = $pattern.Current.GetSelection()
+    if ($sel.Length) { return $sel[0].Current.Name }
+  }
+  $el.Current.Name
+}
+
+<#
+.SYNOPSIS
+  Pair a property form's labels with the controls they name.
+.DESCRIPTION
+  PUDForgeForm builds its rows at run time, so the fields have no ids worth
+  naming - the label is a Static with id 0 and the field is whatever input
+  control comes next. Reading them in z-order and pairing them is how a test
+  asks for "Gold Cost" instead of "the edit with id 105", which would change
+  the moment a row is inserted above it.
+#>
+function Get-PfFormFields {
+  param([Parameter(Mandatory)][IntPtr]$Window)
+  $fields = [ordered]@{}
+  $label = $null
+  # Visible only. A tabbed sheet keeps every page's controls as children and
+  # hides the ones not on top, so an unfiltered walk pairs labels from a tab
+  # nobody is looking at - which is how "Gold Cost" comes back as a checkbox
+  # from the Restrictions page.
+  foreach ($c in (Get-PfChildren $Window | Where-Object { $_.Visible })) {
+    if ($c.Class -eq 'Static') {
+      if ($c.Text -and $c.Text.Trim()) { $label = $c.Text.Trim() }
+      continue
+    }
+    if ($c.Class -in @('Edit', 'Button', 'ComboBox') -and $label) {
+      if (-not $fields.Contains($label)) { $fields[$label] = $c }
+      $label = $null
+    }
+  }
+  $fields
 }
 
 <#
