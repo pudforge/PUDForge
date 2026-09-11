@@ -139,6 +139,11 @@ BEGIN
   IDS_OWNED_BY_MANY     "%d units owned by %ls"
   IDS_GIVEN_TO_ONE      "%d unit given to %ls"
   IDS_GIVEN_TO_MANY     "%d units given to %ls"
+  IDS_NOW_ACTIVE_ONE    "%d unit is now active"
+  IDS_NOW_ACTIVE_MANY   "%d units are now active"
+  IDS_NOW_PASSIVE_ONE   "%d unit is now passive"
+  IDS_NOW_PASSIVE_MANY  "%d units are now passive"
+  IDS_ACTIVITY_NEEDS_UNITS "Select some units first, then set them active or passive"
   IDS_PLACING_FOR       "Placing for %ls"
   /* A number key while a paste is armed: the fragment changes hands before it
      lands, so the line says how many units went and to whom. */

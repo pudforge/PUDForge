@@ -95,6 +95,11 @@ BEGIN
     BEGIN
       MENUITEM "Player 1",                 IDM_EDIT_OWNER_FIRST
     END
+    // A unit the game starts moving, or one that waits to be provoked. Two
+    // entries rather than one toggle: with a mixed selection a toggle has no
+    // answer to give, and these two always do.
+    MENUITEM "Set Acti&ve	Ctrl+Shift+A",  IDM_EDIT_SET_ACTIVE
+    MENUITEM "Set Passi&ve	Ctrl+Shift+P", IDM_EDIT_SET_PASSIVE
     MENUITEM SEPARATOR
     // The two select tools. They live on the toolbar, which is a row of
     // pictures with no keys written on it, so this is where somebody finds out
@@ -143,6 +148,9 @@ BEGIN
       MENUITEM "&Tile IDs",                IDM_VIEW_LAYER_TILES
     END
     MENUITEM "Tile &Grid\tG",              IDM_VIEW_GRID
+    // Not in the Layer submenu: those three replace one another, and this
+    // marks units rather than tiles, so it composes with whichever is on.
+    MENUITEM "&Active and Passive\tA",     IDM_VIEW_ACTIVITY
     MENUITEM "Animate the &Water",         IDM_VIEW_WATER
     MENUITEM "Sight and Range of the s&elected unit(s)", IDM_VIEW_REACH
     MENUITEM SEPARATOR
@@ -326,6 +334,11 @@ BEGIN
   "G",      IDM_MAP_UPGRADES,      VIRTKEY, CONTROL, SHIFT
   "N",      IDM_MAP_RESTRICTIONS,  VIRTKEY, CONTROL, SHIFT
   "I",      IDM_MAP_STATS,         VIRTKEY, CONTROL, SHIFT
+  // Ctrl+A is Select All, so the pair takes Shift as well. "A" on its own
+  // shows the states rather than setting one, which is the safe key to hit.
+  "A",      IDM_EDIT_SET_ACTIVE,   VIRTKEY, CONTROL, SHIFT
+  "P",      IDM_EDIT_SET_PASSIVE,  VIRTKEY, CONTROL, SHIFT
+  "A",      IDM_VIEW_ACTIVITY,     VIRTKEY
   // The eight playable slots, where the hand already is. 0 is taken by zoom
   // to fit, so 9 and 10 stay menu-only.
   "1",      IDM_EDIT_OWNER_FIRST,     VIRTKEY
@@ -793,9 +806,9 @@ END
 // is also why the buttons below are written twice: a dialog template cannot
 // move a control conditionally, only carry two versions of the line.
 #ifdef PF_ENABLE_HD_ART
-IDD_OPTIONS DIALOGEX 0, 0, 250, 280
+IDD_OPTIONS DIALOGEX 0, 0, 250, 266
 #else
-IDD_OPTIONS DIALOGEX 0, 0, 250, 254
+IDD_OPTIONS DIALOGEX 0, 0, 250, 240
 #endif
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "Options"
@@ -806,47 +819,46 @@ BEGIN
   AUTOCHECKBOX    "Adjust edges when &pasting", IDC_OPT_FIT_PASTE, 16, 34, 218, 10
   AUTOCHECKBOX    "&Keep units the terrain no longer supports", IDC_OPT_KEEP_STRANDED, 16, 48, 218, 10
 
-  GROUPBOX        "Unit placement", -1, 8, 74, 234, 76
+  GROUPBOX        "Unit placement", -1, 8, 74, 234, 62
   AUTOCHECKBOX    "Allow placing units at &illegal positions", IDC_OPT_ILLEGAL, 16, 88, 218, 10
   AUTOCHECKBOX    "Allow units on top of each &other", IDC_OPT_STACKED, 16, 102, 218, 10
-  AUTOCHECKBOX    "Allow units on the map &edge", IDC_OPT_EDGE, 16, 116, 218, 10
-  AUTOCHECKBOX    "&Mark special units", IDC_OPT_MARK_SPECIAL, 16, 130, 218, 10
+  AUTOCHECKBOX    "&Mark special units", IDC_OPT_MARK_SPECIAL, 16, 116, 218, 10
 
-  GROUPBOX        "Unit display", -1, 8, 156, 234, 72
-  LTEXT           "&Unit artwork", -1, 16, 170, 50, 8
-  COMBOBOX        IDC_OPT_UNIT_ART, 70, 168, 80, 60, CBS_DROPDOWNLIST | WS_TABSTOP
-  AUTOCHECKBOX    "&Vary rotation", IDC_OPT_FACING, 158, 170, 76, 10
+  GROUPBOX        "Unit display", -1, 8, 142, 234, 72
+  LTEXT           "&Unit artwork", -1, 16, 156, 50, 8
+  COMBOBOX        IDC_OPT_UNIT_ART, 70, 154, 80, 60, CBS_DROPDOWNLIST | WS_TABSTOP
+  AUTOCHECKBOX    "&Vary rotation", IDC_OPT_FACING, 158, 156, 76, 10
   // Off unless asked for, and it needs the game to hand: the clips are read
   // out of the archives the user already owns, like every other byte of
   // artwork. Nothing in the editor depends on one having been heard.
-  AUTOCHECKBOX    "Play unit &sounds", IDC_OPT_SOUNDS, 16, 184, 218, 10
+  AUTOCHECKBOX    "Play unit &sounds", IDC_OPT_SOUNDS, 16, 170, 218, 10
   // Off by default. With it off the palette follows the chosen player and
   // handing a unit to the other race converts it; see Editor::show_all_races.
-  AUTOCHECKBOX    "Unit Toolbar: Show units from &all races", IDC_OPT_ALL_RACES, 16, 198, 218, 10
+  AUTOCHECKBOX    "Unit Toolbar: Show units from &all races", IDC_OPT_ALL_RACES, 16, 184, 218, 10
   // Off by default, and a warning rather than a preference: five of these are
   // slots the game has no unit for, and a map that places one crashes it. The
   // wall-as-unit ids stay hidden even with this on, because walls are terrain
   // here. See Editor::offer_unused_units.
-  AUTOCHECKBOX    "Offer un&used and special units (may crash the game)", IDC_OPT_UNUSED_UNITS, 16, 212, 218, 10
+  AUTOCHECKBOX    "Offer un&used and special units (may crash the game)", IDC_OPT_UNUSED_UNITS, 16, 198, 218, 10
 
 #ifdef PF_ENABLE_HD_ART
   // A tick rather than a choice of size, because a size is a promise this
   // cannot yet keep: the renderer composes at one tile size, so the artwork is
   // drawn at the size it draws everything. See docs/hd_art.md.
-  GROUPBOX        "Artwork", -1, 8, 234, 234, 26
-  AUTOCHECKBOX    "Use Warcraft II &Remastered artwork", IDC_OPT_HD_ART, 16, 248, 218, 10
+  GROUPBOX        "Artwork", -1, 8, 220, 234, 26
+  AUTOCHECKBOX    "Use Warcraft II &Remastered artwork", IDC_OPT_HD_ART, 16, 234, 218, 10
 
   // Away from OK and Cancel, on the other side of the row: it is the one
   // button on this page that discards something.
-  PUSHBUTTON      "&Reset Everything…", IDC_OPT_RESET, 8, 260, 80, 14
-  DEFPUSHBUTTON   "OK", IDOK, 138, 260, 50, 14
-  PUSHBUTTON      "Cancel", IDCANCEL, 192, 260, 50, 14
+  PUSHBUTTON      "&Reset Everything…", IDC_OPT_RESET, 8, 246, 80, 14
+  DEFPUSHBUTTON   "OK", IDOK, 138, 246, 50, 14
+  PUSHBUTTON      "Cancel", IDCANCEL, 192, 246, 50, 14
 #else
   // Away from OK and Cancel, on the other side of the row: it is the one
   // button on this page that discards something.
-  PUSHBUTTON      "&Reset Everything…", IDC_OPT_RESET, 8, 234, 80, 14
-  DEFPUSHBUTTON   "OK", IDOK, 138, 234, 50, 14
-  PUSHBUTTON      "Cancel", IDCANCEL, 192, 234, 50, 14
+  PUSHBUTTON      "&Reset Everything…", IDC_OPT_RESET, 8, 220, 80, 14
+  DEFPUSHBUTTON   "OK", IDOK, 138, 220, 50, 14
+  PUSHBUTTON      "Cancel", IDCANCEL, 192, 220, 50, 14
 #endif
 END
 

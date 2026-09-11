@@ -37,6 +37,24 @@ section therefore covers all the commits after the previous tag.
 `scripts/prep-release.ps1` collects those commits as a start. See
 `docs/releasing.md`.
 
+## 0.1.78
+
+**New**
+
+- Edit, Set Active and Set Passive change the selected units. Ctrl+Shift+A and
+  Ctrl+Shift+P.
+- View, Active and Passive shows the state of each unit. Press A. Active units
+  get a green box, passive units a blue one.
+
+**Changed**
+
+- A unit that you place is passive.
+- You can put a unit on the map edge. The option for it is gone.
+
+**Fixed**
+
+- The tile grid shows when you use the Remastered artwork.
+
 ## 0.1.77
 
 **New**

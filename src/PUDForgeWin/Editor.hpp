@@ -189,6 +189,9 @@ class Editor {
   /// Painting terrain removes units it strands, unless set.
   bool keep_stranded_units = false;
   bool mark_special_units = false;
+  /// Outline units by their active/passive flag. Off by default: it is a
+  /// thing to turn on while checking a map, not a way to look at one.
+  bool show_activity = false;
 
   /// Offer every race's units in the palette, whatever the chosen player is.
   ///
@@ -231,19 +234,12 @@ class Editor {
   /// Stacking is legal in the format, but placing a second unit on top of one
   /// you cannot see is almost always a slip.
   bool allow_stacked_units() const { return allow_stacked_units_; }
-  /// The shipped maps disagree — 2,939 retail units sit on the outer ring —
-  /// so this guards against accident rather than enforcing the format.
-  bool allow_edge_placement() const { return allow_edge_placement_; }
   void SetAllowIllegalPlacement(bool on) {
     allow_illegal_placement_ = on;
     ApplyPlacementOption();
   }
   void SetAllowStackedUnits(bool on) {
     allow_stacked_units_ = on;
-    ApplyPlacementOption();
-  }
-  void SetAllowEdgePlacement(bool on) {
-    allow_edge_placement_ = on;
     ApplyPlacementOption();
   }
 
@@ -427,6 +423,16 @@ class Editor {
   bool DeleteSelected();
   /// Delete the unit under a tile.
   bool EraseAt(int x, int y);
+  /// Turn every selected unit active or passive, as one undo step.
+  ///
+  /// Resources are left alone: their value is an amount, not a flag. False
+  /// when nothing is selected or every selection already holds that state.
+  bool SetSelectedActivity(int active);
+
+  /// 1 active, 0 passive, -1 when the selection is mixed, empty or all
+  /// resources - which is what the menu reads to put a mark against one item.
+  int SelectedActivity() const;
+
   /// Reassign every selected unit to another player slot.
   ///
   /// With `show_all_races` off this can change *what* the units are as well as
@@ -786,7 +792,6 @@ class Editor {
   int PlaceOneUnit(int x, int y);
   bool allow_illegal_placement_ = false;
   bool allow_stacked_units_ = false;
-  bool allow_edge_placement_ = false;
   void AfterHistoryStep();
   void Bump() { revision_++; }
 

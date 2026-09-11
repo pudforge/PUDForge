@@ -359,14 +359,76 @@ TEST(stacking_is_refused_with_a_reason) {
   pf_map_free(map);
 }
 
-TEST(edge_placement_is_refused_by_default) {
+TEST(the_map_edge_takes_a_unit_like_any_other_tile) {
   pf_map* map = blank();
   Editor ed(map);
   ed.placing_type = 0;
-  CHECK_EQ(ed.PlaceUnit(0, 5), -1);
-  CHECK(ed.last_refusal == "that is on the map edge");
-  ed.SetAllowEdgePlacement(true);
+  // Every side, because the check that used to refuse these tested all four
+  // and a replacement that only tries one proves a quarter of the change.
+  // blank() is 64 x 64, so the outer ring is 0 and 63.
   CHECK(ed.PlaceUnit(0, 5) >= 0);
+  CHECK(ed.PlaceUnit(5, 0) >= 0);
+  CHECK(ed.PlaceUnit(63, 5) >= 0);
+  CHECK(ed.PlaceUnit(5, 63) >= 0);
+  // Off the map is still off the map: bounds are not the edge rule.
+  CHECK_EQ(ed.PlaceUnit(-1, 5), -1);
+  CHECK_EQ(ed.PlaceUnit(5, 64), -1);
+  pf_map_free(map);
+}
+
+TEST(a_selection_turns_active_or_passive_in_one_step) {
+  pf_map* map = blank();
+  Editor ed(map);
+  ed.placing_type = 0;
+  CHECK(ed.PlaceUnit(10, 10) >= 0);
+  CHECK(ed.PlaceUnit(20, 20) >= 0);
+  // Placed passive, which is what the editor now defaults to.
+  CHECK_EQ(ed.SelectedActivity(), -1);            // nothing selected yet
+  ed.SelectAt(10, 10, false);
+  CHECK_EQ(ed.SelectedActivity(), 0);
+
+  CHECK(ed.SetSelectedActivity(1));
+  CHECK_EQ(ed.SelectedActivity(), 1);
+  pf_unit unit{};
+  CHECK_EQ(pf_map_unit(map, pf_map_unit_at(map, 10, 10), &unit), PF_OK);
+  CHECK_EQ(int(unit.value), 1);
+  // Already active, so there is nothing to do and it says so rather than
+  // stacking an undo step that changes nothing.
+  CHECK(!ed.SetSelectedActivity(1));
+
+  CHECK(ed.SetSelectedActivity(0));
+  CHECK_EQ(pf_map_unit(map, pf_map_unit_at(map, 10, 10), &unit), PF_OK);
+  CHECK_EQ(int(unit.value), 0);
+
+  // Two units in different states read as mixed, which is what leaves both
+  // menu entries unticked.
+  ed.SelectAt(20, 20, false);
+  CHECK(ed.SetSelectedActivity(1));
+  ed.SelectAt(10, 10, true);
+  CHECK_EQ(ed.SelectedActivity(), -1);
+  pf_map_free(map);
+}
+
+TEST(setting_activity_leaves_a_resource_alone) {
+  pf_map* map = blank();
+  Editor ed(map);
+  // A gold mine keeps an amount in the same field, so the write that turns a
+  // footman active would otherwise empty it.
+  ed.placing_type = 0x5c;
+  const int mine = ed.PlaceUnit(10, 10);
+  CHECK(mine >= 0);
+  pf_unit before{};
+  CHECK_EQ(pf_map_unit(map, mine, &before), PF_OK);
+  CHECK(before.value > 1);
+
+  ed.SelectAt(10, 10, false);
+  // Nothing to change: the only thing selected is one the flag does not apply
+  // to, so the whole operation is a no-op rather than a quiet corruption.
+  CHECK(!ed.SetSelectedActivity(1));
+  CHECK_EQ(ed.SelectedActivity(), -1);
+  pf_unit after{};
+  CHECK_EQ(pf_map_unit(map, pf_map_unit_at(map, 10, 10), &after), PF_OK);
+  CHECK_EQ(int(after.value), int(before.value));
   pf_map_free(map);
 }
 
@@ -1150,15 +1212,15 @@ TEST(paste_obeys_the_same_placement_rules_as_placing_by_hand) {
   CHECK_EQ(ed.PasteAt(30, 30), 1);
   CHECK_EQ(pf_map_unit_count(map), 2);
 
-  // The map edge, the other rule that used to be invisible to paste.
-  CHECK_EQ(ed.PasteAt(0, 0), 0);
-  CHECK_EQ(pf_map_unit_count(map), 2);
+  // The map edge is no longer a rule, so a paste onto it lands like any other.
+  CHECK_EQ(ed.PasteAt(0, 0), 1);
+  CHECK_EQ(pf_map_unit_count(map), 3);
 
   // And lifting the option lifts it for paste too, which is the point of the
   // rules living in one place: stacking is legal in the format.
   ed.SetAllowStackedUnits(true);
   CHECK_EQ(ed.PasteAt(10, 10), 1);
-  CHECK_EQ(pf_map_unit_count(map), 3);
+  CHECK_EQ(pf_map_unit_count(map), 4);
   pf_map_free(map);
 }
 
@@ -2110,7 +2172,7 @@ TEST(saved_options_round_trip) {
   const char* const expected[] = {
       "Grid", "BrushSize", "BrushShape", "MixShades", "PaintDark", "Variation",
       "FitEdges", "FitPasted", "KeepStranded",
-      "AllowIllegal", "AllowStacked", "AllowEdge", "MarkSpecial",
+      "AllowIllegal", "AllowStacked", "MarkSpecial", "ShowActivity",
       "ShowAllRaces", "OfferUnusedUnits",
   };
   const std::vector<Editor::Option>& options = Editor::SavedOptions();
@@ -2153,11 +2215,10 @@ TEST(saved_options_round_trip) {
     CHECK_EQ(option.get(after), stored[option.name]);
   }
 
-  // The three placement hatches are the map's, not the editor's, so restoring
-  // them has to have reached the core as well.
+  // Both placement hatches are the map's, not the editor's, so restoring them
+  // has to have reached the core as well.
   CHECK_EQ(pf_map_allows_illegal_placement(map), 1);
   CHECK_EQ(pf_map_allows_stacked_units(map), 1);
-  CHECK_EQ(pf_map_allows_edge_placement(map), 1);
   pf_map_free(map);
 }
 

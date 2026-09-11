@@ -471,7 +471,7 @@ TEST(a_resource_says_which_one_it_is_and_what_it_starts_with) {
   // "0 passive 1 active" is the format specification's wording, so a footman
   // the editor places is active. It used to be placed at 0, which made every
   // unit PUDForge ever put down passive.
-  CHECK_EQ(pf_unit_default_value(0x00), 1);
+  CHECK_EQ(pf_unit_default_value(0x00), 0);   // passive, by choice
 }
 
 TEST(unit_sounds_name_files_the_game_actually_ships) {
@@ -1648,8 +1648,9 @@ TEST(units_carry_one_for_the_value_the_editor_writes) {
   // The critter is the control: a unit that never fights holds the same value
   // as a footman, so the field is not telling them apart.
   if (critter[0] + critter[1]) CHECK(critter[1] > critter[0]);
-  // And the part unit_default_value actually rests on: 1 is what a map is made
-  // of, and no map is made of 0.
+  // What the shipped maps hold, which is 1. unit_default_value no longer
+  // follows them - the editor places 0 by choice - but the measurement is the
+  // reason that choice is a choice, so it stays asserted.
   if (editor_maps) {
     CHECK(maps_all_one > 0);
     CHECK_EQ(maps_all_zero, 0);

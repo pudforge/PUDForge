@@ -211,17 +211,25 @@ int name_score(const char* query, const char* name) {
 /// numbers are the shipped maps' own habit: 40,000 gold and 20,000 oil are far
 /// and away the commonest, stored in units of 2,500, so 16 and 8.
 ///
-/// Everything else takes the active/passive flag, and active is 1 — "0 passive
-/// 1 active" is the format specification's wording. The editor placed 0 here,
-/// which made every unit it ever put down passive. The maps say the same thing
-/// the other way round: 6,434 of the 7,014 units the game's own editor placed
-/// hold 1, spread over every type and every owner, and that is what a default
-/// looks like.
+/// Everything else takes the active/passive flag, where "0 passive 1 active"
+/// is the format specification's wording.
+///
+/// Passive, by choice rather than by measurement, and the measurement is kept
+/// here because it points the other way: 6,434 of the 7,014 units the game's
+/// own editor placed hold 1, spread over every type and every owner. A map
+/// built here will differ from one the game's editor built, in a field the
+/// game reads.
+///
+/// What the number does not capture is which way round costs more to fix. A
+/// unit placed active is one that moves the moment the map is loaded, and
+/// putting a map's worth of them back is hand work; a passive unit that should
+/// have been active is a unit that sits still until it is told otherwise.
+/// Units, Set Active turns a selection over in one go either way.
 int unit_default_value(int unit_id, int resource) {
   if (resource == 1) return 16;   // gold, 40,000
   if (resource == 2) return 8;    // oil, 20,000
   (void)unit_id;
-  return 1;
+  return 0;
 }
 
 }  // namespace pf

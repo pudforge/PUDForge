@@ -52,6 +52,11 @@
 #define IDS_OWNED_BY_MANY         1067
 #define IDS_GIVEN_TO_ONE          1068
 #define IDS_GIVEN_TO_MANY         1069
+#define IDS_NOW_ACTIVE_ONE        1921
+#define IDS_NOW_ACTIVE_MANY       1922
+#define IDS_NOW_PASSIVE_ONE       1923
+#define IDS_NOW_PASSIVE_MANY      1924
+#define IDS_ACTIVITY_NEEDS_UNITS  1925
 #define IDS_PLACING_FOR           1070
 #define IDS_PLAYER_N              1071
 #define IDS_STARTS_PLACED_MANY    1072

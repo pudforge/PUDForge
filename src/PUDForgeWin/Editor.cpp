@@ -149,12 +149,11 @@ void Editor::SetVariationPolicy(int policy) {
 
 void Editor::ApplyPlacementOption() {
   if (!map_) return;
-  // All three, because all three are the map's now — the core enforces them on
-  // every way of putting a unit down, including the one that never comes through
-  // this file at all.
+  // Both, because both are the map's now — the core enforces them on every way
+  // of putting a unit down, including the one that never comes through this
+  // file at all.
   pf_map_set_allow_illegal_placement(map_, allow_illegal_placement_ ? 1 : 0);
   pf_map_set_allow_stacked_units(map_, allow_stacked_units_ ? 1 : 0);
-  pf_map_set_allow_edge_placement(map_, allow_edge_placement_ ? 1 : 0);
 }
 
 const std::vector<Editor::Option>& Editor::SavedOptions() {
@@ -198,12 +197,12 @@ const std::vector<Editor::Option>& Editor::SavedOptions() {
       {"AllowStacked", 0,
        [](const Editor& e) { return int(e.allow_stacked_units()); },
        [](Editor& e, int v) { e.SetAllowStackedUnits(v != 0); }},
-      {"AllowEdge", 0,
-       [](const Editor& e) { return int(e.allow_edge_placement()); },
-       [](Editor& e, int v) { e.SetAllowEdgePlacement(v != 0); }},
       {"MarkSpecial", 0,
        [](const Editor& e) { return int(e.mark_special_units); },
        [](Editor& e, int v) { e.mark_special_units = v != 0; }},
+      {"ShowActivity", 0,
+       [](const Editor& e) { return int(e.show_activity); },
+       [](Editor& e, int v) { e.show_activity = v != 0; }},
 
 #ifdef PF_ENABLE_HD_ART
       // Which artwork the canvas draws, as the tile size it is cached at. Not
@@ -963,7 +962,6 @@ std::string Editor::PlacementRefusal(int x, int y, int type,
   // the edge, it is where you pointed.
   if (why == PF_PLACE_OUT_OF_BOUNDS) return "that is outside the map";
   if (why == PF_PLACE_OCCUPIED) return "another unit is already there";
-  if (why == PF_PLACE_ON_EDGE) return "that is on the map edge";
   const char* name = pf_unit_name(type);
   return std::string(name ? name : "that") + " " + PlacementReason(why);
 }
@@ -1251,6 +1249,38 @@ bool Editor::SetSelectedOwner(int owner) {
   }
   if (changed) Bump();
   return changed;
+}
+
+bool Editor::SetSelectedActivity(int active) {
+  if (!map_ || selected_.empty()) return false;
+  Checkpoint();
+  const uint16_t want = uint16_t(active ? 1 : 0);
+  bool changed = false;
+  for (int index : selected_) {
+    pf_unit unit{};
+    if (pf_map_unit(map_, index, &unit) != PF_OK) continue;
+    // A gold mine or an oil patch keeps an amount in this field rather than a
+    // flag, so the same write that turns a footman passive would empty a mine.
+    if (pf_unit_resource(unit.type) != 0) continue;
+    if (unit.value == want) continue;
+    if (pf_map_set_unit_value(map_, index, want) == PF_OK) changed = true;
+  }
+  if (changed) Bump();
+  return changed;
+}
+
+int Editor::SelectedActivity() const {
+  if (!map_) return -1;
+  int seen = -1;
+  for (int index : selected_) {
+    pf_unit unit{};
+    if (pf_map_unit(map_, index, &unit) != PF_OK) continue;
+    if (pf_unit_resource(unit.type) != 0) continue;
+    const int state = unit.value ? 1 : 0;
+    if (seen < 0) seen = state;
+    else if (seen != state) return -1;      // a mixed selection ticks neither
+  }
+  return seen;
 }
 
 // ------------------------------------------------------- terrain selection

@@ -561,7 +561,6 @@ INT_PTR CALLBACK OptionsProc(HWND dialog, UINT message, WPARAM wparam, LPARAM lp
       set(IDC_OPT_KEEP_STRANDED, ed.keep_stranded_units);
       set(IDC_OPT_ILLEGAL, ed.allow_illegal_placement());
       set(IDC_OPT_STACKED, ed.allow_stacked_units());
-      set(IDC_OPT_EDGE, ed.allow_edge_placement());
       set(IDC_OPT_MARK_SPECIAL, ed.mark_special_units);
       set(IDC_OPT_ALL_RACES, ed.show_all_races);
       set(IDC_OPT_UNUSED_UNITS, ed.offer_unused_units);
@@ -595,7 +594,6 @@ INT_PTR CALLBACK OptionsProc(HWND dialog, UINT message, WPARAM wparam, LPARAM lp
         ed.keep_stranded_units = get(IDC_OPT_KEEP_STRANDED);
         ed.SetAllowIllegalPlacement(get(IDC_OPT_ILLEGAL));
         ed.SetAllowStackedUnits(get(IDC_OPT_STACKED));
-        ed.SetAllowEdgePlacement(get(IDC_OPT_EDGE));
         ed.mark_special_units = get(IDC_OPT_MARK_SPECIAL);
         ed.show_all_races = get(IDC_OPT_ALL_RACES);
         ed.offer_unused_units = get(IDC_OPT_UNUSED_UNITS);

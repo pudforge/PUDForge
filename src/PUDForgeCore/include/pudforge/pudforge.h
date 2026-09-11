@@ -1322,7 +1322,8 @@ typedef enum pf_placement {
   PF_PLACE_NEEDS_SHORE = 6,    /**< a shipyard, foundry or refinery inland   */
   PF_PLACE_TOO_NEAR_MINE = 7,  /**< a town hall crowding a gold mine         */
   PF_PLACE_OCCUPIED = 8,       /**< another unit is already standing there   */
-  /** Touching the map edge, where the game will not let a unit stand. */
+  /** Retired. Nothing returns this: the outer ring is a placement the shipped
+   *  maps make 2,939 times. The value stays unused rather than reassigned. */
   PF_PLACE_ON_EDGE = 9,
   /** A ship or flying unit on an odd tile. They cover 2x2 and the game's own
    *  editor lays them on a 2x2 grid, so the tiles between are not placements
@@ -1398,8 +1399,9 @@ PF_API void pf_map_set_allow_illegal_placement(pf_map *map, int allow);
 PF_API int pf_map_allows_illegal_placement(const pf_map *map);
 PF_API void pf_map_set_allow_stacked_units(pf_map *map, int allow);
 PF_API int pf_map_allows_stacked_units(const pf_map *map);
-PF_API void pf_map_set_allow_edge_placement(pf_map *map, int allow);
-PF_API int pf_map_allows_edge_placement(const pf_map *map);
+/* pf_map_set_allow_edge_placement and pf_map_allows_edge_placement are gone.
+ * The outer ring was never a rule the format has - 2,939 units in the shipped
+ * maps sit on it - so there is nothing left to allow. */
 
 /* ------------------------------------------------------------ clipboard */
 
@@ -2341,6 +2343,10 @@ typedef struct pf_render_options {
   int unit_filter;               /**< pf_unit_filter                         */
   int grid;                      /**< one-pixel tile grid, heavier every 8th */
   int mark_special;              /**< box resources and start locations      */
+  /** Outline every unit by its active/passive flag: green active, blue
+   *  passive. Resources are left alone, because their value is an amount and
+   *  neither state applies to one. */
+  int mark_activity;
   int vary_facing;               /**< 0 makes every unit face the same way   */
   /**
    * Pixels a tile is composed at, or 0 for `PF_TILE_PX`.

@@ -66,7 +66,6 @@ struct pf_map {
   /// of units the editor would never have let you place.
   bool allow_illegal_placement = false;
   bool allow_stacked_units = false;
-  bool allow_edge_placement = false;
 
   /// Which variations of a tile group painting may choose. PUDDraft offered
   /// the same choice as Plain / Random / Filler on its Map Brush menu.
@@ -2628,10 +2627,10 @@ int pf_map_placement_check_ex(const pf_map* map, int x, int y, int type,
       return PF_PLACE_OCCUPIED;
     }
   }
-  if (!map->allow_edge_placement &&
-      (x <= 0 || y <= 0 || x + fw >= m.width() || y + fh >= m.height())) {
-    return PF_PLACE_ON_EDGE;
-  }
+  // The outer ring is not a rule. 2,939 units in the shipped maps sit on it,
+  // so refusing it guarded against nothing the format minds and got in the way
+  // of copying a map that already does it. Bounds are still enforced above:
+  // off the map is not the same as on the edge of it.
 
   // And last the terrain, which is the one the illegal-placement hatch lifts.
   if (map->allow_illegal_placement) return PF_PLACE_OK;
@@ -2659,14 +2658,6 @@ void pf_map_set_allow_stacked_units(pf_map* map, int allow) {
 
 int pf_map_allows_stacked_units(const pf_map* map) {
   return map && map->allow_stacked_units ? 1 : 0;
-}
-
-void pf_map_set_allow_edge_placement(pf_map* map, int allow) {
-  if (map) map->allow_edge_placement = allow != 0;
-}
-
-int pf_map_allows_edge_placement(const pf_map* map) {
-  return map && map->allow_edge_placement ? 1 : 0;
 }
 
 void pf_map_set_allow_illegal_placement(pf_map* map, int allow) {
@@ -4625,6 +4616,16 @@ int pf_map_compose_region(const pf_map* map, const pf_render_options* o,
         outline_unit_px(out, width, height, *u, fw, fh, o->x0, o->y0, tile,
                         0xff00ffffu);
       }
+      // Active or passive is a number in the file and nothing on the map until
+      // something draws it. A resource has no such state - its value is an
+      // amount - so one is left unmarked rather than called passive.
+      // Through pack_rgb rather than hand-packed: this buffer is 0xAABBGGRR,
+      // so a literal written the way a colour is normally read comes out with
+      // red and blue swapped, and green survives the mistake unchanged.
+      if (o->mark_activity && !pf_unit_resource(u->type)) {
+        outline_unit_px(out, width, height, *u, fw, fh, o->x0, o->y0, tile,
+                        pack_rgb(u->value ? 0x40e040u : 0x4080ffu));
+      }
 
       pf_sprite* sprite = nullptr;
       if (o->sprites) {
@@ -4681,20 +4682,29 @@ int pf_map_compose_region(const pf_map* map, const pf_render_options* o,
   // --- grid
   if (o->grid) {
     constexpr uint32_t kLine = 0x60ffffffu;
+    // As many pixels as the tile is bigger than a classic one. A composition
+    // at 64 px a tile is scaled down before it is shown, and a one-pixel line
+    // in it falls between the samples and disappears - the grid simply stopped
+    // drawing once the Remastered artwork composed at a bigger tile.
+    const int thick = std::max(1, tile / pf::kTilePx);
     for (int col = 0; col <= o->cols; col++) {
-      const int x = std::min(col * tile, width - 1);
       const double a = ((o->x0 + col) % kGridEvery == 0) ? 0.6 : 0.28;
-      for (int y = 0; y < height; y++) {
-        uint32_t& p = out[size_t(y) * size_t(width) + size_t(x)];
-        p = blend_px(p, kLine, a);
+      for (int step = 0; step < thick; step++) {
+        const int x = std::min(col * tile + step, width - 1);
+        for (int y = 0; y < height; y++) {
+          uint32_t& p = out[size_t(y) * size_t(width) + size_t(x)];
+          p = blend_px(p, kLine, a);
+        }
       }
     }
     for (int row = 0; row <= o->rows; row++) {
-      const int y = std::min(row * tile, height - 1);
       const double a = ((o->y0 + row) % kGridEvery == 0) ? 0.6 : 0.28;
-      for (int x = 0; x < width; x++) {
-        uint32_t& p = out[size_t(y) * size_t(width) + size_t(x)];
-        p = blend_px(p, kLine, a);
+      for (int step = 0; step < thick; step++) {
+        const int y = std::min(row * tile + step, height - 1);
+        for (int x = 0; x < width; x++) {
+          uint32_t& p = out[size_t(y) * size_t(width) + size_t(x)];
+          p = blend_px(p, kLine, a);
+        }
       }
     }
   }

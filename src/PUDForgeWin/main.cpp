@@ -1373,6 +1373,31 @@ struct App : Host {
     OnMapEdited();
   }
 
+  /// Turn the selection active or passive, and say how many moved.
+  ///
+  /// The count is of what changed rather than of what was selected: a
+  /// selection that is already passive reports nothing rather than claiming
+  /// to have done work, and resources are never counted because the flag does
+  /// not apply to them.
+  void SetSelectedActivity(bool active) {
+    if (!editor.HasSelection()) {
+      OnStatus(Str(IDS_ACTIVITY_NEEDS_UNITS), false);
+      return;
+    }
+    int moved = 0;
+    for (int index : editor.selected()) {
+      pf_unit unit{};
+      if (pf_map_unit(editor.map(), index, &unit) != PF_OK) continue;
+      if (pf_unit_resource(unit.type) != 0) continue;
+      if ((unit.value != 0) != active) moved++;
+    }
+    if (!editor.SetSelectedActivity(active ? 1 : 0)) return;
+    const int one = active ? IDS_NOW_ACTIVE_ONE : IDS_NOW_PASSIVE_ONE;
+    const int many = active ? IDS_NOW_ACTIVE_MANY : IDS_NOW_PASSIVE_MANY;
+    OnStatus(Format(Plural(moved, one, many), moved), false);
+    OnMapEdited();
+  }
+
   /// Fill the two per-player submenus from the core's own names, so a colour
   /// is spelled out once rather than sixteen times in the .rc.
   void FillPlayerMenus() {
@@ -1659,6 +1684,16 @@ struct App : Host {
       case IDM_VIEW_GRID:
         editor.show_grid = !editor.show_grid;
         canvas.MarkMapChanged();
+        return true;
+
+      case IDM_VIEW_ACTIVITY:
+        editor.show_activity = !editor.show_activity;
+        canvas.MarkMapChanged();
+        return true;
+
+      case IDM_EDIT_SET_ACTIVE:
+      case IDM_EDIT_SET_PASSIVE:
+        SetSelectedActivity(id == IDM_EDIT_SET_ACTIVE);
         return true;
 
       case IDM_VIEW_ZOOM_FIT: canvas.Fit(); return true;
@@ -2063,6 +2098,14 @@ struct App : Host {
       check(IDM_VIEW_LAYER_ART + i, editor.overlay == i);
     }
     check(IDM_VIEW_GRID, editor.show_grid);
+    check(IDM_VIEW_ACTIVITY, editor.show_activity);
+    // Against whichever state the selection is already in, and neither when it
+    // is mixed - the same reading a checkbox gives a mixed group.
+    {
+      const int state = editor.SelectedActivity();
+      check(IDM_EDIT_SET_ACTIVE, state == 1);
+      check(IDM_EDIT_SET_PASSIVE, state == 0);
+    }
 
     check(IDM_VIEW_WATER, canvas.water_animated());
     check(IDM_VIEW_REACH, canvas.show_reach());

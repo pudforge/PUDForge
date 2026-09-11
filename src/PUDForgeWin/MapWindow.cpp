@@ -437,6 +437,7 @@ pf_render_options MapWindow::ComposeOptions(int x0, int y0, int cols, int rows) 
     o.unit_filter = editor_->unit_filter;
     o.grid = editor_->show_grid ? 1 : 0;
     o.mark_special = editor_->mark_special_units ? 1 : 0;
+    o.mark_activity = editor_->show_activity ? 1 : 0;
   }
   return o;
 }

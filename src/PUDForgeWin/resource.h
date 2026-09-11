@@ -42,6 +42,8 @@
 /// and these two are for when the mode is not the answer.
 #define IDM_EDIT_COPY_TERRAIN 236
 #define IDM_EDIT_COPY_UNITS   237
+#define IDM_EDIT_SET_ACTIVE   238
+#define IDM_EDIT_SET_PASSIVE  239
 
 // View
 #define IDM_VIEW_UNITS_ALL       230   /* order matches pf_unit_filter */
@@ -71,6 +73,7 @@
 /// 257 rather than a number beside the other two, which the View block has
 /// run out of; the order of these ids means nothing.
 #define IDM_VIEW_MODE_MOVEMENT   257
+#define IDM_VIEW_ACTIVITY        258
 #define IDM_VIEW_WATER           254
 /// The two pickers that open where the pointer is rather than in a panel.
 #define IDM_VIEW_QUICK_PICK      255
@@ -376,7 +379,7 @@
 #define IDC_OPT_KEEP_STRANDED 682
 #define IDC_OPT_ILLEGAL       683
 #define IDC_OPT_STACKED       684
-#define IDC_OPT_EDGE          685
+/* 685 retired: the map edge was never a rule, so there is nothing to allow */
 #define IDC_OPT_MARK_SPECIAL  686
 #define IDC_OPT_UNIT_ART      687
 #define IDC_OPT_FACING        688
