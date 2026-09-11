@@ -37,6 +37,13 @@ section therefore covers all the commits after the previous tag.
 `scripts/prep-release.ps1` collects those commits as a start. See
 `docs/releasing.md`.
 
+## 0.1.79
+
+**Fixed**
+
+- Ctrl+Shift+P opens the map properties again. Set Passive moves to
+  Ctrl+Shift+D.
+
 ## 0.1.78
 
 **New**

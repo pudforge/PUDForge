@@ -99,7 +99,7 @@ BEGIN
     // entries rather than one toggle: with a mixed selection a toggle has no
     // answer to give, and these two always do.
     MENUITEM "Set Acti&ve	Ctrl+Shift+A",  IDM_EDIT_SET_ACTIVE
-    MENUITEM "Set Passi&ve	Ctrl+Shift+P", IDM_EDIT_SET_PASSIVE
+    MENUITEM "Set Passi&ve	Ctrl+Shift+D", IDM_EDIT_SET_PASSIVE
     MENUITEM SEPARATOR
     // The two select tools. They live on the toolbar, which is a row of
     // pictures with no keys written on it, so this is where somebody finds out
@@ -336,8 +336,11 @@ BEGIN
   "I",      IDM_MAP_STATS,         VIRTKEY, CONTROL, SHIFT
   // Ctrl+A is Select All, so the pair takes Shift as well. "A" on its own
   // shows the states rather than setting one, which is the safe key to hit.
+  //
+  // D for deactivate, because Ctrl+Shift+P is Map Properties: the rest of
+  // this block is the map sheets, and P was taken before this pair existed.
   "A",      IDM_EDIT_SET_ACTIVE,   VIRTKEY, CONTROL, SHIFT
-  "P",      IDM_EDIT_SET_PASSIVE,  VIRTKEY, CONTROL, SHIFT
+  "D",      IDM_EDIT_SET_PASSIVE,  VIRTKEY, CONTROL, SHIFT
   "A",      IDM_VIEW_ACTIVITY,     VIRTKEY
   // The eight playable slots, where the hand already is. 0 is taken by zoom
   // to fit, so 9 and 10 stay menu-only.

@@ -144,6 +144,38 @@ Write-Host ""
 
 try {
 
+# ------------------------------------------------------------- accelerators
+Write-Host "accelerators"
+
+Test-Pf "no two commands claim the same key" {
+  # A duplicate is silent at run time: the table is searched in order, the
+  # first match wins and the later command simply never fires. Ctrl+Shift+P
+  # was Map Properties and Set Passive both, and the only symptom was the
+  # wrong dialog opening.
+  $rc = Join-Path (Split-Path $PSScriptRoot -Parent) 'src\PUDForgeWin\PUDForge.rc'
+  $inside = $false
+  $seen = @{}
+  $clashes = @()
+  foreach ($line in Get-Content $rc) {
+    if ($line -match '^\s*IDR_ACCELERATORS\s+ACCELERATORS') { $inside = $true; continue }
+    if (-not $inside) { continue }
+    if ($line -match '^\s*END\b') { break }
+    if ($line -match '^\s*(//|BEGIN|\s*$)') { continue }
+    if ($line -notmatch '^\s*("?[^",]+"?)\s*,\s*(\w+)\s*,\s*(.+)$') { continue }
+    $key = $Matches[1].Trim()
+    $cmd = $Matches[2].Trim()
+    $mods = ($Matches[3] -split ',' | ForEach-Object { $_.Trim().ToUpper() } |
+             Where-Object { $_ -ne 'VIRTKEY' -and $_ -ne 'ASCII' } | Sort-Object) -join '+'
+    $combo = "$mods+$key"
+    if ($seen.ContainsKey($combo)) { $clashes += "$combo is both $($seen[$combo]) and $cmd" }
+    else { $seen[$combo] = $cmd }
+  }
+  Assert-Pf ($seen.Count -gt 20) "only parsed $($seen.Count) accelerators - the parser is wrong, not the table"
+  # The join is only non-empty on failure, and Assert-Pf wants a message either
+  # way, so it gets one that reads correctly when it is never shown.
+  Assert-Pf ($clashes.Count -eq 0) (($clashes -join '; ') + " [$($seen.Count) keys checked]")
+}
+
 # --------------------------------------------------------------- the window
 Write-Host "the window"
 
